@@ -1,30 +1,233 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>SOCHO KYA HOGA - Public Gallery</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SOCHO KYA HOGA | The Vault</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;500;800&display=swap" rel="stylesheet">
     <style>
-        body { font-family: sans-serif; background-color: #1a1a1a; color: white; text-align: center; }
-        .gallery img { max-width: 300px; margin: 10px; border-radius: 8px; border: 2px solid #555; }
-        form { margin: 20px; padding: 20px; background: #333; display: inline-block; border-radius: 8px; }
-        button { background-color: #e50914; color: white; border: none; padding: 10px 15px; cursor: pointer; border-radius: 4px; }
+        /* Cinematic Dark Theme Variables */
+        :root {
+            --bg-color: #0d0d0d;
+            --accent-color: #e50914; /* Deep cinematic red */
+            --text-color: #f1f1f1;
+            --card-bg: rgba(255, 255, 255, 0.05);
+        }
+
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Header Styling */
+        header {
+            text-align: center;
+            padding: 40px 20px;
+            background: linear-gradient(180deg, rgba(0,0,0,0.9) 0%, rgba(13,13,13,1) 100%);
+            border-bottom: 1px solid #333;
+        }
+
+        header h1 {
+            font-weight: 800;
+            letter-spacing: 3px;
+            margin: 0;
+            font-size: 2.5em;
+            text-transform: uppercase;
+        }
+        
+        header span {
+            color: var(--accent-color);
+        }
+
+        /* Flash Messages */
+        .flash-messages {
+            text-align: center;
+            padding: 10px;
+            margin-bottom: 20px;
+        }
+        .success { color: #4caf50; font-weight: bold; }
+        .error { color: var(--accent-color); font-weight: bold; }
+
+        /* Upload Section (Glassmorphism) */
+        .upload-container {
+            max-width: 500px;
+            margin: 30px auto;
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        input[type="file"] {
+            margin-bottom: 20px;
+            color: #ccc;
+        }
+
+        input[type="file"]::file-selector-button {
+            background: #333;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        input[type="file"]::file-selector-button:hover {
+            background: #555;
+        }
+
+        .upload-btn {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 1em;
+            font-weight: 600;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .upload-btn:hover {
+            background-color: #ff0f1a;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(229, 9, 20, 0.4);
+        }
+
+        /* Masonry/Grid Gallery */
+        .gallery-wrapper {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            grid-gap: 20px;
+        }
+
+        .media-card {
+            position: relative;
+            overflow: hidden;
+            border-radius: 10px;
+            cursor: pointer;
+            background: #1a1a1a;
+            aspect-ratio: 1 / 1;
+        }
+
+        .media-card img, .media-card video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.4s ease, opacity 0.4s ease;
+        }
+
+        .media-card:hover img {
+            transform: scale(1.08);
+            opacity: 0.8;
+        }
+
+        /* Lightbox (Full Screen View) */
+        #lightbox {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9);
+            justify-content: center;
+            align-items: center;
+        }
+        #lightbox img {
+            max-width: 90%;
+            max-height: 90%;
+            border-radius: 5px;
+            box-shadow: 0 0 30px rgba(0,0,0,0.8);
+        }
+        .close-btn {
+            position: absolute;
+            top: 20px; right: 30px;
+            color: white; font-size: 40px;
+            cursor: pointer; font-weight: 300;
+        }
     </style>
 </head>
 <body>
-    <h1>SOCHO KYA HOGA - Public Gallery</h1>
-    
-    <!-- The Upload Form -->
-    <form action="/" method="POST" enctype="multipart/form-data">
-        <input type="file" name="photo" accept="image/*" required>
-        <button type="submit">Upload Photo</button>
-    </form>
 
-    <!-- The Image Grid -->
-    <div class="gallery">
-        {% for photo in photos %}
-            <img src="{{ url_for('static', filename='uploads/' + photo) }}" alt="Uploaded Image">
-        {% else %}
-            <p>No photos uploaded yet. Be the first!</p>
-        {% endfor %}
+    <header>
+        <h1>SOCHO KYA <span>HOGA</span></h1>
+        <p>The Cinematic Media Vault</p>
+    </header>
+
+    <div class="upload-container">
+        <!-- Display Success or Error Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <div class="flash-messages">
+              {% for category, message in messages %}
+                <div class="{{ category }}">{{ message }}</div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
+
+        <form action="/" method="POST" enctype="multipart/form-data">
+            <input type="file" name="media" accept="image/*,video/*" required>
+            <br>
+            <button type="submit" class="upload-btn">Upload to Vault</button>
+        </form>
     </div>
+
+    <div class="gallery-wrapper">
+        <div class="gallery">
+            {% for file in media_files %}
+                <div class="media-card">
+                    {% if file.endswith('.mp4') or file.endswith('.webm') %}
+                        <video controls>
+                            <source src="{{ url_for('static', filename='uploads/' + file) }}" type="video/{{ file.split('.')[-1] }}">
+                        </video>
+                    {% else %}
+                        <!-- Clicking image opens lightbox -->
+                        <img src="{{ url_for('static', filename='uploads/' + file) }}" alt="Media" onclick="openLightbox(this.src)">
+                    {% endif %}
+                </div>
+            {% else %}
+                <p style="grid-column: 1 / -1; text-align: center; color: #777;">The vault is empty. Upload your first visual.</p>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Lightbox Element -->
+    <div id="lightbox">
+        <span class="close-btn" onclick="closeLightbox()">&times;</span>
+        <img id="lightbox-img" src="">
+    </div>
+
+    <!-- JavaScript for Lightbox -->
+    <script>
+        function openLightbox(src) {
+            document.getElementById('lightbox-img').src = src;
+            document.getElementById('lightbox').style.display = 'flex';
+        }
+        function closeLightbox() {
+            document.getElementById('lightbox').style.display = 'none';
+        }
+        // Click outside the image to close
+        document.getElementById('lightbox').addEventListener('click', function(e) {
+            if (e.target !== document.getElementById('lightbox-img')) {
+                closeLightbox();
+            }
+        });
+    </script>
+
 </body>
 </html>
