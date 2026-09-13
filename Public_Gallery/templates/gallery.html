@@ -1,44 +1,131 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>{{ category }} Vault</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ category }} Vault | SOCHO KYA HOGA</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;700;900&display=swap" rel="stylesheet">
+    <style>
+        /* ALL PREMIUM CSS EMBEDDED DIRECTLY FOR GUARANTEED LOADING */
+        :root { --bg-color: #030303; --accent-color: #e50914; --text-color: #f1f1f1; --card-bg: rgba(20, 20, 20, 0.8); }
+        body { font-family: 'Montserrat', sans-serif; background: linear-gradient(135deg, #000 0%, #1a0000 100%); color: var(--text-color); margin: 0; padding: 0; min-height: 100vh; overflow-x: hidden; transition: background 0.5s; }
+
+        /* Theatre Mode */
+        body.theatre-mode { background: #000 !important; }
+        body.theatre-mode header, body.theatre-mode .upload-box, body.theatre-mode .floating-widget, body.theatre-mode .mascot, body.theatre-mode .focus-btn { opacity: 0.1; pointer-events: none; transition: 0.5s; }
+        body.theatre-mode .media-card { z-index: 100; transform: scale(1.05); box-shadow: 0 0 50px rgba(229,9,20,0.5); }
+
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+        @keyframes glow { 0% { box-shadow: 0 0 10px #e50914; } 50% { box-shadow: 0 0 30px #e50914; } 100% { box-shadow: 0 0 10px #e50914; } }
+
+        header { text-align: center; padding: 40px 20px 20px; border-bottom: 1px solid rgba(229,9,20,0.3); background: rgba(0,0,0,0.8); backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 100; transition: 0.5s;}
+        header h1 { font-weight: 900; letter-spacing: 5px; font-size: 2.5em; margin: 0; text-transform: uppercase; }
+        header span { color: var(--accent-color); }
+        .nav-links a { color: #aaa; text-decoration: none; margin: 0 15px; font-weight: bold; transition: 0.3s; }
+        .nav-links a:hover { color: var(--accent-color); }
+
+        .container { max-width: 1400px; margin: 40px auto; padding: 0 20px; animation: fadeIn 1s ease-out; }
+
+        /* Forms & Buttons */
+        .upload-box { background: var(--card-bg); padding: 30px; border-radius: 15px; border: 1px solid #333; margin-bottom: 40px; }
+        input, select, textarea { width: 100%; padding: 12px; background: rgba(0,0,0,0.7); color: white; border: 1px solid #444; border-radius: 8px; margin-bottom: 15px; font-family: inherit;}
+        input:focus, textarea:focus { border-color: var(--accent-color); outline: none; }
+        .btn { background: linear-gradient(90deg, #e50914, #8a050c); color: white; border: none; padding: 10px 20px; width: 100%; font-size: 1em; font-weight: bold; cursor: pointer; border-radius: 8px; text-transform: uppercase; transition: 0.4s; letter-spacing: 2px; }
+        .btn:hover { background: #ff0f1a; box-shadow: 0 5px 20px rgba(229, 9, 20, 0.5); }
+
+        /* Gallery */
+        .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 30px; }
+        .media-card { background: rgba(0,0,0,0.8); border-radius: 12px; overflow: hidden; border: 1px solid #222; transition: 0.4s; position: relative;}
+        .media-card:hover { border-color: var(--accent-color); box-shadow: 0 10px 25px rgba(229,9,20,0.2); }
+        .media-content { height: 250px; background: #000; display: flex; justify-content: center; align-items: center; overflow: hidden; position:relative;}
+        .media-content img, .media-content video { width: 100%; height: 100%; object-fit: cover; }
+        .card-info { padding: 20px; }
+        .card-info h3 { margin: 0 0 10px; font-size: 1.4em; letter-spacing: 1px; color: #fff; }
+        .badge { background: #e50914; font-size: 0.7em; padding: 4px 10px; border-radius: 4px; color: #fff; font-weight: bold; text-transform: uppercase;}
+
+        /* Action Bar */
+        .action-bar { display: flex; gap: 10px; margin-top: 10px; }
+        .action-btn { background: #222; border: 1px solid #444; color: white; padding: 5px 10px; border-radius: 5px; cursor: pointer; font-size: 0.9em; transition: 0.3s; flex: 1;}
+        .action-btn:hover { background: #e50914; border-color:#e50914;}
+
+        /* Comments */
+        .comments-section { margin-top: 15px; border-top: 1px solid #333; padding-top: 15px; }
+        .comment-list { max-height: 100px; overflow-y: auto; font-size: 0.9em; margin-bottom: 10px; color: #bbb; }
+        .comment-item { margin-bottom: 8px; background: rgba(255,255,255,0.05); padding: 8px; border-radius: 6px; border-left: 2px solid var(--accent-color); }
+        .comment-item strong { color: white; }
+        .comment-form { display: flex; gap: 10px; }
+
+        /* Floating Widgets */
+        .floating-widget { position: fixed; bottom: 30px; background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(15px); padding: 12px 25px; border-radius: 50px; border: 1px solid #e50914; display: flex; align-items: center; gap: 15px; z-index: 1000; animation: glow 3s infinite; }
+        .music-player { right: 30px; }
+        .ai-assistant { left: 30px; border-color: #00e5ff; cursor: pointer; animation: none;}
+        .ai-assistant:hover { box-shadow: 0 0 20px rgba(0,229,255,0.5); }
+        .floating-widget button { background: #e50914; border: none; color: white; width: 40px; height: 40px; border-radius: 50%; font-size: 1.2em; cursor: pointer; transition: 0.3s; }
+        .ai-assistant button { background: #00e5ff; }
+
+        /* AI Chat Box */
+        .ai-chat-box { display: none; position: fixed; bottom: 90px; left: 30px; width: 300px; background: rgba(10,10,10,0.95); border: 1px solid #00e5ff; border-radius: 10px; padding: 15px; z-index: 1000; box-shadow: 0 0 30px rgba(0,229,255,0.2); }
+        .ai-messages { height: 200px; overflow-y: auto; margin-bottom: 10px; font-size: 0.9em; color: #ccc;}
+        .ai-messages p { margin: 5px 0; padding: 8px; border-radius: 5px; background: #222;}
+        .ai-messages .bot { border-left: 2px solid #00e5ff; }
+        .ai-messages .user { border-right: 2px solid #e50914; text-align: right;}
+
+        /* Animated Character */
+        .mascot { position: fixed; bottom: 90px; left: 30px; font-size: 50px; z-index: 999; animation: float 4s infinite ease-in-out; cursor: pointer; }
+        
+        /* Focus Mode */
+        body.focus-mode header, body.focus-mode .upload-box, body.focus-mode .mascot, body.focus-mode .music-player, body.focus-mode .ai-assistant { display: none !important; }
+        body.focus-mode { background: #000; }
+        .focus-btn { position: fixed; top: 20px; right: 20px; background: rgba(255,255,255,0.1); color: white; border: 1px solid #555; padding: 10px; border-radius: 5px; cursor: pointer; z-index: 9999; }
+    </style>
 </head>
 <body>
-    <!-- Floating Widgets -->
+    
+    <!-- Focus Mode Button -->
+    <button id="focus-btn" class="focus-btn" onclick="toggleFocus()">Focus Mode 👁️</button>
+    
+    <!-- Mascot -->
+    <div class="mascot" onclick="pokeMascot()">🤖</div>
+
+    <!-- Music Player -->
     <div class="floating-widget music-player">
-        <audio id="bg-music" loop autoplay><source src="https://cdn.pixabay.com/download/audio/2022/05/16/audio_b2875f28ce.mp3" type="audio/mpeg"></audio>
-        <span id="music-status" style="color:white;">BGM: ON</span>
+        <audio id="bg-music" loop autoplay>
+            <source src="https://cdn.pixabay.com/download/audio/2022/05/16/audio_b2875f28ce.mp3" type="audio/mpeg">
+        </audio>
+        <span id="music-status" style="color:white; font-weight:bold;">BGM: ON</span>
         <button id="music-btn" onclick="toggleMusic()">⏸</button>
     </div>
 
     <!-- AI Assistant -->
     <div class="floating-widget ai-assistant" onclick="toggleAI()">
-        <button>🤖</button>
-        <span style="color:#00e5ff;">VAULT A.I.</span>
+        <button>🧠</button>
+        <span style="color:#00e5ff; font-weight:bold;">VAULT A.I.</span>
     </div>
 
+    <!-- AI Chat Box -->
     <div class="ai-chat-box" id="ai-chat">
         <div style="color:#00e5ff; font-weight:bold; margin-bottom:10px; border-bottom:1px solid #333; padding-bottom:5px;">VAULT A.I. SYSTEM</div>
         <div class="ai-messages" id="ai-messages">
             <p class="bot">Greetings Agent {{ session.username }}. I am the Vault Guardian. How can I assist?</p>
         </div>
         <div style="display:flex; gap:5px;">
-            <input type="text" id="ai-input" placeholder="Ask AI..." style="margin:0; padding:8px;">
-            <button class="btn" style="width:auto; padding:8px;" onclick="sendAI()">>></button>
+            <input type="text" id="ai-input" placeholder="Ask AI..." style="margin:0; padding:8px; flex:1; background:rgba(0,0,0,0.5); border:1px solid #444; color:white; border-radius:5px;">
+            <button class="btn" style="width:auto; padding:8px 15px;" onclick="sendAI()">>></button>
         </div>
     </div>
 
     <header>
         <h1>{{ category }} <span>VAULT</span></h1>
-        <div class="nav-links"><a href="/dashboard">Back to Dashboard</a></div>
+        <div class="nav-links">
+            <a href="/dashboard">Back to Dashboard</a>
+        </div>
     </header>
 
     <div class="container">
         {% with messages = get_flashed_messages(with_categories=true) %}
           {% if messages %}
             {% for category, message in messages %}
-              <div style="color: {% if category=='error' %}#ff4c4c{% else %}#4caf50{% endif %}; text-align:center; font-weight:bold; margin-bottom:15px; padding:10px; border:1px solid currentColor;">{{ message }}</div>
+              <div style="color: {% if category=='error' %}#ff4c4c{% else %}#4caf50{% endif %}; text-align:center; font-weight:bold; margin-bottom:15px; padding:10px; border:1px solid currentColor; border-radius:8px;">{{ message }}</div>
             {% endfor %}
           {% endif %}
         {% endwith %}
@@ -65,7 +152,7 @@
                 <div class="media-card" id="card-{{ item.id }}">
                     <div class="media-content">
                         {% if item.filename == 'SHAYARI_TEXT' %}
-                            <div style="padding: 20px; text-align:center; font-style:italic; font-size:1.2em;">"{{ item.prompt }}"</div>
+                            <div style="padding: 20px; text-align:center; font-style:italic; font-size:1.2em; color: #ff9800;">"{{ item.prompt }}"</div>
                         {% elif item.category == 'Video' %}
                             <video controls><source src="{{ url_for('static', filename='uploads/' + item.filename) }}"></video>
                         {% elif item.category == 'Music' %}
@@ -75,9 +162,10 @@
                                 <div style="font-size: 60px;">📄</div><div>View Doc</div>
                             </a>
                         {% else %}
-                            <img src="{{ url_for('static', filename='uploads/' + item.filename) }}">
+                            <img src="{{ url_for('static', filename='uploads/' + item.filename) }}" alt="Gallery Item">
                         {% endif %}
                     </div>
+                    
                     <div class="card-info">
                         <h3>{{ item.title }}</h3>
                         <p style="font-size: 0.8em; color: #888;">By: {{ item.uploaded_by }}</p>
@@ -86,7 +174,6 @@
                             <p style="font-size: 0.9em; color:#ccc; border-left: 2px solid #555; padding-left:10px;">{{ item.prompt }}</p>
                         {% endif %}
 
-                        <!-- Action Bar (Likes, Share, Theatre) -->
                         <div class="action-bar">
                             <button class="action-btn" onclick="likeMedia({{ item.id }})">🔥 <span id="like-{{ item.id }}">{{ item.likes }}</span></button>
                             <button class="action-btn" onclick="shareLink('{{ request.url }}')">🔗 Share</button>
@@ -98,18 +185,19 @@
                             {% endif %}
                         </div>
 
-                        <!-- Comments Section -->
                         <div class="comments-section">
                             <div class="comment-list">
                                 {% if comments.get(item.id) %}
                                     {% for comment in comments[item.id] %}
                                         <div class="comment-item"><strong>{{ comment.user_name }}:</strong> {{ comment.comment }}</div>
                                     {% endfor %}
+                                {% else %}
+                                    <i>No interactions yet.</i>
                                 {% endif %}
                             </div>
                             <form action="/comment/{{ item.id }}" method="POST" class="comment-form">
-                                <input type="text" name="comment" placeholder="Add comment..." required autocomplete="off">
-                                <button type="submit" class="btn" style="width:auto; padding: 10px;">></button>
+                                <input type="text" name="comment" placeholder="Add comment..." required autocomplete="off" style="width:70%;">
+                                <button type="submit" class="btn" style="width:30%; padding: 8px;">></button>
                             </form>
                         </div>
                     </div>
@@ -120,26 +208,56 @@
         </div>
     </div>
 
+    <!-- ALL JAVASCRIPT EMBEDDED -->
     <script>
-        // Music
+        // Focus Mode
+        function toggleFocus() {
+            document.body.classList.toggle('focus-mode');
+            let btn = document.getElementById('focus-btn');
+            if (document.body.classList.contains('focus-mode')) {
+                btn.innerText = "Exit Focus Mode";
+                btn.style.borderColor = "#e50914";
+                btn.style.color = "#e50914";
+            } else {
+                btn.innerText = "Focus Mode 👁️";
+                btn.style.borderColor = "#555";
+                btn.style.color = "white";
+            }
+        }
+
+        // Mascot
+        function pokeMascot() {
+            alert("Bloop! I am the Vault Guardian. Keep exploring!");
+        }
+
+        // Music Player
         let music = document.getElementById("bg-music");
         music.volume = 0.2;
         function toggleMusic() {
             let btn = document.getElementById("music-btn");
             let status = document.getElementById("music-status");
-            if (!music.paused) { music.pause(); btn.innerText = "▶"; status.innerText = "BGM: OFF"; } 
-            else { music.play(); btn.innerText = "⏸"; status.innerText = "BGM: ON"; }
+            if (!music.paused) { 
+                music.pause(); 
+                btn.innerText = "▶"; 
+                status.innerText = "BGM: OFF"; 
+            } else { 
+                music.play(); 
+                btn.innerText = "⏸"; 
+                status.innerText = "BGM: ON"; 
+            }
         }
-        document.body.addEventListener('click', () => { music.play(); }, { once: true });
+        document.body.addEventListener('click', () => { 
+            if(music.paused) { music.play(); } 
+        }, { once: true });
 
-        // Like System (AJAX)
+        // Like System
         function likeMedia(id) {
             fetch('/like/' + id, { method: 'POST' })
             .then(response => response.json())
             .then(data => { document.getElementById('like-' + id).innerText = data.likes; });
         }
 
-        // Share
+        // Share Link
         function shareLink(url) {
             navigator.clipboard.writeText(url);
             alert("Vault Link Copied to Clipboard!");
@@ -155,28 +273,28 @@
             }
         }
 
-        // AI Assistant Logic
+        // AI Assistant
         function toggleAI() {
             let box = document.getElementById('ai-chat');
             box.style.display = box.style.display === 'block' ? 'none' : 'block';
         }
+        
         function sendAI() {
             let input = document.getElementById('ai-input');
             let msgs = document.getElementById('ai-messages');
             if(input.value.trim() === '') return;
             
-            // Add user message
             msgs.innerHTML += `<p class="user">${input.value}</p>`;
             let query = input.value.toLowerCase();
             input.value = '';
             msgs.scrollTop = msgs.scrollHeight;
 
-            // Simple Bot Logic
             setTimeout(() => {
                 let reply = "The vault holds many secrets. Keep searching.";
                 if(query.includes('mystery') || query.includes('secret')) reply = "Ah, the mystery room. The password is known only to the creator.";
                 if(query.includes('hello') || query.includes('hi')) reply = "Greetings. I am here to assist your exploration.";
                 if(query.includes('socho')) reply = "SOCHO KYA HOGA... A question that drives us all.";
+                if(query.includes('radhe')) reply = "RADHE RADHE! 🙏 May your journey through the vault be blessed.";
                 
                 msgs.innerHTML += `<p class="bot">${reply}</p>`;
                 msgs.scrollTop = msgs.scrollHeight;
