@@ -3,93 +3,96 @@
 <head>
     <title>{{ category }} Vault</title>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;500;800&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Montserrat', sans-serif; background: #0a0a0a; color: #fff; margin: 0; transition: 0.5s;}
-        header { padding: 20px; background: #111; text-align: center; border-bottom: 1px solid #e50914;}
-        
-        .upload-box { max-width: 600px; margin: 20px auto; background: #111; padding: 20px; border-radius: 10px; border: 1px solid #333; }
-        input, textarea, select { width: 100%; padding: 10px; background: #000; color: #fff; border: 1px solid #444; border-radius: 5px; margin-bottom: 10px; }
-        .btn { background: #e50914; color: white; border: none; padding: 10px 20px; cursor: pointer; border-radius: 5px; font-weight: bold; width: 100%;}
-        
-        .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; padding: 20px; max-width: 1200px; margin: 0 auto; }
-        .media-card { background: #111; border-radius: 10px; overflow: hidden; border: 1px solid #222; }
-        .media-card img, .media-card video { width: 100%; height: 250px; object-fit: cover; }
-        .card-info { padding: 15px; }
-
-        /* Mascot */
-        .mascot { position: fixed; bottom: 20px; left: 20px; font-size: 50px; z-index: 1000; animation: float 3s infinite ease-in-out; cursor: pointer; }
-        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-15px); } }
-
-        /* AI Chat */
-        .ai-chat-box { display: none; position: fixed; bottom: 90px; left: 20px; width: 300px; background: rgba(0,0,0,0.9); border: 1px solid #00e5ff; border-radius: 10px; padding: 15px; z-index: 1000; }
-        .ai-messages { height: 200px; overflow-y: auto; color: #ccc; font-size: 0.9em; margin-bottom: 10px;}
-        .ai-messages p { padding: 8px; border-radius: 5px; background: #222; margin: 5px 0;}
-        .bot { border-left: 2px solid #00e5ff; } .user { border-right: 2px solid #e50914; text-align: right; }
-
-        /* Focus Mode UI */
-        body.focus-mode header, body.focus-mode .upload-box, body.focus-mode .mascot { display: none !important; }
-        body.focus-mode { background: #000; }
-        .focus-tools { display: none; position: fixed; top: 20px; left: 20px; background: rgba(0,0,0,0.8); padding: 15px; border: 1px solid #00e5ff; border-radius: 10px; color: #00e5ff; font-family: monospace; font-size: 1.5em; z-index: 9999; }
-        body.focus-mode .focus-tools { display: block; }
-        
-        .focus-btn { position: fixed; top: 20px; right: 20px; background: #222; color: white; border: 1px solid #555; padding: 10px; border-radius: 5px; cursor: pointer; z-index: 9999; }
-    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-
     <button id="focus-btn" class="focus-btn" onclick="toggleFocus()">Focus Mode 👁️</button>
-    <div class="mascot" onclick="toggleAI()">🤖</div>
+    <div class="mascot" onclick="toggleAI()" title="Click to chat with AI">🤖</div>
 
-    <!-- Focus Tools (Clock & Stopwatch) -->
+    <!-- Focus Tools -->
     <div class="focus-tools">
         <div id="live-clock">00:00:00</div>
         <div id="live-date" style="font-size: 0.5em; color: #aaa; margin-bottom: 10px;">Date</div>
         <hr style="border-color:#333;">
         <div id="stopwatch" style="color: #e50914;">00:00:00</div>
-        <button onclick="startStopwatch()" style="font-size:0.5em; background:#333; color:white; border:none; cursor:pointer;">Start</button>
-        <button onclick="resetStopwatch()" style="font-size:0.5em; background:#333; color:white; border:none; cursor:pointer;">Reset</button>
+        <button onclick="startStopwatch()" style="font-size:0.5em; background:#333; color:white; border:none; cursor:pointer; padding:3px 6px;">Start</button>
+        <button onclick="resetStopwatch()" style="font-size:0.5em; background:#333; color:white; border:none; cursor:pointer; padding:3px 6px;">Reset</button>
     </div>
 
-    <!-- AI Chat -->
+    <!-- AI Chat Box -->
     <div class="ai-chat-box" id="ai-chat">
-        <div style="color:#00e5ff; font-weight:bold; margin-bottom:5px;">VAULT A.I.</div>
-        <div class="ai-messages" id="ai-messages"><p class="bot">Namaste! Main aapka AI Assistant hu. Boliye, kya madad karu?</p></div>
+        <div style="color:#00e5ff; font-weight:bold; margin-bottom:5px; display:flex; justify-content:space-between;">
+            <span>VAULT A.I. GUARDIAN</span>
+            <span style="cursor:pointer;" onclick="toggleAI()">✕</span>
+        </div>
+        <div class="ai-messages" id="ai-messages"><p class="bot">Namaste Agent {{ session.username }}! Main aapki kya sahayta karu?</p></div>
         <div style="display:flex; gap:5px;">
-            <input type="text" id="ai-input" placeholder="Type in English/Hindi..." style="margin:0; padding:5px; flex:1;">
-            <button class="btn" style="width:auto; padding:5px 10px;" onclick="sendAI()">>></button>
+            <input type="text" id="ai-input" placeholder="Hinglish/English me puche..." style="margin:0; padding:6px; flex:1; font-size:0.85em;">
+            <button class="btn" style="width:auto; padding:6px 10px; font-size:0.85em;" onclick="sendAI()">>></button>
         </div>
     </div>
 
-    <header><h1>{{ category }} <span>VAULT</span></h1><a href="/dashboard" style="color:#aaa;">Back</a></header>
+    <header>
+        <h1>{{ category }} <span>VAULT</span></h1>
+        <div class="nav-links"><a href="/dashboard">Back to Dashboard</a></div>
+    </header>
 
-    <div class="upload-box">
-        <form action="/gallery/{{ category }}" method="POST" enctype="multipart/form-data">
-            <input type="text" name="title" placeholder="Title" required>
-            <input type="file" name="media" required style="color: white;">
-            <button type="submit" class="btn">Upload to {{ category }}</button>
-        </form>
-    </div>
+    <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}{% for c, m in messages %}<div style="color: green; text-align:center; margin-bottom:15px; font-weight:bold;">{{ m }}</div>{% endfor %}{% endif %}
+        {% endwith %}
 
-    <div class="gallery">
-        {% for item in media_files %}
-            <div class="media-card">
-                {% if item.category == 'Video' %}
-                    <video controls style="width:100%;"><source src="{{ url_for('static', filename='uploads/' + item.filename) }}"></video>
-                {% elif item.category == 'Music' %}
-                    <audio controls style="width:100%; margin-top:50px;"><source src="{{ url_for('static', filename='uploads/' + item.filename) }}"></audio>
+        <div class="upload-box">
+            <h2 style="margin-top:0; color:var(--accent-color);">UPLOAD NEW {{ category|upper }}</h2>
+            <form action="/gallery/{{ category }}" method="POST" enctype="multipart/form-data">
+                <input type="text" name="title" placeholder="Title" required>
+                <textarea name="prompt" placeholder="{% if category == 'Shayari' %}Write your Shayari / Quote here...{% else %}Description or Prompt{% endif %}" {% if category == 'Shayari' %}required{% endif %}></textarea>
+                {% if category != 'Shayari' %}
+                <input type="file" name="media" required style="color: white; padding: 10px 0;">
                 {% else %}
-                    <img src="{{ url_for('static', filename='uploads/' + item.filename) }}">
+                <input type="file" name="media" style="color: white; padding: 10px 0;" title="Optional background image">
                 {% endif %}
-                <div class="card-info">
-                    <h3 style="color:#e50914; margin:0;">{{ item.title }}</h3>
-                    <p style="font-size: 0.8em; color: #888;">By: {{ item.uploaded_by }}</p>
+                <button type="submit" class="btn">Submit for Approval</button>
+            </form>
+        </div>
+
+        <div class="gallery">
+            {% for item in media_files %}
+                <div class="media-card">
+                    <div class="media-content">
+                        {% if item.filename == 'SHAYARI_TEXT' %}
+                            <div style="padding: 20px; text-align:center; font-style:italic; font-size:1.2em; color: #ff9800;">"{{ item.prompt }}"</div>
+                        {% elif item.category == 'Video' %}
+                            <video controls><source src="{{ url_for('static', filename='uploads/' + item.filename) }}"></video>
+                        {% elif item.category == 'Music' %}
+                            <audio controls style="width: 85%;"><source src="{{ url_for('static', filename='uploads/' + item.filename) }}"></audio>
+                        {% elif item.category == 'Document' %}
+                            <a href="{{ url_for('static', filename='uploads/' + item.filename) }}" target="_blank" style="color:white; text-decoration:none; text-align:center;">
+                                <div style="font-size: 60px;">📄</div><div>View Doc</div>
+                            </a>
+                        {% else %}
+                            <img src="{{ url_for('static', filename='uploads/' + item.filename) }}">
+                        {% endif %}
+                    </div>
+                    <div class="card-info">
+                        <h3>{{ item.title }}</h3>
+                        <p style="font-size: 0.8em; color: #888;">By: {{ item.uploaded_by }}</p>
+                        {% if item.filename != 'SHAYARI_TEXT' and item.prompt %}
+                            <p style="font-size: 0.9em; color:#ccc;">{{ item.prompt }}</p>
+                        {% endif %}
+                        <div class="action-bar">
+                            <button class="action-btn" onclick="likeMedia({{ item.id }})">🔥 <span id="like-{{ item.id }}">{{ item.likes }}</span></button>
+                            <button class="action-btn" onclick="navigator.clipboard.writeText(window.location.href); alert('Link Copied!');">🔗 Share</button>
+                        </div>
+                    </div>
                 </div>
-            </div>
-        {% endfor %}
+            {% else %}
+                <h3 style="color: #777; text-align: center; grid-column: 1/-1;">No approved media in this vault yet.</h3>
+            {% endfor %}
+        </div>
     </div>
 
     <script>
-        // Focus Mode & Clock Logic
         function toggleFocus() { document.body.classList.toggle('focus-mode'); }
         setInterval(() => {
             let d = new Date();
@@ -110,28 +113,33 @@
         }
         function resetStopwatch() { clearInterval(swTimer); swSeconds = 0; document.getElementById('stopwatch').innerText = "00:00:00"; }
 
-        // Advanced AI Logic (Hindi/English)
         function toggleAI() { let b = document.getElementById('ai-chat'); b.style.display = b.style.display === 'block' ? 'none' : 'block'; }
+        
         function sendAI() {
             let input = document.getElementById('ai-input');
             let msgs = document.getElementById('ai-messages');
-            let query = input.value.toLowerCase();
+            let query = input.value.trim();
             if(!query) return;
-            msgs.innerHTML += `<p class="user">${input.value}</p>`;
+            msgs.innerHTML += `<p class="user">${query}</p>`;
             input.value = ''; msgs.scrollTop = msgs.scrollHeight;
 
-            setTimeout(() => {
-                let reply = "Mujhe samajh nahi aaya. Can you rephrase?";
-                if(query.includes('hi') || query.includes('hello')) reply = "Hello Agent! Kya chal raha hai?";
-                else if(query.includes('kaise ho') || query.includes('how are you')) reply = "Main ekdum theek hu! System fully operational hai. Aap batao?";
-                else if(query.includes('naam') || query.includes('name')) reply = "Mera naam Vault A.I. hai. Main SOCHO KYA HOGA ka guardian hu.";
-                else if(query.includes('kya kar') || query.includes('doing')) reply = "Main is vault ki security aur files ko monitor kar raha hu.";
-                else if(query.includes('radhe')) reply = "RADHE RADHE! 🙏 Jai Shree Krishna.";
-                else if(query.includes('photo') || query.includes('video')) reply = "Aap dashboard se kisi bhi category me jakar files dekh sakte hain.";
-                
-                msgs.innerHTML += `<p class="bot">${reply}</p>`;
+            // Fetch from separate ai_service python backend via app.py
+            fetch('/api/ai', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query: query })
+            })
+            .then(res => res.json())
+            .then(data => {
+                msgs.innerHTML += `<p class="bot">${data.reply}</p>`;
                 msgs.scrollTop = msgs.scrollHeight;
-            }, 800);
+            });
+        }
+
+        function likeMedia(id) {
+            fetch('/like/' + id, { method: 'POST' })
+            .then(res => res.json())
+            .then(data => { document.getElementById('like-' + id).innerText = data.likes; });
         }
     </script>
 </body>
