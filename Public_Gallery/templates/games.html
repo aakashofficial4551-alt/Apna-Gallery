@@ -1,12 +1,241 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>The Arcade</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ category }} Vault | SOCHO KYA HOGA</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body style="text-align: center; padding-top: 100px;">
-    <h1 style="font-size: 4em; color: #00e5ff; text-shadow: 0 0 20px #00e5ff;">THE ARCADE</h1>
-    <p style="color: #aaa; font-size: 1.5em;">Games module is currently under construction. Stay tuned!</p>
-    <br><a href="/dashboard" class="btn" style="width: 200px;">Go Back</a>
+<body>
+    
+    <!-- Focus Mode & Animated Mascot -->
+    <button id="focus-btn" class="focus-btn" onclick="toggleFocus()">Focus Mode 👁️</button>
+    <div class="mascot" onclick="pokeMascot()">🤖</div>
+
+    <!-- Floating Background Music Player -->
+    <div class="floating-widget music-player">
+        <audio id="bg-music" loop autoplay>
+            <source src="https://cdn.pixabay.com/download/audio/2022/05/16/audio_b2875f28ce.mp3" type="audio/mpeg">
+        </audio>
+        <span id="music-status" style="color:white;">BGM: ON</span>
+        <button id="music-btn" onclick="toggleMusic()">⏸</button>
+    </div>
+
+    <!-- AI Assistant Guardian -->
+    <div class="floating-widget ai-assistant" onclick="toggleAI()">
+        <button>🧠</button>
+        <span style="color:#00e5ff;">VAULT A.I.</span>
+    </div>
+
+    <!-- AI Chat Box -->
+    <div class="ai-chat-box" id="ai-chat">
+        <div style="color:#00e5ff; font-weight:bold; margin-bottom:10px; border-bottom:1px solid #333; padding-bottom:5px;">VAULT A.I. SYSTEM</div>
+        <div class="ai-messages" id="ai-messages">
+            <p class="bot">Greetings Agent {{ session.username }}. I am the Vault Guardian. How can I assist?</p>
+        </div>
+        <div style="display:flex; gap:5px;">
+            <input type="text" id="ai-input" placeholder="Ask AI..." style="margin:0; padding:8px; flex:1; background:rgba(0,0,0,0.5); border:1px solid #444; color:white; border-radius:5px;">
+            <button class="btn" style="width:auto; padding:8px 15px;" onclick="sendAI()">>></button>
+        </div>
+    </div>
+
+    <header>
+        <h1>{{ category }} <span>VAULT</span></h1>
+        <div class="nav-links">
+            <a href="/dashboard">Back to Dashboard</a>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div style="color: {% if category=='error' %}#ff4c4c{% else %}#4caf50{% endif %}; text-align:center; font-weight:bold; margin-bottom:15px; padding:10px; border:1px solid currentColor; border-radius:8px;">{{ message }}</div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        <!-- Upload Form -->
+        <div class="upload-box">
+            <h2 style="margin-top:0; color:var(--accent-color);">UPLOAD NEW {{ category|upper }}</h2>
+            <form action="/gallery/{{ category }}" method="POST" enctype="multipart/form-data">
+                <input type="text" name="title" placeholder="Title" required>
+                <textarea name="prompt" placeholder="{% if category == 'Shayari' %}Write your Shayari / Quote here...{% else %}Optional: Description or Prompt{% endif %}" {% if category == 'Shayari' %}required{% endif %}></textarea>
+                
+                {% if category != 'Shayari' %}
+                <input type="file" name="media" required style="color: white; padding: 10px 0;">
+                {% else %}
+                <input type="file" name="media" style="color: white; padding: 10px 0;" title="Optional background image">
+                <p style="font-size:0.8em; color:#777; margin-top:-10px;">(Image is optional for Shayari)</p>
+                {% endif %}
+                
+                <button type="submit" class="btn">Submit for Approval</button>
+            </form>
+        </div>
+
+        <!-- Media Gallery -->
+        <div class="gallery">
+            {% for item in media_files %}
+                <div class="media-card" id="card-{{ item.id }}">
+                    <div class="media-content">
+                        {% if item.filename == 'SHAYARI_TEXT' %}
+                            <div style="padding: 20px; text-align:center; font-style:italic; font-size:1.2em; color: #ff9800;">"{{ item.prompt }}"</div>
+                        {% elif item.category == 'Video' %}
+                            <video controls><source src="{{ url_for('static', filename='uploads/' + item.filename) }}"></video>
+                        {% elif item.category == 'Music' %}
+                            <audio controls style="width: 85%;"><source src="{{ url_for('static', filename='uploads/' + item.filename) }}"></audio>
+                        {% elif item.category == 'Document' %}
+                            <a href="{{ url_for('static', filename='uploads/' + item.filename) }}" target="_blank" style="color:white; text-decoration:none; text-align:center;">
+                                <div style="font-size: 60px;">📄</div><div>View Doc</div>
+                            </a>
+                        {% else %}
+                            <img src="{{ url_for('static', filename='uploads/' + item.filename) }}" alt="Gallery Item">
+                        {% endif %}
+                    </div>
+                    
+                    <div class="card-info">
+                        <h3>{{ item.title }}</h3>
+                        <p style="font-size: 0.8em; color: #888;">By: {{ item.uploaded_by }}</p>
+                        
+                        {% if item.filename != 'SHAYARI_TEXT' and item.prompt %}
+                            <p style="font-size: 0.9em; color:#ccc; border-left: 2px solid #555; padding-left:10px;">{{ item.prompt }}</p>
+                        {% endif %}
+
+                        <!-- Action Bar (Likes, Share, Theatre, Delete) -->
+                        <div class="action-bar">
+                            <button class="action-btn" onclick="likeMedia({{ item.id }})">🔥 <span id="like-{{ item.id }}">{{ item.likes }}</span></button>
+                            <button class="action-btn" onclick="shareLink('{{ request.url }}')">🔗 Share</button>
+                            
+                            {% if item.category in ['Video', 'Photo'] %}
+                            <button class="action-btn" onclick="toggleTheatre(this)">🎬 Theatre</button>
+                            {% endif %}
+                            
+                            {% if session.is_admin %}
+                                <a href="/delete/{{ item.id }}" class="action-btn" style="background:red; border:none; text-align:center; text-decoration:none;">Del</a>
+                            {% endif %}
+                        </div>
+
+                        <!-- Comments Section -->
+                        <div class="comments-section">
+                            <div class="comment-list">
+                                {% if comments.get(item.id) %}
+                                    {% for comment in comments[item.id] %}
+                                        <div class="comment-item"><strong>{{ comment.user_name }}:</strong> {{ comment.comment }}</div>
+                                    {% endfor %}
+                                {% else %}
+                                    <i>No interactions yet.</i>
+                                {% endif %}
+                            </div>
+                            <form action="/comment/{{ item.id }}" method="POST" class="comment-form">
+                                <input type="text" name="comment" placeholder="Add comment..." required autocomplete="off" style="width:70%;">
+                                <button type="submit" class="btn" style="width:30%; padding: 8px;">></button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            {% else %}
+                <h3 style="color: #777; text-align: center; grid-column: 1/-1;">No approved media in this vault yet.</h3>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- ALL JAVASCRIPT DIRECTLY IN FILE -->
+    <script>
+        // --- FOCUS MODE ---
+        function toggleFocus() {
+            document.body.classList.toggle('focus-mode');
+            let btn = document.getElementById('focus-btn');
+            if (document.body.classList.contains('focus-mode')) {
+                btn.innerText = "Exit Focus Mode";
+                btn.style.borderColor = "#e50914";
+                btn.style.color = "#e50914";
+            } else {
+                btn.innerText = "Focus Mode 👁️";
+                btn.style.borderColor = "#555";
+                btn.style.color = "white";
+            }
+        }
+
+        // --- MASCOT ---
+        function pokeMascot() {
+            alert("Bloop! I am the Vault Guardian. Keep exploring!");
+        }
+
+        // --- MUSIC PLAYER ---
+        let music = document.getElementById("bg-music");
+        music.volume = 0.2;
+        function toggleMusic() {
+            let btn = document.getElementById("music-btn");
+            let status = document.getElementById("music-status");
+            if (!music.paused) { 
+                music.pause(); 
+                btn.innerText = "▶"; 
+                status.innerText = "BGM: OFF"; 
+            } else { 
+                music.play(); 
+                btn.innerText = "⏸"; 
+                status.innerText = "BGM: ON"; 
+            }
+        }
+        // Play music on first click anywhere
+        document.body.addEventListener('click', () => { 
+            if(music.paused) { music.play(); } 
+        }, { once: true });
+
+        // --- LIKE SYSTEM ---
+        function likeMedia(id) {
+            fetch('/like/' + id, { method: 'POST' })
+            .then(response => response.json())
+            .then(data => { document.getElementById('like-' + id).innerText = data.likes; });
+        }
+
+        // --- SHARE LINK ---
+        function shareLink(url) {
+            navigator.clipboard.writeText(url);
+            alert("Vault Link Copied to Clipboard!");
+        }
+
+        // --- THEATRE MODE ---
+        function toggleTheatre(btn) {
+            document.body.classList.toggle('theatre-mode');
+            if(document.body.classList.contains('theatre-mode')){
+                btn.innerText = "💡 Lights On";
+            } else {
+                btn.innerText = "🎬 Theatre";
+            }
+        }
+
+        // --- AI ASSISTANT ---
+        function toggleAI() {
+            let box = document.getElementById('ai-chat');
+            box.style.display = box.style.display === 'block' ? 'none' : 'block';
+        }
+        
+        function sendAI() {
+            let input = document.getElementById('ai-input');
+            let msgs = document.getElementById('ai-messages');
+            if(input.value.trim() === '') return;
+            
+            // User Message Show
+            msgs.innerHTML += `<p class="user">${input.value}</p>`;
+            let query = input.value.toLowerCase();
+            input.value = '';
+            msgs.scrollTop = msgs.scrollHeight;
+
+            // AI Reply Logic
+            setTimeout(() => {
+                let reply = "The vault holds many secrets. Keep searching.";
+                if(query.includes('mystery') || query.includes('secret')) reply = "Ah, the mystery room. The password is known only to the creator.";
+                if(query.includes('hello') || query.includes('hi')) reply = "Greetings. I am here to assist your exploration.";
+                if(query.includes('socho')) reply = "SOCHO KYA HOGA... A question that drives us all.";
+                if(query.includes('radhe')) reply = "RADHE RADHE! 🙏 May your journey through the vault be blessed.";
+                
+                msgs.innerHTML += `<p class="bot">${reply}</p>`;
+                msgs.scrollTop = msgs.scrollHeight;
+            }, 1000);
+        }
+    </script>
 </body>
 </html>
