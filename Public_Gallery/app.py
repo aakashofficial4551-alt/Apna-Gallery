@@ -7,9 +7,10 @@ app = Flask(__name__)
 app.secret_key = "socho_kya_hoga_secret_key_123"
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
 
-# Added Audio and Documents extensions
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'mp4', 'webm', 'mp3', 'wav', 'pdf', 'txt', 'docx'}
 ADMIN_PASSCODE = "12345"
+# MYSTERY ROOM PASSWORD
+MYSTERY_CODE = "SOCHO" 
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
@@ -20,23 +21,8 @@ def get_db_connection():
 
 def init_db():
     conn = get_db_connection()
-    # Media Table
-    conn.execute('''CREATE TABLE IF NOT EXISTS media (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        filename TEXT NOT NULL,
-                        title TEXT,
-                        category TEXT,
-                        prompt TEXT,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )''')
-    # Comments Table
-    conn.execute('''CREATE TABLE IF NOT EXISTS comments (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        media_id INTEGER,
-                        user_name TEXT,
-                        comment TEXT,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )''')
+    conn.execute('''CREATE TABLE IF NOT EXISTS media (id INTEGER PRIMARY KEY AUTOINCREMENT, filename TEXT, title TEXT, category TEXT, prompt TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+    conn.execute('''CREATE TABLE IF NOT EXISTS comments (id INTEGER PRIMARY KEY AUTOINCREMENT, media_id INTEGER, user_name TEXT, comment TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     conn.commit()
     conn.close()
 
@@ -45,44 +31,30 @@ init_db()
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-@app.route('/login', methods=['POST'])
+# 1. Login Route
+@app.route('/login', methods=['GET', 'POST'])
 def login():
-    session['username'] = request.form.get('username')
-    return redirect(url_for('index'))
+    if request.method == 'POST':
+        session['username'] = request.form.get('username')
+        return redirect(url_for('index'))
+    return render_template('login.html')
 
 @app.route('/logout')
 def logout():
     session.pop('username', None)
-    return redirect(url_for('index'))
+    return redirect(url_for('login'))
 
-@app.route('/', methods=['GET', 'POST'])
+# 2. Main Gallery Route
+@app.route('/')
 def index():
-    if request.method == 'POST' and 'media' in request.files:
-        file = request.files['media']
-        title = request.form.get('title', 'Untitled')
-        category = request.form.get('category', 'Photo')
-        prompt = request.form.get('prompt', '')
-
-        if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-            
-            conn = get_db_connection()
-            conn.execute('INSERT INTO media (filename, title, category, prompt) VALUES (?, ?, ?, ?)',
-                         (filename, title, category, prompt))
-            conn.commit()
-            conn.close()
-            flash('File added successfully!', 'success')
-            return redirect(url_for('index'))
-        else:
-            flash('Invalid format!', 'error')
-
+    if 'username' not in session:
+        return redirect(url_for('login'))
+        
     conn = get_db_connection()
     media_files = conn.execute('SELECT * FROM media ORDER BY created_at DESC').fetchall()
     comments_db = conn.execute('SELECT * FROM comments ORDER BY created_at ASC').fetchall()
     conn.close()
 
-    # Group comments by media_id
     comments = {}
     for c in comments_db:
         if c['media_id'] not in comments:
@@ -91,37 +63,45 @@ def index():
 
     return render_template('index.html', media_files=media_files, comments=comments)
 
+# 3. Upload Route
+@app.route('/upload', methods=['POST'])
+def upload():
+    if 'username' not in session: return redirect(url_for('login'))
+    
+    file = request.files['media']
+    if file and allowed_file(file.filename):
+        filename = secure_filename(file.filename)
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        
+        conn = get_db_connection()
+        conn.execute('INSERT INTO media (filename, title, category) VALUES (?, ?, ?)',
+                     (filename, request.form.get('title'), request.form.get('category')))
+        conn.commit()
+        conn.close()
+        flash('File added successfully!', 'success')
+    else:
+        flash('Invalid format!', 'error')
+    return redirect(url_for('index'))
+
+# 4. Comments Route
 @app.route('/comment/<int:media_id>', methods=['POST'])
 def add_comment(media_id):
-    if 'username' not in session:
-        flash('Enter your name first!', 'error')
-        return redirect(url_for('index'))
-        
-    comment_text = request.form.get('comment')
-    if comment_text:
+    if 'username' in session:
         conn = get_db_connection()
         conn.execute('INSERT INTO comments (media_id, user_name, comment) VALUES (?, ?, ?)',
-                     (media_id, session['username'], comment_text))
+                     (media_id, session['username'], request.form.get('comment')))
         conn.commit()
         conn.close()
     return redirect(url_for('index'))
 
-@app.route('/delete/<int:id>', methods=['POST'])
-def delete(id):
-    passcode = request.form.get('passcode')
-    if passcode == ADMIN_PASSCODE:
-        conn = get_db_connection()
-        item = conn.execute('SELECT * FROM media WHERE id = ?', (id,)).fetchone()
-        if item:
-            try:
-                os.remove(os.path.join(app.config['UPLOAD_FOLDER'], item['filename']))
-            except:
-                pass
-            conn.execute('DELETE FROM media WHERE id = ?', (id,))
-            conn.execute('DELETE FROM comments WHERE media_id = ?', (id,))
-            conn.commit()
-        conn.close()
-    return redirect(url_for('index'))
+# 5. Mystery Room Route
+@app.route('/mystery', methods=['POST'])
+def mystery():
+    if request.form.get('passcode') == MYSTERY_CODE:
+        return render_template('mystery.html')
+    else:
+        flash('ACCESS DENIED: Incorrect Mystery Code', 'error')
+        return redirect(url_for('index'))
 
 if __name__ == '__main__':
     app.run(debug=True)
