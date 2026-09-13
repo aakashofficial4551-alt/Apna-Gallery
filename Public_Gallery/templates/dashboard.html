@@ -2,27 +2,55 @@
 <html lang="en">
 <head>
     <title>HQ Dashboard</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;500;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Montserrat', sans-serif; background: #000; color: #fff; margin: 0; padding: 0; }
+        header { text-align: center; padding: 20px; background: #111; border-bottom: 1px solid #e50914; }
+        .nav-links a { color: #aaa; margin: 0 15px; text-decoration: none; font-weight: bold; }
+        .nav-links a:hover { color: #e50914; }
+        
+        /* 5 Category Boxes Layout */
+        .container { max-width: 1200px; margin: 40px auto; padding: 20px; }
+        .grid-5 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 40px;}
+        .card { background: #111; height: 180px; display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 15px; border: 1px solid #333; text-decoration: none; color: white; transition: 0.4s; }
+        .card:hover { transform: translateY(-5px); border-color: #e50914; box-shadow: 0 10px 20px rgba(229,9,20,0.3); background: rgba(229,9,20,0.1); }
+        .card h2 { margin: 0; font-size: 1.5em; }
+        
+        .games-banner { background: linear-gradient(45deg, #00e5ff, #0055ff); border-radius: 15px; padding: 40px; text-align: center; text-decoration: none; color: white; display: block; font-size: 2em; font-weight: 800; transition: 0.4s; }
+        .games-banner:hover { transform: scale(1.02); box-shadow: 0 0 30px rgba(0,229,255,0.5); }
+    </style>
 </head>
 <body>
     <header>
-        <h1>SOCHO KYA <span>HOGA</span></h1>
+        <h1 style="color:#e50914; letter-spacing: 3px;">SOCHO KYA HOGA</h1>
         <div class="nav-links">
-            <span>Agent {{ session.username }}</span>
-            {% if session.is_registered %}<a href="/profile">My Profile</a>{% endif %}
+            <a href="/profile">My Profile 👤</a>
             <a href="/logout">Logout</a>
         </div>
     </header>
 
-    <div class="container" style="display: flex; gap: 40px; justify-content: center; margin-top: 100px;">
-        <a href="/gallery/Photo" class="dash-card" style="width: 400px; height: 300px; background: linear-gradient(135deg, rgba(229,9,20,0.2), transparent);">
-            <h2 style="font-size: 3em;">📂 THE VAULT</h2>
-            <p>Access Photos, Videos & Docs</p>
-        </a>
-        <a href="/games" class="dash-card" style="width: 400px; height: 300px; background: linear-gradient(135deg, rgba(0,229,255,0.2), transparent); border-color: #00e5ff;">
-            <h2 style="font-size: 3em; color: #00e5ff;">🎮 THE ARCADE</h2>
-            <p>Play Exclusive Games</p>
-        </a>
+    <div class="container">
+        <h2 style="text-align: center; color: #888; font-weight: 300; margin-bottom: 30px;">VAULT CATEGORIES</h2>
+        
+        <div class="grid-5">
+            <a href="/gallery/Photo" class="card"><h2>📸 Photo</h2></a>
+            <a href="/gallery/Video" class="card"><h2>🎥 Video</h2></a>
+            <a href="/gallery/Music" class="card"><h2>🎵 Music</h2></a>
+            <a href="/gallery/Document" class="card"><h2>📄 Document</h2></a>
+            <div class="card" style="border-color: #8a2be2;" onclick="askMystery()">
+                <h2 style="color: #d4a5ff;">🔒 Mystery</h2>
+            </div>
+        </div>
+
+        <a href="/games" class="games-banner">🎮 ENTER ARCADE ZONE</a>
     </div>
+
+    <form id="mystery-form" action="/mystery" method="POST" style="display:none;"><input type="hidden" name="passcode" id="mystery-pass"></form>
+    <script>
+        function askMystery() {
+            let pass = prompt("CLASSIFIED AREA: Enter Secret Code:");
+            if (pass) { document.getElementById('mystery-pass').value = pass; document.getElementById('mystery-form').submit(); }
+        }
+    </script>
 </body>
 </html>
