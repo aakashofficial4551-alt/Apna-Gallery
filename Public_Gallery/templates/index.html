@@ -6,170 +6,55 @@
     <title>SOCHO KYA HOGA | The Vault</title>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;500;800&display=swap" rel="stylesheet">
     <style>
-        /* Cinematic Dark Theme Variables */
-        :root {
-            --bg-color: #0d0d0d;
-            --accent-color: #e50914; /* Deep cinematic red */
-            --text-color: #f1f1f1;
-            --card-bg: rgba(255, 255, 255, 0.05);
-        }
-
-        body {
-            font-family: 'Montserrat', sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            margin: 0;
-            padding: 0;
-        }
-
-        /* Header Styling */
-        header {
-            text-align: center;
-            padding: 40px 20px;
-            background: linear-gradient(180deg, rgba(0,0,0,0.9) 0%, rgba(13,13,13,1) 100%);
-            border-bottom: 1px solid #333;
-        }
-
-        header h1 {
-            font-weight: 800;
-            letter-spacing: 3px;
-            margin: 0;
-            font-size: 2.5em;
-            text-transform: uppercase;
-        }
+        :root { --bg-color: #050505; --accent-color: #e50914; --text-color: #f1f1f1; --card-bg: rgba(255, 255, 255, 0.05); }
+        body { font-family: 'Montserrat', sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 0; }
+        header { text-align: center; padding: 50px 20px; background: linear-gradient(180deg, rgba(20,0,0,0.9) 0%, var(--bg-color) 100%); border-bottom: 1px solid #222; }
+        header h1 { font-weight: 800; letter-spacing: 4px; margin: 0; font-size: 3em; text-transform: uppercase; }
+        header span { color: var(--accent-color); }
         
-        header span {
-            color: var(--accent-color);
-        }
+        .upload-container { max-width: 600px; margin: -30px auto 30px; background: var(--card-bg); padding: 30px; border-radius: 15px; backdrop-filter: blur(15px); border: 1px solid rgba(255,0,0,0.2); box-shadow: 0 10px 40px rgba(0,0,0,0.8); position: relative; z-index: 10; }
+        .form-group { margin-bottom: 15px; text-align: left; }
+        input[type="text"], select, textarea { width: 100%; padding: 12px; background: #111; color: white; border: 1px solid #333; border-radius: 5px; box-sizing: border-box; font-family: inherit; }
+        textarea { resize: vertical; height: 80px; }
+        .upload-btn { background-color: var(--accent-color); color: white; border: none; padding: 12px; width: 100%; font-size: 1.1em; font-weight: bold; border-radius: 5px; cursor: pointer; transition: 0.3s; text-transform: uppercase; }
+        .upload-btn:hover { background-color: #ff0f1a; box-shadow: 0 0 20px rgba(229, 9, 20, 0.5); }
+        
+        .filters { text-align: center; margin: 30px 0; }
+        .filter-btn { background: transparent; border: 1px solid #555; color: #aaa; padding: 8px 20px; margin: 0 5px; border-radius: 20px; cursor: pointer; transition: 0.3s; }
+        .filter-btn:hover, .filter-btn.active { border-color: var(--accent-color); color: white; background: rgba(229, 9, 20, 0.1); }
 
-        /* Flash Messages */
-        .flash-messages {
-            text-align: center;
-            padding: 10px;
-            margin-bottom: 20px;
-        }
-        .success { color: #4caf50; font-weight: bold; }
-        .error { color: var(--accent-color); font-weight: bold; }
+        .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; padding: 20px; max-width: 1400px; margin: 0 auto; }
+        .media-card { position: relative; border-radius: 8px; overflow: hidden; background: #111; border: 1px solid #222; }
+        .media-card img, .media-card video { width: 100%; height: 300px; object-fit: cover; display: block; cursor: pointer; transition: 0.5s; }
+        .media-card:hover img { transform: scale(1.05); opacity: 0.7; }
+        .card-info { padding: 15px; }
+        .card-info h3 { margin: 0 0 5px; font-size: 1.1em; color: var(--accent-color); }
+        .card-info span { font-size: 0.8em; color: #777; background: #222; padding: 3px 8px; border-radius: 3px; }
+        
+        .delete-form { margin-top: 15px; display: flex; gap: 10px; }
+        .delete-form input { flex: 1; padding: 5px; font-size: 0.8em; }
+        .delete-form button { background: #444; color: white; border: none; padding: 5px 10px; cursor: pointer; border-radius: 3px; }
+        .delete-form button:hover { background: red; }
 
-        /* Upload Section (Glassmorphism) */
-        .upload-container {
-            max-width: 500px;
-            margin: 30px auto;
-            background: var(--card-bg);
-            padding: 30px;
-            border-radius: 15px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255,255,255,0.1);
-            text-align: center;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-        }
+        .flash-messages { text-align: center; color: #4caf50; font-weight: bold; margin-bottom: 15px; }
+        .error { color: var(--accent-color); }
 
-        input[type="file"] {
-            margin-bottom: 20px;
-            color: #ccc;
-        }
-
-        input[type="file"]::file-selector-button {
-            background: #333;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: background 0.3s;
-        }
-
-        input[type="file"]::file-selector-button:hover {
-            background: #555;
-        }
-
-        .upload-btn {
-            background-color: var(--accent-color);
-            color: white;
-            border: none;
-            padding: 12px 30px;
-            font-size: 1em;
-            font-weight: 600;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .upload-btn:hover {
-            background-color: #ff0f1a;
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(229, 9, 20, 0.4);
-        }
-
-        /* Masonry/Grid Gallery */
-        .gallery-wrapper {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-
-        .gallery {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-            grid-gap: 20px;
-        }
-
-        .media-card {
-            position: relative;
-            overflow: hidden;
-            border-radius: 10px;
-            cursor: pointer;
-            background: #1a1a1a;
-            aspect-ratio: 1 / 1;
-        }
-
-        .media-card img, .media-card video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            transition: transform 0.4s ease, opacity 0.4s ease;
-        }
-
-        .media-card:hover img {
-            transform: scale(1.08);
-            opacity: 0.8;
-        }
-
-        /* Lightbox (Full Screen View) */
-        #lightbox {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9);
-            justify-content: center;
-            align-items: center;
-        }
-        #lightbox img {
-            max-width: 90%;
-            max-height: 90%;
-            border-radius: 5px;
-            box-shadow: 0 0 30px rgba(0,0,0,0.8);
-        }
-        .close-btn {
-            position: absolute;
-            top: 20px; right: 30px;
-            color: white; font-size: 40px;
-            cursor: pointer; font-weight: 300;
-        }
+        /* Lightbox */
+        #lightbox { display: none; position: fixed; z-index: 1000; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); justify-content: center; align-items: center; flex-direction: column; }
+        #lightbox img { max-width: 80%; max-height: 70vh; border-radius: 5px; box-shadow: 0 0 50px rgba(229,9,20,0.2); }
+        #lb-text { color: white; max-width: 80%; margin-top: 20px; text-align: center; font-size: 1.1em; line-height: 1.5; }
+        .close-btn { position: absolute; top: 20px; right: 40px; color: white; font-size: 50px; cursor: pointer; font-weight: 100; transition: 0.3s; }
+        .close-btn:hover { color: var(--accent-color); }
     </style>
 </head>
 <body>
 
     <header>
         <h1>SOCHO KYA <span>HOGA</span></h1>
-        <p>The Cinematic Media Vault</p>
+        <p>Advanced Media & Prompt Vault</p>
     </header>
 
     <div class="upload-container">
-        <!-- Display Success or Error Messages -->
         {% with messages = get_flashed_messages(with_categories=true) %}
           {% if messages %}
             <div class="flash-messages">
@@ -181,53 +66,96 @@
         {% endwith %}
 
         <form action="/" method="POST" enctype="multipart/form-data">
-            <input type="file" name="media" accept="image/*,video/*" required>
-            <br>
+            <div class="form-group">
+                <input type="text" name="title" placeholder="Project Title" required>
+            </div>
+            <div class="form-group">
+                <select name="category">
+                    <option value="Cinematic">Cinematic</option>
+                    <option value="Anime">Anime Romance / Art</option>
+                    <option value="Horror">Horror / Dark Theme</option>
+                    <option value="Cyberpunk">Cyberpunk / Sci-Fi</option>
+                    <option value="Vlog">Vlog / Podcast</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <textarea name="prompt" placeholder="Enter your detailed scene script, AI generation prompt, or story context here..."></textarea>
+            </div>
+            <div class="form-group">
+                <input type="file" name="media" accept="image/*,video/*" required style="color: white;">
+            </div>
             <button type="submit" class="upload-btn">Upload to Vault</button>
         </form>
     </div>
 
-    <div class="gallery-wrapper">
-        <div class="gallery">
-            {% for file in media_files %}
-                <div class="media-card">
-                    {% if file.endswith('.mp4') or file.endswith('.webm') %}
-                        <video controls>
-                            <source src="{{ url_for('static', filename='uploads/' + file) }}" type="video/{{ file.split('.')[-1] }}">
-                        </video>
-                    {% else %}
-                        <!-- Clicking image opens lightbox -->
-                        <img src="{{ url_for('static', filename='uploads/' + file) }}" alt="Media" onclick="openLightbox(this.src)">
-                    {% endif %}
-                </div>
-            {% else %}
-                <p style="grid-column: 1 / -1; text-align: center; color: #777;">The vault is empty. Upload your first visual.</p>
-            {% endfor %}
-        </div>
+    <div class="filters">
+        <button class="filter-btn active" onclick="filterMedia('All')">All</button>
+        <button class="filter-btn" onclick="filterMedia('Cinematic')">Cinematic</button>
+        <button class="filter-btn" onclick="filterMedia('Anime')">Anime</button>
+        <button class="filter-btn" onclick="filterMedia('Horror')">Horror</button>
+        <button class="filter-btn" onclick="filterMedia('Cyberpunk')">Cyberpunk</button>
+        <button class="filter-btn" onclick="filterMedia('Vlog')">Vlog</button>
     </div>
 
-    <!-- Lightbox Element -->
+    <div class="gallery">
+        {% for item in media_files %}
+            <div class="media-card" data-category="{{ item.category }}">
+                {% if item.filename.endswith('.mp4') or item.filename.endswith('.webm') %}
+                    <video controls>
+                        <source src="{{ url_for('static', filename='uploads/' + item.filename) }}" type="video/{{ item.filename.split('.')[-1] }}">
+                    </video>
+                {% else %}
+                    <img src="{{ url_for('static', filename='uploads/' + item.filename) }}" 
+                         onclick="openLightbox(this.src, '{{ item.prompt | replace('\n', '\\n') | replace('\'', '\\\'') }}')">
+                {% endif %}
+                <div class="card-info">
+                    <h3>{{ item.title }}</h3>
+                    <span>{{ item.category }}</span>
+                    
+                    <!-- Admin Delete Form -->
+                    <form action="{{ url_for('delete', id=item.id) }}" method="POST" class="delete-form">
+                        <input type="password" name="passcode" placeholder="Admin PIN" required>
+                        <button type="submit">Delete</button>
+                    </form>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+
     <div id="lightbox">
         <span class="close-btn" onclick="closeLightbox()">&times;</span>
         <img id="lightbox-img" src="">
+        <div id="lb-text"></div>
     </div>
 
-    <!-- JavaScript for Lightbox -->
     <script>
-        function openLightbox(src) {
+        function openLightbox(src, prompt) {
             document.getElementById('lightbox-img').src = src;
+            document.getElementById('lb-text').innerText = prompt ? "Prompt / Script: " + prompt : "";
             document.getElementById('lightbox').style.display = 'flex';
         }
         function closeLightbox() {
             document.getElementById('lightbox').style.display = 'none';
         }
-        // Click outside the image to close
         document.getElementById('lightbox').addEventListener('click', function(e) {
-            if (e.target !== document.getElementById('lightbox-img')) {
-                closeLightbox();
-            }
+            if (e.target !== document.getElementById('lightbox-img')) closeLightbox();
         });
-    </script>
 
+        function filterMedia(category) {
+            let cards = document.querySelectorAll('.media-card');
+            let btns = document.querySelectorAll('.filter-btn');
+            
+            btns.forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+
+            cards.forEach(card => {
+                if (category === 'All' || card.getAttribute('data-category') === category) {
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        }
+    </script>
 </body>
 </html>
