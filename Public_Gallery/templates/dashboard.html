@@ -1,1 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Dashboard | SOCHO KYA HOGA</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <header>
+        <h1>SOCHO KYA <span>HOGA</span></h1>
+        <div class="nav-links">
+            <span>Welcome, {{ session.username }} (Age: {{ session.age }})</span>
+            <a href="/admin">Admin Panel</a>
+            <a href="/logout">Logout</a>
+        </div>
+    </header>
 
+    <div class="container">
+        <h2 style="text-align: center; color: #aaa; margin-bottom: 40px; font-weight: 300;">CHOOSE YOUR INTEL CATEGORY</h2>
+        <div class="dash-grid">
+            <a href="/gallery/Photo" class="dash-card"><h2>📸 PHOTOS</h2><p>Visual Evidence</p></a>
+            <a href="/gallery/Video" class="dash-card" style="animation-delay: 0.2s;"><h2>🎥 VIDEOS</h2><p>Motion Records</p></a>
+            <a href="/gallery/Music" class="dash-card" style="animation-delay: 0.4s;"><h2>🎵 MUSIC</h2><p>Audio Files</p></a>
+            <a href="/gallery/Document" class="dash-card" style="animation-delay: 0.6s;"><h2>📄 DOCS</h2><p>Classified Intel</p></a>
+            <div class="dash-card" style="border-color: #8a2be2; animation-delay: 0.8s;" onclick="askMystery()">
+                <h2 style="color: #d4a5ff;">🔒 MYSTERY</h2><p>Highly Classified</p>
+            </div>
+        </div>
+    </div>
+    
+    <form id="mystery-form" action="/mystery" method="POST" style="display:none;">
+        <input type="hidden" name="passcode" id="mystery-pass">
+    </form>
+
+    <script>
+        function askMystery() {
+            let pass = prompt("WARNING: Classified Area.\nEnter Secret Code:");
+            if (pass) {
+                document.getElementById('mystery-pass').value = pass;
+                document.getElementById('mystery-form').submit(); 
+            }
+        }
+    </script>
+</body>
+</html>
