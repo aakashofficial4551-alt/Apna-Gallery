@@ -1,58 +1,58 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>Admin HQ | SOCHO KYA HOGA</title>
+    <title>Admin Approvals | Sky Blue</title>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;500;800&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Montserrat', sans-serif; background: #000; color: #fff; margin: 0; }
-        header { padding: 20px; background: #111; text-align: center; border-bottom: 2px solid #e50914;}
+        body { font-family: 'Montserrat', sans-serif; background: #e0f7fa; color: #333; margin: 0; }
+        header { padding: 20px; background: #fff; text-align: center; border-bottom: 3px solid #00b4d8;}
         .container { max-width: 900px; margin: 40px auto; padding: 20px; }
         
-        .auth-box { background: #111; padding: 40px; border-radius: 10px; border: 1px solid #e50914; text-align: center; max-width: 400px; margin: 0 auto; box-shadow: 0 0 30px rgba(229,9,20,0.3);}
-        input { width: 100%; padding: 12px; background: #000; color: #fff; border: 1px solid #444; border-radius: 5px; margin-bottom: 20px; box-sizing: border-box;}
-        .btn { background: #e50914; color: white; border: none; padding: 12px 20px; width: 100%; font-weight: bold; cursor: pointer; border-radius: 5px; text-transform: uppercase;}
+        .auth-box { background: #fff; padding: 40px; border-radius: 15px; border: 2px solid #00b4d8; text-align: center; max-width: 400px; margin: 0 auto; box-shadow: 0 10px 30px rgba(0,180,216,0.2);}
+        input { width: 100%; padding: 12px; background: #f9f9f9; color: #333; border: 1px solid #ccc; border-radius: 8px; margin-bottom: 20px; box-sizing: border-box;}
+        .btn { background: #0077b6; color: white; border: none; padding: 15px 20px; width: 100%; font-weight: bold; cursor: pointer; border-radius: 8px; text-transform: uppercase;}
         
-        .pending-card { background: #111; padding: 20px; border: 1px solid #333; margin-bottom: 20px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; transition: 0.3s;}
-        .pending-card:hover { border-color: #00e5ff; box-shadow: 0 0 15px rgba(0,229,255,0.2);}
-        .approve-btn { background: #00cc44; color: white; padding: 10px 15px; border-radius: 5px; text-decoration: none; font-weight: bold; margin-right: 10px;}
-        .reject-btn { background: #e50914; color: white; padding: 10px 15px; border-radius: 5px; text-decoration: none; font-weight: bold;}
+        .pending-card { background: #fff; padding: 20px; border: 2px solid #b2ebf2; margin-bottom: 20px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 5px 15px rgba(0,0,0,0.05);}
+        .approve-btn { background: #2a9d8f; color: white; padding: 12px 20px; border-radius: 8px; text-decoration: none; font-weight: bold; margin-right: 10px;}
+        .reject-btn { background: #e76f51; color: white; padding: 12px 20px; border-radius: 8px; text-decoration: none; font-weight: bold;}
     </style>
 </head>
 <body>
+    <audio id="click-sound" src="https://actions.google.com/sounds/v1/ui/button_click.ogg"></audio>
+
     <header>
-        <h1 style="margin:0;">ADMIN <span>HQ</span></h1>
-        <a href="/dashboard" style="color:#00e5ff; text-decoration:none;">Exit Admin Mode</a>
+        <h1 style="margin:0; color:#023e8a;">ADMIN <span>HQ</span></h1>
+        <a href="/dashboard" style="color:#0077b6; text-decoration:none; font-weight:bold;">⬅ Exit Admin Mode</a>
     </header>
 
     <div class="container">
         {% if auth_required %}
             <div class="auth-box">
-                <h2 style="color:#e50914; margin-top:0;">RESTRICTED ACCESS</h2>
-                <p style="color:#aaa;">Enter Master Passcode to manage uploads.</p>
-                <form method="POST">
-                    <input type="password" name="passcode" placeholder="Passcode (Hint: 12345)" required>
+                <h2 style="color:#023e8a; margin-top:0;">ADMIN LOGIN</h2>
+                <p style="color:#666;">Enter passcode to approve posts. (Hint: 12345)</p>
+                <form method="POST" onsubmit="document.getElementById('click-sound').play()">
+                    <input type="password" name="passcode" placeholder="Passcode..." required>
                     <button type="submit" class="btn">AUTHORIZE</button>
                 </form>
             </div>
         {% else %}
-            <h2 style="border-bottom: 1px solid #333; padding-bottom: 10px; color:#00e5ff;">PENDING USER UPLOADS</h2>
-            <p style="color:#aaa;">Approve items here so they appear in the public gallery.</p>
+            <h2 style="border-bottom: 2px solid #00b4d8; padding-bottom: 10px; color:#023e8a;">PENDING USER UPLOADS</h2>
+            <p style="color:#555; font-weight:bold;">Aap jab yahan se 'Approve' dabayenge, tabhi photo sabko dikhegi!</p>
             
             {% for item in pending_media %}
                 <div class="pending-card">
                     <div>
-                        <h3 style="margin: 0 0 5px 0; color:#fff;">{{ item.title }} <span style="background:#e50914; font-size:0.6em; padding:3px 8px; border-radius:3px; vertical-align:middle;">{{ item.category }}</span></h3>
-                        <p style="margin: 0; color: #888; font-size: 0.9em;">Agent: {{ item.uploaded_by }} | File: {{ item.filename }}</p>
-                        {% if item.prompt %}<p style="margin: 5px 0 0 0; color: #aaa; font-size: 0.85em; font-style:italic;">"{{ item.prompt }}"</p>{% endif %}
+                        <h3 style="margin: 0 0 5px 0; color:#023e8a;">{{ item.title }} <span style="background:#00b4d8; color:white; font-size:0.6em; padding:3px 8px; border-radius:3px;">{{ item.category }}</span></h3>
+                        <p style="margin: 0; color: #555; font-size: 0.9em;">Uploaded By: <b>{{ item.uploaded_by }}</b></p>
                     </div>
                     <div>
-                        <a href="/approve/{{ item.id }}" class="approve-btn">✔ Approve</a>
-                        <a href="/delete/{{ item.id }}" class="reject-btn">✖ Reject/Delete</a>
+                        <a href="/approve/{{ item.id }}" class="approve-btn" onclick="document.getElementById('click-sound').play()">✔ APPROVE</a>
+                        <a href="/delete/{{ item.id }}" class="reject-btn" onclick="document.getElementById('click-sound').play()">✖ REJECT</a>
                     </div>
                 </div>
             {% else %}
-                <div style="text-align:center; padding:50px; background:#111; border-radius:10px; color:#555;">
-                    <h3>All clear. No pending uploads.</h3>
+                <div style="text-align:center; padding:50px; background:#fff; border-radius:10px; color:#0077b6; font-weight:bold; border: 2px dashed #00b4d8;">
+                    <h3>All clear! Kisi ne kuch naya upload nahi kiya.</h3>
                 </div>
             {% endfor %}
         {% endif %}
