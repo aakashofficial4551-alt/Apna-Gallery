@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SOCHO KYA HOGA - Public Gallery</title>
+    <style>
+        body { font-family: sans-serif; background-color: #1a1a1a; color: white; text-align: center; }
+        .gallery img { max-width: 300px; margin: 10px; border-radius: 8px; border: 2px solid #555; }
+        form { margin: 20px; padding: 20px; background: #333; display: inline-block; border-radius: 8px; }
+        button { background-color: #e50914; color: white; border: none; padding: 10px 15px; cursor: pointer; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>SOCHO KYA HOGA - Public Gallery</h1>
+    
+    <!-- The Upload Form -->
+    <form action="/" method="POST" enctype="multipart/form-data">
+        <input type="file" name="photo" accept="image/*" required>
+        <button type="submit">Upload Photo</button>
+    </form>
+
+    <!-- The Image Grid -->
+    <div class="gallery">
+        {% for photo in photos %}
+            <img src="{{ url_for('static', filename='uploads/' + photo) }}" alt="Uploaded Image">
+        {% else %}
+            <p>No photos uploaded yet. Be the first!</p>
+        {% endfor %}
+    </div>
+</body>
+</html>
