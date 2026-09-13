@@ -1,45 +1,47 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>Enter The Vault</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <title>Access Portal | SOCHO KYA HOGA</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;500;800&display=swap" rel="stylesheet">
     <style>
-        body { display: flex; justify-content: center; align-items: center; height: 100vh; background: #000; flex-direction: column;}
-        .top-blessing { color: #ff9800; font-size: 1.5em; letter-spacing: 5px; margin-bottom: 20px; font-weight: bold; animation: glow 2s infinite; }
-        .login-box { text-align: center; background: #111; padding: 40px; border-radius: 10px; border: 1px solid #e50914; max-width: 400px; width: 100%; }
-        .form-section { margin-top: 20px; border-top: 1px solid #333; padding-top: 20px; }
+        body { margin: 0; padding: 0; height: 100vh; background: radial-gradient(circle at center, #1a0000 0%, #000000 100%); font-family: 'Montserrat', sans-serif; display: flex; justify-content: center; align-items: center; color: #fff; flex-direction: column;}
+        .blessing { color: #ff9800; font-size: 1.4em; letter-spacing: 6px; font-weight: bold; margin-bottom: 25px; text-shadow: 0 0 15px rgba(255,152,0,0.5); }
+        .portal-card { background: rgba(15, 15, 15, 0.85); border: 1px solid rgba(229,9,20,0.4); padding: 40px; border-radius: 15px; width: 380px; backdrop-filter: blur(10px); box-shadow: 0 15px 35px rgba(0,0,0,0.9); }
+        h1 { text-align: center; font-size: 2em; letter-spacing: 3px; margin-top: 0; text-transform: uppercase; }
+        h1 span { color: #e50914; }
+        input { width: 100%; padding: 12px; background: rgba(0,0,0,0.6); border: 1px solid #333; border-radius: 6px; color: #fff; margin-bottom: 15px; box-sizing: border-box; font-family: inherit;}
+        input:focus { border-color: #e50914; outline: none; box-shadow: 0 0 8px rgba(229,9,20,0.4); }
+        .btn { background: #e50914; color: white; border: none; padding: 12px; width: 100%; font-weight: bold; border-radius: 6px; cursor: pointer; text-transform: uppercase; letter-spacing: 1px; transition: 0.3s; }
+        .btn:hover { background: #ff0f1a; box-shadow: 0 0 15px rgba(229,9,20,0.6); }
+        .section-title { font-size: 0.85em; color: #888; text-transform: uppercase; letter-spacing: 1px; margin: 20px 0 10px; border-bottom: 1px solid #222; padding-bottom: 5px;}
+        .flash { color: #ff4c4c; font-size: 0.9em; text-align: center; margin-bottom: 15px; font-weight: bold;}
     </style>
 </head>
 <body>
-    <div class="top-blessing">🙏 RADHE RADHE 🙏</div>
+    <div class="blessing">🙏 RADHE RADHE 🙏</div>
     
-    <div class="login-box">
-        <h1 style="margin: 0; font-size: 2em;">SOCHO KYA <span style="color:#e50914;">HOGA</span></h1>
+    <div class="portal-card">
+        <h1>SOCHO KYA <span>HOGA</span></h1>
         
-        <!-- Flash Messages -->
         {% with messages = get_flashed_messages(with_categories=true) %}
-          {% if messages %}{% for category, message in messages %}<p style="color:red;">{{ message }}</p>{% endfor %}{% endif %}
+          {% if messages %}{% for c, m in messages %}<div class="flash">{{ m }}</div>{% endfor %}{% endif %}
         {% endwith %}
 
-        <div class="form-section">
-            <h3 style="color:#aaa;">Create Account / Login</h3>
-            <form action="/login" method="POST">
-                <input type="text" name="username" placeholder="Username" required autocomplete="off" style="margin-bottom: 10px; width:100%; padding:10px;">
-                <input type="password" name="password" placeholder="Password" required style="margin-bottom: 10px; width:100%; padding:10px;">
-                <div style="display:flex; gap:10px;">
-                    <button type="submit" name="action" value="login" class="btn">Login</button>
-                    <button type="submit" name="action" value="register" class="btn" style="background:#444;">Register</button>
-                </div>
-            </form>
-        </div>
+        <form action="/login" method="POST">
+            <div class="section-title">Secure Member Access</div>
+            <input type="text" name="username" placeholder="Agent Username" required autocomplete="off">
+            <input type="password" name="password" placeholder="Passcode" required>
+            <div style="display:flex; gap:10px;">
+                <button type="submit" name="action" value="login" class="btn">Login</button>
+                <button type="submit" name="action" value="register" class="btn" style="background:#333;">Register</button>
+            </div>
+        </form>
 
-        <div class="form-section">
-            <h3 style="color:#aaa;">Or Enter Without Login</h3>
-            <form action="/login" method="POST">
-                <input type="text" name="username" placeholder="Guest Name" required autocomplete="off" style="margin-bottom: 10px; width:100%; padding:10px;">
-                <button type="submit" name="action" value="guest" class="btn" style="background:transparent; border:1px solid #e50914; color:#e50914;">Enter as Guest</button>
-            </form>
-        </div>
+        <form action="/login" method="POST" style="margin-top: 15px;">
+            <div class="section-title">Quick Entry</div>
+            <input type="text" name="username" placeholder="Enter Guest Alias" required autocomplete="off">
+            <button type="submit" name="action" value="guest" class="btn" style="background:transparent; border:1px solid #555; color:#aaa;">Enter as Guest</button>
+        </form>
     </div>
 </body>
 </html>
