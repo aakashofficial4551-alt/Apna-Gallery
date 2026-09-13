@@ -1,1 +1,25 @@
-
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SOCHO KYA HOGA | Identify</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;500;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        body { display: flex; justify-content: center; align-items: center; height: 100vh; background: #000; }
+        .login-box { text-align: center; background: #111; padding: 50px; border-radius: 10px; border: 1px solid #333; animation: glow 3s infinite; }
+    </style>
+</head>
+<body>
+    <div class="login-box">
+        <h1>SOCHO KYA <span style="color:#e50914;">HOGA</span></h1>
+        <p style="color:#aaa;">Identify yourself to enter the vault.</p>
+        <form action="/login" method="POST">
+            <div class="form-group">
+                <input type="text" name="username" placeholder="Enter your Secret Name..." required autocomplete="off">
+            </div>
+            <button type="submit" class="btn">Enter Vault</button>
+        </form>
+    </div>
+</body>
+</html>
