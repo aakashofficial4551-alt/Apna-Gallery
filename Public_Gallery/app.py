@@ -21,10 +21,12 @@ def get_db_connection():
 
 def init_db():
     conn = get_db_connection()
+    # Added profile_pic column
     conn.execute('''CREATE TABLE IF NOT EXISTS users (
                         id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, password TEXT,
                         bio TEXT DEFAULT 'Classified Agent of SOCHO KYA HOGA.',
-                        country TEXT DEFAULT 'India')''')
+                        country TEXT DEFAULT 'India', friends_count INTEGER DEFAULT 0,
+                        profile_pic TEXT DEFAULT '')''')
     conn.execute('''CREATE TABLE IF NOT EXISTS media (
                         id INTEGER PRIMARY KEY AUTOINCREMENT, filename TEXT NOT NULL, title TEXT, 
                         category TEXT, prompt TEXT, uploaded_by TEXT, approved INTEGER DEFAULT 0,
@@ -93,10 +95,20 @@ def profile():
     if 'username' not in session: return redirect(url_for('login'))
     conn = get_db_connection()
     if request.method == 'POST':
+        # Update Bio & Country
         if 'bio' in request.form:
             conn.execute('UPDATE users SET bio = ?, country = ? WHERE username = ?',
                          (request.form['bio'], request.form['country'], session['username']))
             conn.commit()
+        # Upload Profile Picture
+        elif 'profile_pic' in request.files:
+            file = request.files['profile_pic']
+            if file and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                conn.execute('UPDATE users SET profile_pic = ? WHERE username = ?', (filename, session['username']))
+                conn.commit()
+        # Upload Story
         elif 'story' in request.files:
             file = request.files['story']
             if file and allowed_file(file.filename):
@@ -151,15 +163,17 @@ def ai_endpoint():
     bot_reply = get_ai_response(user_query)
     return jsonify({'reply': bot_reply})
 
-# Admin & Utility routes...
+# --- ADMIN ROUTES ---
 @app.route('/admin', methods=['GET', 'POST'])
 def admin():
     if request.method == 'POST':
         if request.form.get('passcode') == ADMIN_PASSCODE:
             session['is_admin'] = True
-            flash('Admin Access Granted.', 'success')
-        else: flash('Invalid Passcode', 'error')
-    if not session.get('is_admin'): return render_template('admin.html', auth_required=True)
+        else: flash('Invalid Admin Passcode!', 'error')
+    
+    if not session.get('is_admin'): 
+        return render_template('admin.html', auth_required=True)
+    
     conn = get_db_connection()
     pending_media = conn.execute('SELECT * FROM media WHERE approved = 0 ORDER BY created_at DESC').fetchall()
     conn.close()
