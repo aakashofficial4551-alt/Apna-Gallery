@@ -1,15 +1,15 @@
 import os
 import sqlite3
-from flask import Flask, request, render_template, redirect, url_for, flash
+from flask import Flask, request, render_template, redirect, url_for, flash, session
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-app.secret_key = "socho_kya_hoga_secret_key"
+app.secret_key = "socho_kya_hoga_secret_key_123"
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'mp4', 'webm'}
 
-# Yahan apna secret password dalein jisse sirf aap delete kar sakein
-ADMIN_PASSCODE = "12345" 
+# Added Audio and Documents extensions
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'mp4', 'webm', 'mp3', 'wav', 'pdf', 'txt', 'docx'}
+ADMIN_PASSCODE = "12345"
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
@@ -18,15 +18,23 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
-# Create database table
 def init_db():
     conn = get_db_connection()
+    # Media Table
     conn.execute('''CREATE TABLE IF NOT EXISTS media (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         filename TEXT NOT NULL,
                         title TEXT,
                         category TEXT,
                         prompt TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )''')
+    # Comments Table
+    conn.execute('''CREATE TABLE IF NOT EXISTS comments (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        media_id INTEGER,
+                        user_name TEXT,
+                        comment TEXT,
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )''')
     conn.commit()
@@ -37,16 +45,22 @@ init_db()
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+@app.route('/login', methods=['POST'])
+def login():
+    session['username'] = request.form.get('username')
+    return redirect(url_for('index'))
+
+@app.route('/logout')
+def logout():
+    session.pop('username', None)
+    return redirect(url_for('index'))
+
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    if request.method == 'POST':
-        if 'media' not in request.files:
-            flash('No file uploaded', 'error')
-            return redirect(request.url)
-        
+    if request.method == 'POST' and 'media' in request.files:
         file = request.files['media']
-        title = request.form.get('title', 'Untitled Project')
-        category = request.form.get('category', 'Cinematic')
+        title = request.form.get('title', 'Untitled')
+        category = request.form.get('category', 'Photo')
         prompt = request.form.get('prompt', '')
 
         if file and allowed_file(file.filename):
@@ -58,16 +72,39 @@ def index():
                          (filename, title, category, prompt))
             conn.commit()
             conn.close()
-            
-            flash('Visual added to the Vault!', 'success')
+            flash('File added successfully!', 'success')
             return redirect(url_for('index'))
         else:
-            flash('Invalid format! Use images or videos.', 'error')
+            flash('Invalid format!', 'error')
 
     conn = get_db_connection()
     media_files = conn.execute('SELECT * FROM media ORDER BY created_at DESC').fetchall()
+    comments_db = conn.execute('SELECT * FROM comments ORDER BY created_at ASC').fetchall()
     conn.close()
-    return render_template('index.html', media_files=media_files)
+
+    # Group comments by media_id
+    comments = {}
+    for c in comments_db:
+        if c['media_id'] not in comments:
+            comments[c['media_id']] = []
+        comments[c['media_id']].append(c)
+
+    return render_template('index.html', media_files=media_files, comments=comments)
+
+@app.route('/comment/<int:media_id>', methods=['POST'])
+def add_comment(media_id):
+    if 'username' not in session:
+        flash('Enter your name first!', 'error')
+        return redirect(url_for('index'))
+        
+    comment_text = request.form.get('comment')
+    if comment_text:
+        conn = get_db_connection()
+        conn.execute('INSERT INTO comments (media_id, user_name, comment) VALUES (?, ?, ?)',
+                     (media_id, session['username'], comment_text))
+        conn.commit()
+        conn.close()
+    return redirect(url_for('index'))
 
 @app.route('/delete/<int:id>', methods=['POST'])
 def delete(id):
@@ -81,11 +118,9 @@ def delete(id):
             except:
                 pass
             conn.execute('DELETE FROM media WHERE id = ?', (id,))
+            conn.execute('DELETE FROM comments WHERE media_id = ?', (id,))
             conn.commit()
-            flash('Item deleted securely.', 'success')
         conn.close()
-    else:
-        flash('Access Denied: Wrong Passcode', 'error')
     return redirect(url_for('index'))
 
 if __name__ == '__main__':
