@@ -6,140 +6,189 @@
     <title>SOCHO KYA HOGA | The Vault</title>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;500;800&display=swap" rel="stylesheet">
     <style>
-        :root { --bg-color: #050505; --accent-color: #e50914; --text-color: #f1f1f1; --card-bg: rgba(255, 255, 255, 0.05); }
-        body { font-family: 'Montserrat', sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 0; }
-        header { text-align: center; padding: 50px 20px; background: linear-gradient(180deg, rgba(20,0,0,0.9) 0%, var(--bg-color) 100%); border-bottom: 1px solid #222; }
-        header h1 { font-weight: 800; letter-spacing: 4px; margin: 0; font-size: 3em; text-transform: uppercase; }
+        :root { --bg-color: #030303; --accent-color: #e50914; --text-color: #f1f1f1; --card-bg: #111; }
+        body { font-family: 'Montserrat', sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 0; overflow-x: hidden; }
+        
+        /* Animations */
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes glow { 0% { box-shadow: 0 0 5px var(--accent-color); } 50% { box-shadow: 0 0 20px var(--accent-color); } 100% { box-shadow: 0 0 5px var(--accent-color); } }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.02); } 100% { transform: scale(1); } }
+
+        /* Login Gate (Name Prompt) */
+        #entry-gate { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .gate-box { background: #111; padding: 40px; border-radius: 10px; border: 1px solid #333; text-align: center; animation: pulse 3s infinite; }
+        .gate-box input { padding: 15px; width: 80%; margin-bottom: 20px; background: #000; color: white; border: 1px solid var(--accent-color); font-size: 1.2em; text-align: center; }
+        .gate-box button { background: var(--accent-color); color: white; padding: 15px 30px; border: none; font-size: 1.2em; cursor: pointer; text-transform: uppercase; letter-spacing: 2px; }
+        .gate-box button:hover { background: #ff0f1a; animation: glow 1.5s infinite; }
+
+        /* Main UI */
+        header { text-align: center; padding: 40px 20px; background: linear-gradient(180deg, rgba(20,0,0,0.9) 0%, var(--bg-color) 100%); }
+        header h1 { font-weight: 800; letter-spacing: 4px; font-size: 3em; margin: 0; }
         header span { color: var(--accent-color); }
-        
-        .upload-container { max-width: 600px; margin: -30px auto 30px; background: var(--card-bg); padding: 30px; border-radius: 15px; backdrop-filter: blur(15px); border: 1px solid rgba(255,0,0,0.2); box-shadow: 0 10px 40px rgba(0,0,0,0.8); position: relative; z-index: 10; }
-        .form-group { margin-bottom: 15px; text-align: left; }
-        input[type="text"], select, textarea { width: 100%; padding: 12px; background: #111; color: white; border: 1px solid #333; border-radius: 5px; box-sizing: border-box; font-family: inherit; }
-        textarea { resize: vertical; height: 80px; }
-        .upload-btn { background-color: var(--accent-color); color: white; border: none; padding: 12px; width: 100%; font-size: 1.1em; font-weight: bold; border-radius: 5px; cursor: pointer; transition: 0.3s; text-transform: uppercase; }
-        .upload-btn:hover { background-color: #ff0f1a; box-shadow: 0 0 20px rgba(229, 9, 20, 0.5); }
-        
-        .filters { text-align: center; margin: 30px 0; }
-        .filter-btn { background: transparent; border: 1px solid #555; color: #aaa; padding: 8px 20px; margin: 0 5px; border-radius: 20px; cursor: pointer; transition: 0.3s; }
+        .welcome-text { font-size: 1.2em; color: #aaa; margin-top: 10px; }
+
+        .upload-container { max-width: 600px; margin: 20px auto; background: var(--card-bg); padding: 20px; border-radius: 10px; border: 1px solid #222; animation: fadeIn 1s ease-out; }
+        .form-group { margin-bottom: 15px; }
+        input[type="text"], select, textarea { width: 100%; padding: 10px; background: #000; color: white; border: 1px solid #333; border-radius: 5px; box-sizing: border-box; }
+        .upload-btn { background: var(--accent-color); color: white; border: none; padding: 12px; width: 100%; font-weight: bold; cursor: pointer; border-radius: 5px; }
+
+        /* Filters */
+        .filters { text-align: center; margin: 30px 0; animation: fadeIn 1.2s ease-out; }
+        .filter-btn { background: transparent; border: 1px solid #555; color: #aaa; padding: 10px 25px; margin: 5px; border-radius: 30px; cursor: pointer; transition: 0.3s; font-weight: bold; }
         .filter-btn:hover, .filter-btn.active { border-color: var(--accent-color); color: white; background: rgba(229, 9, 20, 0.1); }
+        .mystery-btn { border-color: #8a2be2; color: #8a2be2; }
+        .mystery-btn:hover { background: rgba(138, 43, 226, 0.1); border-color: #8a2be2; cursor: not-allowed; }
 
-        .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; padding: 20px; max-width: 1400px; margin: 0 auto; }
-        .media-card { position: relative; border-radius: 8px; overflow: hidden; background: #111; border: 1px solid #222; }
-        .media-card img, .media-card video { width: 100%; height: 300px; object-fit: cover; display: block; cursor: pointer; transition: 0.5s; }
-        .media-card:hover img { transform: scale(1.05); opacity: 0.7; }
-        .card-info { padding: 15px; }
-        .card-info h3 { margin: 0 0 5px; font-size: 1.1em; color: var(--accent-color); }
-        .card-info span { font-size: 0.8em; color: #777; background: #222; padding: 3px 8px; border-radius: 3px; }
+        /* Gallery */
+        .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 25px; padding: 20px; max-width: 1200px; margin: 0 auto; animation: fadeIn 1.5s ease-out; }
+        .media-card { background: var(--card-bg); border-radius: 10px; overflow: hidden; border: 1px solid #222; transition: transform 0.3s; }
+        .media-card:hover { transform: translateY(-5px); border-color: #444; }
+        .media-content { height: 250px; background: #000; display: flex; justify-content: center; align-items: center; overflow: hidden; }
+        .media-content img, .media-content video { width: 100%; height: 100%; object-fit: cover; }
+        .media-content audio { width: 90%; }
+        .doc-icon { font-size: 50px; color: #aaa; }
         
-        .delete-form { margin-top: 15px; display: flex; gap: 10px; }
-        .delete-form input { flex: 1; padding: 5px; font-size: 0.8em; }
-        .delete-form button { background: #444; color: white; border: none; padding: 5px 10px; cursor: pointer; border-radius: 3px; }
-        .delete-form button:hover { background: red; }
+        .card-info { padding: 15px; }
+        .card-info h3 { margin: 0 0 10px; color: var(--accent-color); }
+        .badge { background: #333; font-size: 0.7em; padding: 3px 8px; border-radius: 3px; color: #aaa; }
 
-        .flash-messages { text-align: center; color: #4caf50; font-weight: bold; margin-bottom: 15px; }
-        .error { color: var(--accent-color); }
+        /* Comments Section */
+        .comments-section { margin-top: 15px; border-top: 1px solid #333; padding-top: 10px; }
+        .comment-list { max-height: 100px; overflow-y: auto; font-size: 0.85em; margin-bottom: 10px; color: #ccc; }
+        .comment-item { margin-bottom: 5px; background: #000; padding: 5px; border-radius: 4px; border-left: 2px solid var(--accent-color); }
+        .comment-item strong { color: white; }
+        .comment-form { display: flex; gap: 5px; }
+        .comment-form input { flex: 1; padding: 8px; font-size: 0.8em; }
+        .comment-form button { background: #444; color: white; border: none; cursor: pointer; padding: 0 10px; border-radius: 3px; }
 
-        /* Lightbox */
-        #lightbox { display: none; position: fixed; z-index: 1000; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); justify-content: center; align-items: center; flex-direction: column; }
-        #lightbox img { max-width: 80%; max-height: 70vh; border-radius: 5px; box-shadow: 0 0 50px rgba(229,9,20,0.2); }
-        #lb-text { color: white; max-width: 80%; margin-top: 20px; text-align: center; font-size: 1.1em; line-height: 1.5; }
-        .close-btn { position: absolute; top: 20px; right: 40px; color: white; font-size: 50px; cursor: pointer; font-weight: 100; transition: 0.3s; }
-        .close-btn:hover { color: var(--accent-color); }
+        .audio-player { display: none; } /* Hidden background music player */
     </style>
 </head>
 <body>
 
+    <!-- Background Music -->
+    <audio id="bg-music" class="audio-player" loop>
+        <!-- Soft suspenseful ambient track -->
+        <source src="https://cdn.pixabay.com/download/audio/2022/05/16/audio_b2875f28ce.mp3" type="audio/mpeg">
+    </audio>
+
+    <!-- Name Entry Gate -->
+    {% if not session.username %}
+    <div id="entry-gate">
+        <div class="gate-box">
+            <h1 style="margin-top:0;">IDENTIFY YOURSELF</h1>
+            <p style="color:#aaa;">You are entering a classified vault.</p>
+            <form action="/login" method="POST" onsubmit="startMusic()">
+                <input type="text" name="username" placeholder="Enter your name..." required autocomplete="off">
+                <br>
+                <button type="submit">Unlock Vault</button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
     <header>
         <h1>SOCHO KYA <span>HOGA</span></h1>
-        <p>Advanced Media & Prompt Vault</p>
+        {% if session.username %}
+            <div class="welcome-text">Welcome, Agent {{ session.username }} | <a href="/logout" style="color:var(--accent-color); text-decoration:none; font-size:0.8em;">Leave</a></div>
+        {% endif %}
     </header>
 
+    {% if session.username %}
     <div class="upload-container">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-          {% if messages %}
-            <div class="flash-messages">
-              {% for category, message in messages %}
-                <div class="{{ category }}">{{ message }}</div>
-              {% endfor %}
-            </div>
-          {% endif %}
-        {% endwith %}
-
         <form action="/" method="POST" enctype="multipart/form-data">
             <div class="form-group">
-                <input type="text" name="title" placeholder="Project Title" required>
+                <input type="text" name="title" placeholder="Title" required>
             </div>
             <div class="form-group">
                 <select name="category">
-                    <option value="Cinematic">Cinematic</option>
-                    <option value="Anime">Anime Romance / Art</option>
-                    <option value="Horror">Horror / Dark Theme</option>
-                    <option value="Cyberpunk">Cyberpunk / Sci-Fi</option>
-                    <option value="Vlog">Vlog / Podcast</option>
+                    <option value="Photo">Photo</option>
+                    <option value="Video">Video</option>
+                    <option value="Music">Music / Audio</option>
+                    <option value="Document">Document</option>
                 </select>
             </div>
             <div class="form-group">
-                <textarea name="prompt" placeholder="Enter your detailed scene script, AI generation prompt, or story context here..."></textarea>
+                <input type="file" name="media" required style="color: white;">
             </div>
-            <div class="form-group">
-                <input type="file" name="media" accept="image/*,video/*" required style="color: white;">
-            </div>
-            <button type="submit" class="upload-btn">Upload to Vault</button>
+            <button type="submit" class="upload-btn">Upload</button>
         </form>
     </div>
+    {% endif %}
 
     <div class="filters">
         <button class="filter-btn active" onclick="filterMedia('All')">All</button>
-        <button class="filter-btn" onclick="filterMedia('Cinematic')">Cinematic</button>
-        <button class="filter-btn" onclick="filterMedia('Anime')">Anime</button>
-        <button class="filter-btn" onclick="filterMedia('Horror')">Horror</button>
-        <button class="filter-btn" onclick="filterMedia('Cyberpunk')">Cyberpunk</button>
-        <button class="filter-btn" onclick="filterMedia('Vlog')">Vlog</button>
+        <button class="filter-btn" onclick="filterMedia('Photo')">Photos</button>
+        <button class="filter-btn" onclick="filterMedia('Video')">Videos</button>
+        <button class="filter-btn" onclick="filterMedia('Music')">Music</button>
+        <button class="filter-btn" onclick="filterMedia('Document')">Documents</button>
+        <button class="filter-btn mystery-btn" onclick="openMystery()">Mystery 🔒</button>
     </div>
 
     <div class="gallery">
         {% for item in media_files %}
             <div class="media-card" data-category="{{ item.category }}">
-                {% if item.filename.endswith('.mp4') or item.filename.endswith('.webm') %}
-                    <video controls>
-                        <source src="{{ url_for('static', filename='uploads/' + item.filename) }}" type="video/{{ item.filename.split('.')[-1] }}">
-                    </video>
-                {% else %}
-                    <img src="{{ url_for('static', filename='uploads/' + item.filename) }}" 
-                         onclick="openLightbox(this.src, '{{ item.prompt | replace('\n', '\\n') | replace('\'', '\\\'') }}')">
-                {% endif %}
+                
+                <div class="media-content">
+                    {% if item.category == 'Video' %}
+                        <video controls><source src="{{ url_for('static', filename='uploads/' + item.filename) }}"></video>
+                    {% elif item.category == 'Music' %}
+                        <audio controls><source src="{{ url_for('static', filename='uploads/' + item.filename) }}"></audio>
+                    {% elif item.category == 'Document' %}
+                        <a href="{{ url_for('static', filename='uploads/' + item.filename) }}" target="_blank" style="color:white; text-decoration:none;">
+                            <div class="doc-icon">📄</div>
+                            <div>Open Document</div>
+                        </a>
+                    {% else %}
+                        <img src="{{ url_for('static', filename='uploads/' + item.filename) }}" alt="Image">
+                    {% endif %}
+                </div>
+
                 <div class="card-info">
                     <h3>{{ item.title }}</h3>
-                    <span>{{ item.category }}</span>
+                    <span class="badge">{{ item.category }}</span>
                     
-                    <!-- Admin Delete Form -->
-                    <form action="{{ url_for('delete', id=item.id) }}" method="POST" class="delete-form">
-                        <input type="password" name="passcode" placeholder="Admin PIN" required>
-                        <button type="submit">Delete</button>
-                    </form>
+                    <!-- Comments Section -->
+                    <div class="comments-section">
+                        <div class="comment-list">
+                            {% if comments.get(item.id) %}
+                                {% for comment in comments[item.id] %}
+                                    <div class="comment-item">
+                                        <strong>{{ comment.user_name }}:</strong> {{ comment.comment }}
+                                    </div>
+                                {% endfor %}
+                            {% else %}
+                                <i>No messages yet.</i>
+                            {% endif %}
+                        </div>
+                        {% if session.username %}
+                        <form action="{{ url_for('add_comment', media_id=item.id) }}" method="POST" class="comment-form">
+                            <input type="text" name="comment" placeholder="Leave a message..." required autocomplete="off">
+                            <button type="submit">></button>
+                        </form>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
         {% endfor %}
     </div>
 
-    <div id="lightbox">
-        <span class="close-btn" onclick="closeLightbox()">&times;</span>
-        <img id="lightbox-img" src="">
-        <div id="lb-text"></div>
-    </div>
-
     <script>
-        function openLightbox(src, prompt) {
-            document.getElementById('lightbox-img').src = src;
-            document.getElementById('lb-text').innerText = prompt ? "Prompt / Script: " + prompt : "";
-            document.getElementById('lightbox').style.display = 'flex';
+        // Start background music when user clicks the unlock button
+        function startMusic() {
+            let music = document.getElementById("bg-music");
+            music.volume = 0.3; // Keep it soft
+            music.play();
         }
-        function closeLightbox() {
-            document.getElementById('lightbox').style.display = 'none';
-        }
-        document.getElementById('lightbox').addEventListener('click', function(e) {
-            if (e.target !== document.getElementById('lightbox-img')) closeLightbox();
-        });
+
+        // If user is already logged in, try to play music automatically
+        window.onload = function() {
+            if(!document.getElementById('entry-gate')) {
+                let music = document.getElementById("bg-music");
+                music.volume = 0.3;
+                music.play().catch(e => console.log("Autoplay blocked by browser until user interacts."));
+            }
+        };
 
         function filterMedia(category) {
             let cards = document.querySelectorAll('.media-card');
@@ -150,11 +199,16 @@
 
             cards.forEach(card => {
                 if (category === 'All' || card.getAttribute('data-category') === category) {
+                    card.style.animation = "fadeIn 0.5s ease-out";
                     card.style.display = 'block';
                 } else {
                     card.style.display = 'none';
                 }
             });
+        }
+
+        function openMystery() {
+            alert("ACCESS DENIED: You do not have clearance to open the Mystery Vault.");
         }
     </script>
 </body>
