@@ -2,101 +2,185 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>SOCHO KYA HOGA | The Vault</title>
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;500;800&display=swap" rel="stylesheet">
+    <title>SOCHO KYA HOGA | The Premium Vault</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;700;900&display=swap" rel="stylesheet">
     <style>
-        /* ALL CSS DESIGN EMBEDDED DIRECTLY HERE */
-        :root { --bg-color: #030303; --accent-color: #e50914; --text-color: #f1f1f1; --card-bg: #111; }
-        body { font-family: 'Montserrat', sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 0; overflow-x: hidden; }
+        /* Premium Animated Background */
+        body { 
+            font-family: 'Montserrat', sans-serif; 
+            margin: 0; padding: 0; overflow-x: hidden;
+            background: linear-gradient(-45deg, #000000, #1a0000, #0d0000, #220000);
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
+            color: #fff;
+        }
 
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes glow { 0% { box-shadow: 0 0 5px var(--accent-color); } 50% { box-shadow: 0 0 20px var(--accent-color); } 100% { box-shadow: 0 0 5px var(--accent-color); } }
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
 
-        header { text-align: center; padding: 40px 20px; background: linear-gradient(180deg, rgba(20,0,0,0.9) 0%, var(--bg-color) 100%); }
-        header h1 { font-weight: 800; letter-spacing: 4px; font-size: 3em; margin: 0; text-transform: uppercase; }
-        header span { color: var(--accent-color); }
-        .welcome-text { font-size: 1.2em; color: #aaa; margin-top: 10px; }
+        @keyframes neonPulse {
+            0% { box-shadow: 0 0 10px rgba(229, 9, 20, 0.2); }
+            50% { box-shadow: 0 0 25px rgba(229, 9, 20, 0.6); }
+            100% { box-shadow: 0 0 10px rgba(229, 9, 20, 0.2); }
+        }
 
-        .upload-container { max-width: 600px; margin: 20px auto; background: var(--card-bg); padding: 20px; border-radius: 10px; border: 1px solid #222; animation: fadeIn 1s ease-out; }
-        .form-group { margin-bottom: 15px; }
-        input[type="text"], input[type="password"], select, textarea { width: 100%; padding: 10px; background: #000; color: white; border: 1px solid #333; border-radius: 5px; box-sizing: border-box; }
-        .btn { background: var(--accent-color); color: white; border: none; padding: 12px 20px; width: 100%; font-weight: bold; cursor: pointer; border-radius: 5px; text-transform: uppercase; transition: 0.3s; }
-        .btn:hover { background: #ff0f1a; box-shadow: 0 0 15px rgba(229, 9, 20, 0.5); }
+        /* Header */
+        header { 
+            text-align: center; padding: 60px 20px 40px; 
+            background: transparent; 
+        }
+        header h1 { 
+            font-weight: 900; letter-spacing: 6px; font-size: 4em; margin: 0; 
+            text-transform: uppercase; text-shadow: 2px 2px 10px rgba(229,9,20,0.5);
+        }
+        header span { color: #e50914; }
+        .welcome-text { font-size: 1.1em; color: #ccc; margin-top: 15px; font-weight: 300; letter-spacing: 1px;}
+        .welcome-text a { color: #e50914; text-decoration: none; font-weight: bold; border-bottom: 1px solid #e50914;}
 
-        .filters { text-align: center; margin: 30px 0; animation: fadeIn 1.2s ease-out; }
-        .filter-btn { background: transparent; border: 1px solid #555; color: #aaa; padding: 10px 25px; margin: 5px; border-radius: 30px; cursor: pointer; transition: 0.3s; font-weight: bold; }
-        .filter-btn:hover, .filter-btn.active { border-color: var(--accent-color); color: white; background: rgba(229, 9, 20, 0.1); }
-        .mystery-btn { border-color: #8a2be2; color: #8a2be2; }
-        .mystery-btn:hover { background: rgba(138, 43, 226, 0.2); color: white; }
+        /* Upload Container - Glassmorphism */
+        .upload-container { 
+            max-width: 650px; margin: 0 auto 40px; 
+            background: rgba(10, 10, 10, 0.6); 
+            padding: 30px; border-radius: 15px; 
+            backdrop-filter: blur(20px); 
+            border: 1px solid rgba(229, 9, 20, 0.3); 
+            animation: neonPulse 3s infinite;
+        }
+        .form-group { margin-bottom: 20px; }
+        input[type="text"], input[type="password"], select, textarea { 
+            width: 100%; padding: 15px; background: rgba(0,0,0,0.7); 
+            color: white; border: 1px solid #333; border-radius: 8px; 
+            box-sizing: border-box; font-family: 'Montserrat', sans-serif;
+            transition: 0.3s;
+        }
+        input:focus, select:focus { outline: none; border-color: #e50914; }
+        
+        .btn { 
+            background: linear-gradient(90deg, #e50914, #8a050c); 
+            color: white; border: none; padding: 15px 20px; width: 100%; 
+            font-size: 1.1em; font-weight: bold; cursor: pointer; 
+            border-radius: 8px; text-transform: uppercase; transition: 0.4s; 
+            letter-spacing: 2px;
+        }
+        .btn:hover { transform: translateY(-3px); box-shadow: 0 10px 20px rgba(229, 9, 20, 0.5); }
 
-        .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 25px; padding: 20px; max-width: 1200px; margin: 0 auto; animation: fadeIn 1.5s ease-out; }
-        .media-card { background: var(--card-bg); border-radius: 10px; overflow: hidden; border: 1px solid #222; transition: transform 0.3s; }
-        .media-card:hover { transform: translateY(-5px); border-color: #444; }
-        .media-content { height: 250px; background: #000; display: flex; justify-content: center; align-items: center; overflow: hidden; }
+        /* Modern Filters */
+        .filters { text-align: center; margin: 40px 0; }
+        .filter-btn { 
+            background: rgba(255,255,255,0.05); border: 1px solid transparent; 
+            color: #fff; padding: 10px 30px; margin: 5px; 
+            border-radius: 30px; cursor: pointer; transition: 0.4s; font-weight: 500; 
+            backdrop-filter: blur(5px);
+        }
+        .filter-btn:hover, .filter-btn.active { 
+            border-color: #e50914; background: rgba(229, 9, 20, 0.2); box-shadow: 0 0 15px rgba(229,9,20,0.4);
+        }
+        .mystery-btn { border-color: #8a2be2; color: #d4a5ff; }
+        .mystery-btn:hover { background: rgba(138, 43, 226, 0.3); box-shadow: 0 0 15px rgba(138, 43, 226, 0.6); }
+
+        /* Gallery Grid */
+        .gallery { 
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); 
+            gap: 30px; padding: 20px; max-width: 1400px; margin: 0 auto; 
+        }
+        .media-card { 
+            background: rgba(0,0,0,0.8); border-radius: 12px; overflow: hidden; 
+            border: 1px solid #222; transition: all 0.4s ease; 
+        }
+        .media-card:hover { 
+            transform: translateY(-10px) scale(1.02); 
+            border-color: #e50914; box-shadow: 0 15px 30px rgba(0,0,0,0.8); 
+            z-index: 2;
+        }
+        .media-content { height: 280px; display: flex; justify-content: center; align-items: center; overflow: hidden; background:#000;}
         .media-content img, .media-content video { width: 100%; height: 100%; object-fit: cover; }
-        .card-info { padding: 15px; }
-        .card-info h3 { margin: 0 0 10px; color: var(--accent-color); }
-        .badge { background: #333; font-size: 0.7em; padding: 3px 8px; border-radius: 3px; color: #aaa; }
+        
+        .card-info { padding: 20px; }
+        .card-info h3 { margin: 0 0 10px; font-size: 1.4em; letter-spacing: 1px; color: #fff; }
+        .badge { background: #e50914; font-size: 0.7em; padding: 4px 10px; border-radius: 4px; color: #fff; font-weight: bold; text-transform: uppercase;}
 
-        .comments-section { margin-top: 15px; border-top: 1px solid #333; padding-top: 10px; }
-        .comment-list { max-height: 100px; overflow-y: auto; font-size: 0.85em; margin-bottom: 10px; color: #ccc; }
-        .comment-item { margin-bottom: 5px; background: #000; padding: 5px; border-radius: 4px; border-left: 2px solid var(--accent-color); }
-        .comment-item strong { color: white; }
-        .comment-form { display: flex; gap: 5px; }
+        /* Comments Styling */
+        .comments-section { margin-top: 20px; border-top: 1px solid #333; padding-top: 15px; }
+        .comment-list { max-height: 120px; overflow-y: auto; font-size: 0.9em; margin-bottom: 15px; color: #bbb; padding-right:5px;}
+        .comment-list::-webkit-scrollbar { width: 5px; }
+        .comment-list::-webkit-scrollbar-thumb { background: #e50914; border-radius: 5px;}
+        
+        .comment-item { margin-bottom: 8px; background: rgba(255,255,255,0.05); padding: 8px 12px; border-radius: 6px; border-left: 3px solid #e50914; }
+        .comment-item strong { color: #fff; }
+        .comment-form { display: flex; gap: 10px; }
+        .comment-form input { flex: 1; padding: 10px; background:rgba(0,0,0,0.5); border:1px solid #444;}
+        .comment-form button { background: #e50914; color: white; border: none; cursor: pointer; padding: 0 15px; border-radius: 6px; font-weight:bold;}
 
-        .music-player { position: fixed; bottom: 20px; right: 20px; background: rgba(17, 17, 17, 0.8); backdrop-filter: blur(10px); padding: 10px 20px; border-radius: 30px; border: 1px solid #333; display: flex; align-items: center; gap: 10px; z-index: 1000; }
-        .music-player button { background: transparent; border: none; color: white; font-size: 1.5em; cursor: pointer; }
-        .music-player span { font-size: 0.8em; color: #aaa; font-weight: bold; letter-spacing: 1px;}
+        /* Floating Pulsing Music Player */
+        .music-player { 
+            position: fixed; bottom: 30px; right: 30px; 
+            background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(15px); 
+            padding: 12px 25px; border-radius: 50px; 
+            border: 1px solid #e50914; display: flex; align-items: center; gap: 15px; 
+            z-index: 1000; animation: neonPulse 2s infinite;
+        }
+        .music-player button { 
+            background: #e50914; border: none; color: white; 
+            width: 40px; height: 40px; border-radius: 50%; font-size: 1.2em; 
+            cursor: pointer; display: flex; justify-content: center; align-items: center;
+            transition: 0.3s;
+        }
+        .music-player button:hover { transform: scale(1.1); }
+        .music-player span { font-size: 0.9em; color: #fff; font-weight: 700; letter-spacing: 2px;}
     </style>
 </head>
 <body>
 
-    <!-- Floating Background Music Player -->
+    <!-- Soft suspenseful ambient track -->
+    <audio id="bg-music" loop>
+        <source src="https://cdn.pixabay.com/download/audio/2022/05/16/audio_b2875f28ce.mp3" type="audio/mpeg">
+    </audio>
+
     <div class="music-player">
-        <audio id="bg-music" loop>
-            <source src="https://cdn.pixabay.com/download/audio/2022/05/16/audio_b2875f28ce.mp3" type="audio/mpeg">
-        </audio>
-        <span id="music-status">BGM: OFF</span>
+        <span id="music-status">BGM: WAITING...</span>
         <button id="music-btn" onclick="toggleMusic()">▶</button>
     </div>
 
     <header>
         <h1>SOCHO KYA <span>HOGA</span></h1>
-        <div class="welcome-text">Welcome, Agent {{ session.username }} | <a href="/logout" style="color:var(--accent-color);">Leave</a></div>
+        <div class="welcome-text">Welcome to the inner circle, <span>Agent {{ session.username }}</span> | <a href="/logout">ABORT MISSION</a></div>
     </header>
 
     <div class="upload-container">
         {% with messages = get_flashed_messages(with_categories=true) %}
           {% if messages %}
             {% for category, message in messages %}
-              <div style="color: {% if category=='error' %}red{% else %}green{% endif %}; text-align:center; font-weight:bold; margin-bottom:10px;">{{ message }}</div>
+              <div style="color: {% if category=='error' %}#ff4c4c{% else %}#4caf50{% endif %}; text-align:center; font-weight:bold; margin-bottom:15px; padding:10px; border:1px solid currentColor; border-radius:5px;">{{ message }}</div>
             {% endfor %}
           {% endif %}
         {% endwith %}
 
         <form action="/upload" method="POST" enctype="multipart/form-data">
-            <div class="form-group"><input type="text" name="title" placeholder="Title" required></div>
+            <div class="form-group"><input type="text" name="title" placeholder="ENTER CLASSIFIED TITLE" required></div>
             <div class="form-group">
                 <select name="category">
-                    <option value="Photo">Photo</option>
-                    <option value="Video">Video</option>
-                    <option value="Music">Music</option>
-                    <option value="Document">Document</option>
+                    <option value="Photo">PHOTO / STILL</option>
+                    <option value="Video">MOTION / VIDEO</option>
+                    <option value="Music">AUDIO / SCORE</option>
+                    <option value="Document">INTEL / DOCUMENT</option>
                 </select>
             </div>
-            <div class="form-group"><input type="file" name="media" required style="color: white;"></div>
-            <button type="submit" class="btn">Upload</button>
+            <div class="form-group"><input type="file" name="media" required style="color: white; padding: 10px 0;"></div>
+            <button type="submit" class="btn">SECURE UPLOAD</button>
         </form>
     </div>
 
     <div class="filters">
-        <button class="filter-btn active" onclick="filterMedia('All')">All</button>
-        <button class="filter-btn" onclick="filterMedia('Photo')">Photos</button>
-        <button class="filter-btn" onclick="filterMedia('Video')">Videos</button>
-        <button class="filter-btn" onclick="filterMedia('Music')">Music</button>
-        <button class="filter-btn" onclick="filterMedia('Document')">Documents</button>
+        <button class="filter-btn active" onclick="filterMedia('All')">ALL INTEL</button>
+        <button class="filter-btn" onclick="filterMedia('Photo')">PHOTOS</button>
+        <button class="filter-btn" onclick="filterMedia('Video')">VIDEOS</button>
+        <button class="filter-btn" onclick="filterMedia('Music')">AUDIO</button>
+        <button class="filter-btn" onclick="filterMedia('Document')">DOCS</button>
         <form action="/mystery" method="POST" style="display:inline;">
-            <button class="filter-btn mystery-btn" type="button" onclick="askMystery()">Mystery 🔒</button>
+            <button class="filter-btn mystery-btn" type="button" onclick="askMystery()">MYSTERY 🔒</button>
             <input type="hidden" name="passcode" id="mystery-pass">
         </form>
     </div>
@@ -108,18 +192,18 @@
                     {% if item.category == 'Video' %}
                         <video controls><source src="{{ url_for('static', filename='uploads/' + item.filename) }}"></video>
                     {% elif item.category == 'Music' %}
-                        <audio controls style="width: 90%;"><source src="{{ url_for('static', filename='uploads/' + item.filename) }}"></audio>
+                        <audio controls style="width: 85%;"><source src="{{ url_for('static', filename='uploads/' + item.filename) }}"></audio>
                     {% elif item.category == 'Document' %}
                         <a href="{{ url_for('static', filename='uploads/' + item.filename) }}" target="_blank" style="color:white; text-decoration:none; text-align:center;">
-                            <div style="font-size: 50px;">📄</div><div>Open Document</div>
+                            <div style="font-size: 60px; margin-bottom:10px;">📄</div><div style="letter-spacing:1px;">VIEW DOC</div>
                         </a>
                     {% else %}
                         <img src="{{ url_for('static', filename='uploads/' + item.filename) }}">
                     {% endif %}
                 </div>
                 <div class="card-info">
-                    <h3>{{ item.title }}</h3>
                     <span class="badge">{{ item.category }}</span>
+                    <h3 style="margin-top:15px;">{{ item.title }}</h3>
                     
                     <div class="comments-section">
                         <div class="comment-list">
@@ -127,11 +211,11 @@
                                 {% for comment in comments[item.id] %}
                                     <div class="comment-item"><strong>{{ comment.user_name }}:</strong> {{ comment.comment }}</div>
                                 {% endfor %}
-                            {% else %}<i>No messages yet.</i>{% endif %}
+                            {% else %}<i>No interactions yet.</i>{% endif %}
                         </div>
                         <form action="/comment/{{ item.id }}" method="POST" class="comment-form">
-                            <input type="text" name="comment" placeholder="Leave a message..." required autocomplete="off" style="width:70%;">
-                            <button type="submit" class="btn" style="width:30%; padding: 8px;">Send</button>
+                            <input type="text" name="comment" placeholder="Add intel..." required autocomplete="off">
+                            <button type="submit">SEND</button>
                         </form>
                     </div>
                 </div>
@@ -140,20 +224,43 @@
     </div>
 
     <script>
-        // Background Music Controller
+        // Music Logic - Force play on FIRST click anywhere on screen
         let music = document.getElementById("bg-music");
+        let btn = document.getElementById("music-btn");
+        let status = document.getElementById("music-status");
         let isPlaying = false;
-        music.volume = 0.2; 
+        let musicStarted = false;
+
+        music.volume = 0.25;
+
+        function playAudio() {
+            music.play().then(() => {
+                isPlaying = true;
+                musicStarted = true;
+                btn.innerText = "⏸"; 
+                status.innerText = "BGM: ON";
+            }).catch(e => console.log("Waiting for user interaction..."));
+        }
+
+        // Start music automatically when user clicks anywhere on the page
+        document.body.addEventListener('click', function() {
+            if (!musicStarted) {
+                playAudio();
+            }
+        }, { once: true }); // Only runs once
 
         function toggleMusic() {
-            let btn = document.getElementById("music-btn");
-            let status = document.getElementById("music-status");
             if (isPlaying) {
-                music.pause(); btn.innerText = "▶"; status.innerText = "BGM: OFF";
+                music.pause(); 
+                btn.innerText = "▶"; 
+                status.innerText = "BGM: OFF";
             } else {
-                music.play(); btn.innerText = "⏸"; status.innerText = "BGM: ON";
+                music.play(); 
+                btn.innerText = "⏸"; 
+                status.innerText = "BGM: ON";
             }
             isPlaying = !isPlaying;
+            musicStarted = true; // prevent the auto-click from interfering
         }
 
         // Filter Logic
@@ -168,7 +275,7 @@
 
         // Mystery Vault Logic
         function askMystery() {
-            let pass = prompt("WARNING: Classified Area.\nEnter Secret Code:");
+            let pass = prompt("CLASSIFIED AREA: Enter Secret Code:");
             if (pass) {
                 document.getElementById('mystery-pass').value = pass;
                 document.forms[1].submit(); 
