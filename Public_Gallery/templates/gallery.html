@@ -5,18 +5,33 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-    <!-- Music Player -->
-    <div class="music-player">
+    <!-- Floating Widgets -->
+    <div class="floating-widget music-player">
         <audio id="bg-music" loop autoplay><source src="https://cdn.pixabay.com/download/audio/2022/05/16/audio_b2875f28ce.mp3" type="audio/mpeg"></audio>
-        <span id="music-status">BGM: ON</span>
+        <span id="music-status" style="color:white;">BGM: ON</span>
         <button id="music-btn" onclick="toggleMusic()">⏸</button>
+    </div>
+
+    <!-- AI Assistant -->
+    <div class="floating-widget ai-assistant" onclick="toggleAI()">
+        <button>🤖</button>
+        <span style="color:#00e5ff;">VAULT A.I.</span>
+    </div>
+
+    <div class="ai-chat-box" id="ai-chat">
+        <div style="color:#00e5ff; font-weight:bold; margin-bottom:10px; border-bottom:1px solid #333; padding-bottom:5px;">VAULT A.I. SYSTEM</div>
+        <div class="ai-messages" id="ai-messages">
+            <p class="bot">Greetings Agent {{ session.username }}. I am the Vault Guardian. How can I assist?</p>
+        </div>
+        <div style="display:flex; gap:5px;">
+            <input type="text" id="ai-input" placeholder="Ask AI..." style="margin:0; padding:8px;">
+            <button class="btn" style="width:auto; padding:8px;" onclick="sendAI()">>></button>
+        </div>
     </div>
 
     <header>
         <h1>{{ category }} <span>VAULT</span></h1>
-        <div class="nav-links">
-            <a href="/dashboard">Back to Dashboard</a>
-        </div>
+        <div class="nav-links"><a href="/dashboard">Back to Dashboard</a></div>
     </header>
 
     <div class="container">
@@ -32,17 +47,26 @@
             <h2 style="margin-top:0; color:var(--accent-color);">UPLOAD NEW {{ category|upper }}</h2>
             <form action="/gallery/{{ category }}" method="POST" enctype="multipart/form-data">
                 <input type="text" name="title" placeholder="Title" required>
-                <textarea name="prompt" placeholder="Optional: Description or Prompt"></textarea>
-                <input type="file" name="media" required>
+                <textarea name="prompt" placeholder="{% if category == 'Shayari' %}Write your Shayari / Quote here...{% else %}Optional: Description or Prompt{% endif %}" {% if category == 'Shayari' %}required{% endif %}></textarea>
+                
+                {% if category != 'Shayari' %}
+                <input type="file" name="media" required style="color: white; padding: 10px 0;">
+                {% else %}
+                <input type="file" name="media" style="color: white; padding: 10px 0;" title="Optional background image">
+                <p style="font-size:0.8em; color:#777; margin-top:-10px;">(Image is optional for Shayari)</p>
+                {% endif %}
+                
                 <button type="submit" class="btn">Submit for Approval</button>
             </form>
         </div>
 
         <div class="gallery">
             {% for item in media_files %}
-                <div class="media-card">
+                <div class="media-card" id="card-{{ item.id }}">
                     <div class="media-content">
-                        {% if item.category == 'Video' %}
+                        {% if item.filename == 'SHAYARI_TEXT' %}
+                            <div style="padding: 20px; text-align:center; font-style:italic; font-size:1.2em;">"{{ item.prompt }}"</div>
+                        {% elif item.category == 'Video' %}
                             <video controls><source src="{{ url_for('static', filename='uploads/' + item.filename) }}"></video>
                         {% elif item.category == 'Music' %}
                             <audio controls style="width: 85%;"><source src="{{ url_for('static', filename='uploads/' + item.filename) }}"></audio>
@@ -56,13 +80,25 @@
                     </div>
                     <div class="card-info">
                         <h3>{{ item.title }}</h3>
-                        <p style="font-size: 0.8em; color: #888;">Uploaded by: {{ item.uploaded_by }}</p>
+                        <p style="font-size: 0.8em; color: #888;">By: {{ item.uploaded_by }}</p>
                         
-                        <!-- Delete Button (Only visible if Admin is logged in) -->
-                        {% if session.is_admin %}
-                            <a href="/delete/{{ item.id }}" style="color: red; font-size: 0.8em; text-decoration: none; border: 1px solid red; padding: 2px 5px; border-radius: 3px;">DELETE</a>
+                        {% if item.filename != 'SHAYARI_TEXT' and item.prompt %}
+                            <p style="font-size: 0.9em; color:#ccc; border-left: 2px solid #555; padding-left:10px;">{{ item.prompt }}</p>
                         {% endif %}
 
+                        <!-- Action Bar (Likes, Share, Theatre) -->
+                        <div class="action-bar">
+                            <button class="action-btn" onclick="likeMedia({{ item.id }})">🔥 <span id="like-{{ item.id }}">{{ item.likes }}</span></button>
+                            <button class="action-btn" onclick="shareLink('{{ request.url }}')">🔗 Share</button>
+                            {% if item.category in ['Video', 'Photo'] %}
+                            <button class="action-btn" onclick="toggleTheatre(this)">🎬 Theatre</button>
+                            {% endif %}
+                            {% if session.is_admin %}
+                                <a href="/delete/{{ item.id }}" class="action-btn" style="background:red; border:none; text-align:center; text-decoration:none;">Del</a>
+                            {% endif %}
+                        </div>
+
+                        <!-- Comments Section -->
                         <div class="comments-section">
                             <div class="comment-list">
                                 {% if comments.get(item.id) %}
@@ -72,8 +108,8 @@
                                 {% endif %}
                             </div>
                             <form action="/comment/{{ item.id }}" method="POST" class="comment-form">
-                                <input type="text" name="comment" placeholder="Add comment..." required>
-                                <button type="submit" class="btn" style="width:auto; padding: 10px;">>></button>
+                                <input type="text" name="comment" placeholder="Add comment..." required autocomplete="off">
+                                <button type="submit" class="btn" style="width:auto; padding: 10px;">></button>
                             </form>
                         </div>
                     </div>
@@ -85,15 +121,67 @@
     </div>
 
     <script>
+        // Music
         let music = document.getElementById("bg-music");
-        let btn = document.getElementById("music-btn");
-        let status = document.getElementById("music-status");
         music.volume = 0.2;
         function toggleMusic() {
+            let btn = document.getElementById("music-btn");
+            let status = document.getElementById("music-status");
             if (!music.paused) { music.pause(); btn.innerText = "▶"; status.innerText = "BGM: OFF"; } 
             else { music.play(); btn.innerText = "⏸"; status.innerText = "BGM: ON"; }
         }
         document.body.addEventListener('click', () => { music.play(); }, { once: true });
+
+        // Like System (AJAX)
+        function likeMedia(id) {
+            fetch('/like/' + id, { method: 'POST' })
+            .then(response => response.json())
+            .then(data => { document.getElementById('like-' + id).innerText = data.likes; });
+        }
+
+        // Share
+        function shareLink(url) {
+            navigator.clipboard.writeText(url);
+            alert("Vault Link Copied to Clipboard!");
+        }
+
+        // Theatre Mode
+        function toggleTheatre(btn) {
+            document.body.classList.toggle('theatre-mode');
+            if(document.body.classList.contains('theatre-mode')){
+                btn.innerText = "💡 Lights On";
+            } else {
+                btn.innerText = "🎬 Theatre";
+            }
+        }
+
+        // AI Assistant Logic
+        function toggleAI() {
+            let box = document.getElementById('ai-chat');
+            box.style.display = box.style.display === 'block' ? 'none' : 'block';
+        }
+        function sendAI() {
+            let input = document.getElementById('ai-input');
+            let msgs = document.getElementById('ai-messages');
+            if(input.value.trim() === '') return;
+            
+            // Add user message
+            msgs.innerHTML += `<p class="user">${input.value}</p>`;
+            let query = input.value.toLowerCase();
+            input.value = '';
+            msgs.scrollTop = msgs.scrollHeight;
+
+            // Simple Bot Logic
+            setTimeout(() => {
+                let reply = "The vault holds many secrets. Keep searching.";
+                if(query.includes('mystery') || query.includes('secret')) reply = "Ah, the mystery room. The password is known only to the creator.";
+                if(query.includes('hello') || query.includes('hi')) reply = "Greetings. I am here to assist your exploration.";
+                if(query.includes('socho')) reply = "SOCHO KYA HOGA... A question that drives us all.";
+                
+                msgs.innerHTML += `<p class="bot">${reply}</p>`;
+                msgs.scrollTop = msgs.scrollHeight;
+            }, 1000);
+        }
     </script>
 </body>
 </html>
