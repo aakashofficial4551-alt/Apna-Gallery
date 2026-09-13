@@ -20,19 +20,20 @@ def get_db_connection():
 
 def init_db():
     conn = get_db_connection()
-    # Users Table for optional accounts
     conn.execute('''CREATE TABLE IF NOT EXISTS users (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        username TEXT UNIQUE, password TEXT)''')
-    # Media Table
+                        id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, password TEXT,
+                        bio TEXT DEFAULT 'Agent of SOCHO KYA HOGA vault. Exploring secrets.',
+                        country TEXT DEFAULT 'India', friends_count INTEGER DEFAULT 0)''')
     conn.execute('''CREATE TABLE IF NOT EXISTS media (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        filename TEXT NOT NULL, title TEXT, category TEXT, 
-                        prompt TEXT, uploaded_by TEXT, approved INTEGER DEFAULT 0,
+                        id INTEGER PRIMARY KEY AUTOINCREMENT, filename TEXT NOT NULL, title TEXT, 
+                        category TEXT, prompt TEXT, uploaded_by TEXT, approved INTEGER DEFAULT 0,
                         likes INTEGER DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     conn.execute('''CREATE TABLE IF NOT EXISTS comments (
                         id INTEGER PRIMARY KEY AUTOINCREMENT, media_id INTEGER, 
                         user_name TEXT, comment TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+    conn.execute('''CREATE TABLE IF NOT EXISTS stories (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, 
+                        filename TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     conn.commit()
     conn.close()
 
@@ -40,8 +41,6 @@ init_db()
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-# --- ROUTES ---
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -68,8 +67,7 @@ def login():
                 session['username'] = user['username']
                 session['is_registered'] = True
                 return redirect(url_for('dashboard'))
-            else:
-                flash('Invalid Credentials!', 'error')
+            else: flash('Invalid Credentials!', 'error')
         conn.close()
     return render_template('login.html')
 
@@ -89,38 +87,49 @@ def games():
     if 'username' not in session: return redirect(url_for('login'))
     return render_template('games.html')
 
-@app.route('/profile')
+@app.route('/profile', methods=['GET', 'POST'])
 def profile():
     if 'username' not in session: return redirect(url_for('login'))
     conn = get_db_connection()
-    # Fetch all uploads by this user, approved or not
+    
+    if request.method == 'POST':
+        if 'bio' in request.form:
+            conn.execute('UPDATE users SET bio = ?, country = ? WHERE username = ?',
+                         (request.form['bio'], request.form['country'], session['username']))
+            conn.commit()
+        elif 'story' in request.files:
+            file = request.files['story']
+            if file and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                conn.execute('INSERT INTO stories (username, filename) VALUES (?, ?)', (session['username'], filename))
+                conn.commit()
+
+    user = conn.execute('SELECT * FROM users WHERE username = ?', (session['username'],)).fetchone()
     my_uploads = conn.execute('SELECT * FROM media WHERE uploaded_by = ? ORDER BY created_at DESC', (session['username'],)).fetchall()
+    stories = conn.execute('SELECT * FROM stories WHERE username = ? ORDER BY created_at DESC', (session['username'],)).fetchall()
+    post_count = len(my_uploads)
     conn.close()
-    return render_template('profile.html', my_uploads=my_uploads)
+    
+    return render_template('profile.html', user=user, my_uploads=my_uploads, post_count=post_count, stories=stories)
 
 @app.route('/gallery/<category>', methods=['GET', 'POST'])
 def gallery(category):
     if 'username' not in session: return redirect(url_for('login'))
-    
     if request.method == 'POST':
         file = request.files.get('media')
         filename = "SHAYARI_TEXT"
-        
         if file and file.filename != '':
-            if allowed_file(file.filename):
-                filename = secure_filename(file.filename)
-                file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-            else:
-                flash('Invalid format!', 'error')
-                return redirect(url_for('gallery', category=category))
-
+            filename = secure_filename(file.filename)
+            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        
         is_approved = 1 if session.get('is_admin') else 0
         conn = get_db_connection()
         conn.execute('INSERT INTO media (filename, title, category, prompt, uploaded_by, approved) VALUES (?, ?, ?, ?, ?, ?)',
                      (filename, request.form.get('title'), category, request.form.get('prompt', ''), session['username'], is_approved))
         conn.commit()
         conn.close()
-        flash('Sent for Admin approval. You can view it in your Profile.', 'success')
+        flash('Uploaded successfully!', 'success')
         return redirect(url_for('gallery', category=category))
 
     conn = get_db_connection()
@@ -128,8 +137,11 @@ def gallery(category):
     conn.close()
     return render_template('gallery.html', media_files=media_files, category=category)
 
-# Admin, Delete, Mystery routes remain the same as previous...
-# (Paste the admin, delete, and mystery routes from the previous code here)
+@app.route('/mystery', methods=['POST'])
+def mystery():
+    if request.form.get('passcode') == MYSTERY_CODE:
+        return render_template('mystery.html')
+    return redirect(url_for('dashboard'))
 
 if __name__ == '__main__':
     app.run(debug=True)
