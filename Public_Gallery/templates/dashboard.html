@@ -1,44 +1,28 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>Dashboard | SOCHO KYA HOGA</title>
+    <title>HQ Dashboard</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
     <header>
         <h1>SOCHO KYA <span>HOGA</span></h1>
         <div class="nav-links">
-            <span>Welcome, {{ session.username }}</span>
-            <a href="/admin">Admin Panel</a>
+            <span>Agent {{ session.username }}</span>
+            {% if session.is_registered %}<a href="/profile">My Profile</a>{% endif %}
             <a href="/logout">Logout</a>
         </div>
     </header>
 
-    <div class="container">
-        <h2 style="text-align: center; color: #aaa; margin-bottom: 40px; font-weight: 300;">CHOOSE YOUR INTEL CATEGORY</h2>
-        <div class="dash-grid">
-            <a href="/gallery/Photo" class="dash-card"><h2>📸 PHOTOS</h2><p>Visual Evidence</p></a>
-            <a href="/gallery/Video" class="dash-card" style="animation-delay: 0.2s;"><h2>🎥 VIDEOS</h2><p>Motion Records</p></a>
-            <a href="/gallery/Music" class="dash-card" style="animation-delay: 0.4s;"><h2>🎵 MUSIC</h2><p>Audio Files</p></a>
-            <a href="/gallery/Document" class="dash-card" style="animation-delay: 0.6s;"><h2>📄 DOCS</h2><p>Classified Intel</p></a>
-            <a href="/gallery/Shayari" class="dash-card" style="animation-delay: 0.7s; border-color: #ff9800;">
-                <h2 style="color: #ff9800;">✍️ SHAYARI</h2><p>Poetry & Quotes</p>
-            </a>
-            <div class="dash-card" style="border-color: #8a2be2; animation-delay: 0.8s;" onclick="askMystery()">
-                <h2 style="color: #d4a5ff;">🔒 MYSTERY</h2><p>Highly Classified</p>
-            </div>
-        </div>
+    <div class="container" style="display: flex; gap: 40px; justify-content: center; margin-top: 100px;">
+        <a href="/gallery/Photo" class="dash-card" style="width: 400px; height: 300px; background: linear-gradient(135deg, rgba(229,9,20,0.2), transparent);">
+            <h2 style="font-size: 3em;">📂 THE VAULT</h2>
+            <p>Access Photos, Videos & Docs</p>
+        </a>
+        <a href="/games" class="dash-card" style="width: 400px; height: 300px; background: linear-gradient(135deg, rgba(0,229,255,0.2), transparent); border-color: #00e5ff;">
+            <h2 style="font-size: 3em; color: #00e5ff;">🎮 THE ARCADE</h2>
+            <p>Play Exclusive Games</p>
+        </a>
     </div>
-    
-    <form id="mystery-form" action="/mystery" method="POST" style="display:none;">
-        <input type="hidden" name="passcode" id="mystery-pass">
-    </form>
-
-    <script>
-        function askMystery() {
-            let pass = prompt("WARNING: Classified Area.\nEnter Secret Code:");
-            if (pass) { document.getElementById('mystery-pass').value = pass; document.getElementById('mystery-form').submit(); }
-        }
-    </script>
 </body>
 </html>
