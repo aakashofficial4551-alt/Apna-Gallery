@@ -4,19 +4,42 @@
     <title>Enter The Vault</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <style>
-        body { display: flex; justify-content: center; align-items: center; height: 100vh; background: #000; }
-        .login-box { text-align: center; background: #111; padding: 50px; border-radius: 10px; border: 1px solid #e50914; animation: glow 3s infinite; max-width: 400px; width: 100%; }
+        body { display: flex; justify-content: center; align-items: center; height: 100vh; background: #000; flex-direction: column;}
+        .top-blessing { color: #ff9800; font-size: 1.5em; letter-spacing: 5px; margin-bottom: 20px; font-weight: bold; animation: glow 2s infinite; }
+        .login-box { text-align: center; background: #111; padding: 40px; border-radius: 10px; border: 1px solid #e50914; max-width: 400px; width: 100%; }
+        .form-section { margin-top: 20px; border-top: 1px solid #333; padding-top: 20px; }
     </style>
 </head>
 <body>
+    <div class="top-blessing">🙏 RADHE RADHE 🙏</div>
+    
     <div class="login-box">
-        <h1 style="margin: 0; font-size: 2.5em; letter-spacing: 3px;">SOCHO KYA <span style="color:#e50914;">HOGA</span></h1>
-        <p style="color:#aaa; margin-bottom: 30px;">Identify yourself to enter the vault.</p>
-        <form action="/login" method="POST">
-            <input type="text" name="username" placeholder="Agent Name" required autocomplete="off">
-            <input type="number" name="age" placeholder="Agent Age" required>
-            <button type="submit" class="btn">Enter Vault</button>
-        </form>
+        <h1 style="margin: 0; font-size: 2em;">SOCHO KYA <span style="color:#e50914;">HOGA</span></h1>
+        
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}{% for category, message in messages %}<p style="color:red;">{{ message }}</p>{% endfor %}{% endif %}
+        {% endwith %}
+
+        <div class="form-section">
+            <h3 style="color:#aaa;">Create Account / Login</h3>
+            <form action="/login" method="POST">
+                <input type="text" name="username" placeholder="Username" required autocomplete="off" style="margin-bottom: 10px; width:100%; padding:10px;">
+                <input type="password" name="password" placeholder="Password" required style="margin-bottom: 10px; width:100%; padding:10px;">
+                <div style="display:flex; gap:10px;">
+                    <button type="submit" name="action" value="login" class="btn">Login</button>
+                    <button type="submit" name="action" value="register" class="btn" style="background:#444;">Register</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="form-section">
+            <h3 style="color:#aaa;">Or Enter Without Login</h3>
+            <form action="/login" method="POST">
+                <input type="text" name="username" placeholder="Guest Name" required autocomplete="off" style="margin-bottom: 10px; width:100%; padding:10px;">
+                <button type="submit" name="action" value="guest" class="btn" style="background:transparent; border:1px solid #e50914; color:#e50914;">Enter as Guest</button>
+            </form>
+        </div>
     </div>
 </body>
 </html>
