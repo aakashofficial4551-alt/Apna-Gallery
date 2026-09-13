@@ -4,7 +4,50 @@
     <meta charset="UTF-8">
     <title>SOCHO KYA HOGA | The Vault</title>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;500;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        /* ALL CSS DESIGN EMBEDDED DIRECTLY HERE */
+        :root { --bg-color: #030303; --accent-color: #e50914; --text-color: #f1f1f1; --card-bg: #111; }
+        body { font-family: 'Montserrat', sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 0; overflow-x: hidden; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes glow { 0% { box-shadow: 0 0 5px var(--accent-color); } 50% { box-shadow: 0 0 20px var(--accent-color); } 100% { box-shadow: 0 0 5px var(--accent-color); } }
+
+        header { text-align: center; padding: 40px 20px; background: linear-gradient(180deg, rgba(20,0,0,0.9) 0%, var(--bg-color) 100%); }
+        header h1 { font-weight: 800; letter-spacing: 4px; font-size: 3em; margin: 0; text-transform: uppercase; }
+        header span { color: var(--accent-color); }
+        .welcome-text { font-size: 1.2em; color: #aaa; margin-top: 10px; }
+
+        .upload-container { max-width: 600px; margin: 20px auto; background: var(--card-bg); padding: 20px; border-radius: 10px; border: 1px solid #222; animation: fadeIn 1s ease-out; }
+        .form-group { margin-bottom: 15px; }
+        input[type="text"], input[type="password"], select, textarea { width: 100%; padding: 10px; background: #000; color: white; border: 1px solid #333; border-radius: 5px; box-sizing: border-box; }
+        .btn { background: var(--accent-color); color: white; border: none; padding: 12px 20px; width: 100%; font-weight: bold; cursor: pointer; border-radius: 5px; text-transform: uppercase; transition: 0.3s; }
+        .btn:hover { background: #ff0f1a; box-shadow: 0 0 15px rgba(229, 9, 20, 0.5); }
+
+        .filters { text-align: center; margin: 30px 0; animation: fadeIn 1.2s ease-out; }
+        .filter-btn { background: transparent; border: 1px solid #555; color: #aaa; padding: 10px 25px; margin: 5px; border-radius: 30px; cursor: pointer; transition: 0.3s; font-weight: bold; }
+        .filter-btn:hover, .filter-btn.active { border-color: var(--accent-color); color: white; background: rgba(229, 9, 20, 0.1); }
+        .mystery-btn { border-color: #8a2be2; color: #8a2be2; }
+        .mystery-btn:hover { background: rgba(138, 43, 226, 0.2); color: white; }
+
+        .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 25px; padding: 20px; max-width: 1200px; margin: 0 auto; animation: fadeIn 1.5s ease-out; }
+        .media-card { background: var(--card-bg); border-radius: 10px; overflow: hidden; border: 1px solid #222; transition: transform 0.3s; }
+        .media-card:hover { transform: translateY(-5px); border-color: #444; }
+        .media-content { height: 250px; background: #000; display: flex; justify-content: center; align-items: center; overflow: hidden; }
+        .media-content img, .media-content video { width: 100%; height: 100%; object-fit: cover; }
+        .card-info { padding: 15px; }
+        .card-info h3 { margin: 0 0 10px; color: var(--accent-color); }
+        .badge { background: #333; font-size: 0.7em; padding: 3px 8px; border-radius: 3px; color: #aaa; }
+
+        .comments-section { margin-top: 15px; border-top: 1px solid #333; padding-top: 10px; }
+        .comment-list { max-height: 100px; overflow-y: auto; font-size: 0.85em; margin-bottom: 10px; color: #ccc; }
+        .comment-item { margin-bottom: 5px; background: #000; padding: 5px; border-radius: 4px; border-left: 2px solid var(--accent-color); }
+        .comment-item strong { color: white; }
+        .comment-form { display: flex; gap: 5px; }
+
+        .music-player { position: fixed; bottom: 20px; right: 20px; background: rgba(17, 17, 17, 0.8); backdrop-filter: blur(10px); padding: 10px 20px; border-radius: 30px; border: 1px solid #333; display: flex; align-items: center; gap: 10px; z-index: 1000; }
+        .music-player button { background: transparent; border: none; color: white; font-size: 1.5em; cursor: pointer; }
+        .music-player span { font-size: 0.8em; color: #aaa; font-weight: bold; letter-spacing: 1px;}
+    </style>
 </head>
 <body>
 
@@ -23,7 +66,6 @@
     </header>
 
     <div class="upload-container">
-        <!-- Flash Messages -->
         {% with messages = get_flashed_messages(with_categories=true) %}
           {% if messages %}
             {% for category, message in messages %}
@@ -101,7 +143,7 @@
         // Background Music Controller
         let music = document.getElementById("bg-music");
         let isPlaying = false;
-        music.volume = 0.2; // Soft volume
+        music.volume = 0.2; 
 
         function toggleMusic() {
             let btn = document.getElementById("music-btn");
@@ -129,7 +171,7 @@
             let pass = prompt("WARNING: Classified Area.\nEnter Secret Code:");
             if (pass) {
                 document.getElementById('mystery-pass').value = pass;
-                document.forms[1].submit(); // Submit the mystery form
+                document.forms[1].submit(); 
             }
         }
     </script>
