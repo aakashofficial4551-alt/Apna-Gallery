@@ -1,43 +1,113 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>Arcade | Snake</title>
+    <title>Arcade | SOCHO KYA HOGA</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
-        body { background: #000; color: #00e5ff; font-family: monospace; text-align: center; padding-top: 50px; }
-        canvas { border: 2px solid #00e5ff; background: #111; box-shadow: 0 0 20px rgba(0,229,255,0.3); }
-        .btn { background: #00e5ff; color: #000; border: none; padding: 10px 20px; cursor: pointer; font-weight: bold; margin-top: 20px; text-decoration: none; display: inline-block;}
+        body { background: #050505; color: #00e5ff; font-family: 'Press Start 2P', cursive; text-align: center; margin: 0; padding-top: 30px;}
+        h1 { text-shadow: 0 0 20px #00e5ff; font-size: 2em; margin-bottom: 10px;}
+        .btn { background: #e50914; color: #fff; border: none; padding: 12px 20px; cursor: pointer; text-decoration: none; font-family: 'Press Start 2P'; font-size:0.6em; border-radius:5px; transition:0.3s;}
+        .btn:hover { background: #ff0f1a; box-shadow: 0 0 15px #e50914;}
+        
+        /* Game Tabs */
+        .tabs { margin: 20px 0; }
+        .tab-btn { background: #111; border: 2px solid #333; color: #aaa; padding: 15px 30px; cursor: pointer; font-family: 'Press Start 2P'; font-size:0.7em;}
+        .tab-btn.active { background: rgba(0,229,255,0.2); border-color: #00e5ff; color: #fff; box-shadow: 0 0 15px rgba(0,229,255,0.4);}
+        .game-container { display: none; margin-top: 20px;}
+        .game-container.active { display: block; }
+
+        /* Snake Game */
+        canvas { border: 4px solid #00e5ff; background: #0a0a0a; box-shadow: 0 0 30px rgba(0,229,255,0.2); margin: 0 auto; display:block;}
+        .score-board { font-size: 0.8em; margin: 15px 0; color: #fff;}
+
+        /* Tic Tac Toe */
+        .ttt-board { display: grid; grid-template-columns: repeat(3, 100px); gap: 5px; justify-content: center; margin-top: 20px;}
+        .ttt-cell { width: 100px; height: 100px; background: #111; border: 2px solid #e50914; display: flex; justify-content: center; align-items: center; font-size: 3em; cursor: pointer; transition: 0.3s;}
+        .ttt-cell:hover { background: rgba(229,9,20,0.2); }
+        .ttt-cell.x { color: #00e5ff; text-shadow: 0 0 15px #00e5ff;}
+        .ttt-cell.o { color: #e50914; text-shadow: 0 0 15px #e50914;}
     </style>
 </head>
 <body>
-    <h1>NEON SNAKE ARCADE</h1>
-    <canvas id="gameCanvas" width="400" height="400"></canvas>
-    <p>Use Arrow Keys to Move</p>
-    <a href="/dashboard" class="btn">Back to Dashboard</a>
+    <h1>NEON ARCADE</h1>
+    <a href="/dashboard" class="btn">⬅ Exit to HQ</a>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchGame('snake', this)">SNAKE (PRO)</button>
+        <button class="tab-btn" onclick="switchGame('ttt', this)">TIC-TAC-TOE</button>
+    </div>
+
+    <!-- SNAKE GAME -->
+    <div id="snake" class="game-container active">
+        <div class="score-board">SCORE: <span id="score">0</span> | HIGH SCORE: <span id="highscore">0</span></div>
+        <canvas id="gameCanvas" width="400" height="400"></canvas>
+        <p style="font-size:0.6em; color:#aaa; margin-top:20px;">Use Arrow Keys to move. Speed increases as you eat!</p>
+    </div>
+
+    <!-- TIC TAC TOE GAME -->
+    <div id="ttt" class="game-container">
+        <div class="score-board" id="ttt-status">Your Turn (X)</div>
+        <div class="ttt-board" id="board">
+            <div class="ttt-cell" onclick="makeMove(this, 0)"></div>
+            <div class="ttt-cell" onclick="makeMove(this, 1)"></div>
+            <div class="ttt-cell" onclick="makeMove(this, 2)"></div>
+            <div class="ttt-cell" onclick="makeMove(this, 3)"></div>
+            <div class="ttt-cell" onclick="makeMove(this, 4)"></div>
+            <div class="ttt-cell" onclick="makeMove(this, 5)"></div>
+            <div class="ttt-cell" onclick="makeMove(this, 6)"></div>
+            <div class="ttt-cell" onclick="makeMove(this, 7)"></div>
+            <div class="ttt-cell" onclick="makeMove(this, 8)"></div>
+        </div>
+        <button class="btn" onclick="resetTTT()" style="margin-top: 30px;">Restart Match</button>
+    </div>
 
     <script>
+        function switchGame(gameId, btn) {
+            document.querySelectorAll('.game-container').forEach(c => c.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(gameId).classList.add('active');
+            btn.classList.add('active');
+        }
+
+        /* --- SNAKE GAME LOGIC --- */
         const canvas = document.getElementById("gameCanvas");
         const ctx = canvas.getContext("2d");
         const box = 20;
-        let snake = []; snake[0] = { x: 9 * box, y: 10 * box };
-        let food = { x: Math.floor(Math.random() * 19 + 1) * box, y: Math.floor(Math.random() * 19 + 1) * box };
-        let score = 0; let d;
+        let snake, food, score, d, gameSpeed, game;
+        let highScore = localStorage.getItem("snakeHighScore") || 0;
+        document.getElementById("highscore").innerText = highScore;
 
-        document.addEventListener("keydown", direction);
-        function direction(event) {
+        function initSnake() {
+            snake = []; snake[0] = { x: 9 * box, y: 10 * box };
+            food = { x: Math.floor(Math.random() * 19 + 1) * box, y: Math.floor(Math.random() * 19 + 1) * box };
+            score = 0; d = null; gameSpeed = 120;
+            document.getElementById("score").innerText = score;
+            if(game) clearInterval(game);
+            game = setInterval(draw, gameSpeed);
+        }
+
+        document.addEventListener("keydown", event => {
             if (event.keyCode == 37 && d != "RIGHT") d = "LEFT";
             else if (event.keyCode == 38 && d != "DOWN") d = "UP";
             else if (event.keyCode == 39 && d != "LEFT") d = "RIGHT";
             else if (event.keyCode == 40 && d != "UP") d = "DOWN";
-        }
+        });
 
         function draw() {
-            ctx.fillStyle = "#111"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "#0a0a0a"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw Grid
+            ctx.strokeStyle = "#111";
+            for(let i=0; i<400; i+=20) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,400); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(400,i); ctx.stroke();}
+
             for (let i = 0; i < snake.length; i++) {
-                ctx.fillStyle = i == 0 ? "#00e5ff" : "#0088ff";
-                ctx.fillRect(snake[i].x, snake[i].y, box, box);
-                ctx.strokeStyle = "#000"; ctx.strokeRect(snake[i].x, snake[i].y, box, box);
+                ctx.fillStyle = i == 0 ? "#00e5ff" : "rgba(0,229,255,0.5)";
+                ctx.fillRect(snake[i].x, snake[i].y, box-1, box-1);
             }
-            ctx.fillStyle = "#e50914"; ctx.fillRect(food.x, food.y, box, box);
+            // Food
+            ctx.fillStyle = "#e50914"; ctx.fillRect(food.x, food.y, box-1, box-1);
+
+            if(!d) return; // Wait for first key press
 
             let snakeX = snake[0].x; let snakeY = snake[0].y;
             if (d == "LEFT") snakeX -= box; if (d == "UP") snakeY -= box;
@@ -45,23 +115,74 @@
 
             if (snakeX == food.x && snakeY == food.y) {
                 score++;
+                document.getElementById("score").innerText = score;
                 food = { x: Math.floor(Math.random() * 19 + 1) * box, y: Math.floor(Math.random() * 19 + 1) * box };
+                // Speed up slightly
+                if(gameSpeed > 50) { clearInterval(game); gameSpeed -= 3; game = setInterval(draw, gameSpeed); }
             } else { snake.pop(); }
 
             let newHead = { x: snakeX, y: snakeY };
 
             if (snakeX < 0 || snakeX >= canvas.width || snakeY < 0 || snakeY >= canvas.height || collision(newHead, snake)) {
-                clearInterval(game); alert("GAME OVER! Score: " + score); location.reload();
+                clearInterval(game);
+                if(score > highScore) { localStorage.setItem("snakeHighScore", score); document.getElementById("highscore").innerText = score;}
+                ctx.fillStyle = "rgba(229,9,20,0.8)"; ctx.fillRect(0, 150, 400, 100);
+                ctx.fillStyle = "#fff"; ctx.fillText("SYSTEM FAILURE", 90, 200);
+                setTimeout(initSnake, 2000);
+                return;
             }
             snake.unshift(newHead);
-            ctx.fillStyle = "white"; ctx.font = "20px monospace"; ctx.fillText("Score: " + score, box, 1.5 * box);
+        }
+        function collision(head, array) { for (let i = 0; i < array.length; i++) { if (head.x == array[i].x && head.y == array[i].y) return true; } return false; }
+        initSnake();
+
+        /* --- TIC TAC TOE LOGIC --- */
+        let boardState = ["", "", "", "", "", "", "", "", ""];
+        let gameActive = true;
+        const statusDisplay = document.getElementById('ttt-status');
+        const winConditions = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+
+        function makeMove(cell, index) {
+            if(boardState[index] !== "" || !gameActive) return;
+            boardState[index] = "X";
+            cell.innerText = "X"; cell.classList.add("x");
+            checkWin();
+            if(gameActive) {
+                statusDisplay.innerText = "AI is thinking...";
+                setTimeout(aiMove, 600);
+            }
         }
 
-        function collision(head, array) {
-            for (let i = 0; i < array.length; i++) { if (head.x == array[i].x && head.y == array[i].y) return true; }
-            return false;
+        function aiMove() {
+            let available = [];
+            for(let i=0; i<9; i++) if(boardState[i] == "") available.push(i);
+            if(available.length > 0) {
+                let random = available[Math.floor(Math.random() * available.length)];
+                boardState[random] = "O";
+                let cell = document.getElementsByClassName("ttt-cell")[random];
+                cell.innerText = "O"; cell.classList.add("o");
+                checkWin();
+                if(gameActive) statusDisplay.innerText = "Your Turn (X)";
+            }
         }
-        let game = setInterval(draw, 100);
+
+        function checkWin() {
+            let roundWon = false;
+            for(let i=0; i<8; i++) {
+                let a = boardState[winConditions[i][0]], b = boardState[winConditions[i][1]], c = boardState[winConditions[i][2]];
+                if(a === "" || b === "" || c === "") continue;
+                if(a === b && b === c) { roundWon = true; break; }
+            }
+            if(roundWon) { statusDisplay.innerText = "MATCH OVER!"; gameActive = false; return; }
+            if(!boardState.includes("")) { statusDisplay.innerText = "IT'S A TIE!"; gameActive = false; return; }
+        }
+
+        function resetTTT() {
+            boardState = ["", "", "", "", "", "", "", "", ""];
+            gameActive = true;
+            statusDisplay.innerText = "Your Turn (X)";
+            document.querySelectorAll('.ttt-cell').forEach(cell => { cell.innerText = ""; cell.className = "ttt-cell"; });
+        }
     </script>
 </body>
 </html>
