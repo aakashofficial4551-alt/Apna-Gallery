@@ -1,1 +1,25 @@
-
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>My Profile</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <header><h1>MY <span>DOSSIER</span></h1><a href="/dashboard" style="color:white;">Back to Dashboard</a></header>
+    <div class="container">
+        <h2>My Uploads</h2>
+        <div class="gallery">
+            {% for item in my_uploads %}
+                <div class="media-card" style="border-color: {% if item.approved %}green{% else %}orange{% endif %};">
+                    <div class="card-info">
+                        <h3>{{ item.title }}</h3>
+                        <p>Status: {% if item.approved %}<strong style="color:green;">Approved</strong>{% else %}<strong style="color:orange;">Pending Approval</strong>{% endif %}</p>
+                    </div>
+                </div>
+            {% else %}
+                <p>You haven't uploaded anything yet.</p>
+            {% endfor %}
+        </div>
+    </div>
+</body>
+</html>
