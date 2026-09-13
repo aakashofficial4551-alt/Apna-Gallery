@@ -1,15 +1,38 @@
 import os
+import sqlite3
 from flask import Flask, request, render_template, redirect, url_for, flash
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-# Security key for flash messages
-app.secret_key = "socho_kya_hoga_secret_key" 
+app.secret_key = "socho_kya_hoga_secret_key"
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
-# Sirf images aur videos allow karne ke liye
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'mp4', 'webm'}
 
+# Yahan apna secret password dalein jisse sirf aap delete kar sakein
+ADMIN_PASSCODE = "12345" 
+
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+def get_db_connection():
+    conn = sqlite3.connect('database.db')
+    conn.row_factory = sqlite3.Row
+    return conn
+
+# Create database table
+def init_db():
+    conn = get_db_connection()
+    conn.execute('''CREATE TABLE IF NOT EXISTS media (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        filename TEXT NOT NULL,
+                        title TEXT,
+                        category TEXT,
+                        prompt TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )''')
+    conn.commit()
+    conn.close()
+
+init_db()
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -18,28 +41,52 @@ def allowed_file(filename):
 def index():
     if request.method == 'POST':
         if 'media' not in request.files:
-            flash('No file part', 'error')
+            flash('No file uploaded', 'error')
             return redirect(request.url)
+        
         file = request.files['media']
-        if file.filename == '':
-            flash('No selected file', 'error')
-            return redirect(request.url)
+        title = request.form.get('title', 'Untitled Project')
+        category = request.form.get('category', 'Cinematic')
+        prompt = request.form.get('prompt', '')
+
         if file and allowed_file(file.filename):
-            # secure_filename safe naam banata hai (e.g., spaces hatata hai)
             filename = secure_filename(file.filename)
             file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-            flash('Media Uploaded Successfully!', 'success')
+            
+            conn = get_db_connection()
+            conn.execute('INSERT INTO media (filename, title, category, prompt) VALUES (?, ?, ?, ?)',
+                         (filename, title, category, prompt))
+            conn.commit()
+            conn.close()
+            
+            flash('Visual added to the Vault!', 'success')
             return redirect(url_for('index'))
         else:
-            flash('Invalid file format. Only images and videos are allowed.', 'error')
-    
-    # Files ko get karna aur naye files ko sabse upar dikhana (sorting)
-    files = os.listdir(app.config['UPLOAD_FOLDER'])
-    files_with_paths = [os.path.join(app.config['UPLOAD_FOLDER'], f) for f in files]
-    files_with_paths.sort(key=os.path.getmtime, reverse=True)
-    sorted_files = [os.path.basename(f) for f in files_with_paths]
-    
-    return render_template('index.html', media_files=sorted_files)
+            flash('Invalid format! Use images or videos.', 'error')
+
+    conn = get_db_connection()
+    media_files = conn.execute('SELECT * FROM media ORDER BY created_at DESC').fetchall()
+    conn.close()
+    return render_template('index.html', media_files=media_files)
+
+@app.route('/delete/<int:id>', methods=['POST'])
+def delete(id):
+    passcode = request.form.get('passcode')
+    if passcode == ADMIN_PASSCODE:
+        conn = get_db_connection()
+        item = conn.execute('SELECT * FROM media WHERE id = ?', (id,)).fetchone()
+        if item:
+            try:
+                os.remove(os.path.join(app.config['UPLOAD_FOLDER'], item['filename']))
+            except:
+                pass
+            conn.execute('DELETE FROM media WHERE id = ?', (id,))
+            conn.commit()
+            flash('Item deleted securely.', 'success')
+        conn.close()
+    else:
+        flash('Access Denied: Wrong Passcode', 'error')
+    return redirect(url_for('index'))
 
 if __name__ == '__main__':
     app.run(debug=True)
