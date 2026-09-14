@@ -23,11 +23,11 @@
         .games-banner { background: linear-gradient(45deg, #00b4d8, #0077b6); border-radius: 15px; padding: 30px; text-align: center; text-decoration: none; color: white; display: block; font-size: 2em; font-weight: 800; transition: 0.4s; box-shadow: 0 10px 20px rgba(0,180,216,0.4);}
         .games-banner:hover { transform: scale(1.02); }
 
-        /* --- MASCOT WIDGET --- */
+        /* --- MASCOT WIDGET (VIDEO MAGIC) --- */
         #mascot-widget {
             position: fixed;
             bottom: 20px;
-            left: 30px; /* Dashboard par left side me rakha hai */
+            left: 30px;
             z-index: 9999;
             cursor: pointer;
             display: flex;
@@ -35,13 +35,6 @@
             align-items: center;
             animation: floatMascot 3s infinite ease-in-out;
         }
-
-        #ff-mascot {
-            height: 180px;
-            filter: drop-shadow(0 10px 15px rgba(0, 180, 216, 0.4));
-            transition: transform 0.3s;
-        }
-        #ff-mascot:hover { transform: scale(1.1); }
 
         .mascot-bubble {
             background: #0077b6;
@@ -70,7 +63,7 @@
         .ai-messages { height: 200px; overflow-y: auto; color: #333; font-size: 0.9em; margin-bottom: 10px; padding-right: 5px;}
         .bot { background: #e0f7fa; padding: 10px; border-radius: 8px; border-left: 4px solid #00b4d8; margin-bottom:5px; font-weight: 500;}
         .user { background: #0077b6; color:white; padding: 10px; border-radius: 8px; text-align:right; margin-bottom:5px; font-weight: 500;}
-        input { width: 100%; padding: 10px; background: #f0fcfd; border: 1px solid #90e0ef; border-radius: 8px; font-family: inherit; box-sizing: border-box;}
+        .ai-chat-box input { width: 100%; padding: 10px; background: #f0fcfd; border: 1px solid #90e0ef; border-radius: 8px; font-family: inherit; box-sizing: border-box;}
         .btn-ai { background: #0077b6; color: white; border: none; padding: 10px 15px; cursor: pointer; border-radius: 8px; font-weight: bold;}
     </style>
 </head>
@@ -104,12 +97,15 @@
         <a href="/games" class="games-banner">🎮 ENTER ARCADE ZONE</a>
     </div>
 
-    <!-- ALWAYS VISIBLE ROLLER SKATE CHARACTER -->
+    <!-- ALWAYS VISIBLE MASCOT (VIDEO MAGIC WITH AUTO BG REMOVER) -->
     <div id="mascot-widget" onclick="toggleAI()">
         <div class="mascot-bubble">Talk to A.I. 🤖</div>
-        <img id="ff-mascot" 
-     src="https://cdn-icons-png.flaticon.com/512/4712/4712010.png" 
-     alt="A.I. Mascot">
+        
+        <!-- Canvas jo background hata kar sirf character dikhayega -->
+        <canvas id="ff-mascot-canvas" style="height: 170px; filter: drop-shadow(0 10px 15px rgba(0, 180, 216, 0.4));"></canvas>
+        
+        <!-- Hidden Video (Make sure cartoon_ff.mp4 is uploaded in static/mascot folder) -->
+        <video id="ff-mascot-video" src="{{ url_for('static', filename='mascot/cartoon_ff.mp4') }}" autoplay loop muted playsinline style="display:none;" crossorigin="anonymous"></video>
     </div>
 
     <!-- AI CHAT BOX -->
@@ -128,6 +124,41 @@
     <form id="mystery-form" action="/mystery" method="POST" style="display:none;"><input type="hidden" name="passcode" id="mystery-pass"></form>
     
     <script>
+        // --- LIVE VIDEO BACKGROUND REMOVER LOGIC ---
+        window.addEventListener('load', function() {
+            const video = document.getElementById('ff-mascot-video');
+            const canvas = document.getElementById('ff-mascot-canvas');
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+            video.addEventListener('loadedmetadata', function() {
+                canvas.width = video.videoWidth / 2;
+                canvas.height = video.videoHeight / 2;
+            });
+
+            video.addEventListener('play', function() {
+                function processFrame() {
+                    if (video.paused || video.ended) return;
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    let frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    let length = frame.data.length / 4;
+
+                    for (let i = 0; i < length; i++) {
+                        let r = frame.data[i * 4 + 0];
+                        let g = frame.data[i * 4 + 1];
+                        let b = frame.data[i * 4 + 2];
+                        
+                        // Auto remove Black & Green background from video frames
+                        if ((r < 30 && g < 30 && b < 30) || (g > 90 && r < 80 && b < 80)) {
+                            frame.data[i * 4 + 3] = 0; 
+                        }
+                    }
+                    ctx.putImageData(frame, 0, 0);
+                    requestAnimationFrame(processFrame);
+                }
+                requestAnimationFrame(processFrame);
+            });
+        });
+
         document.querySelectorAll('a, .card').forEach(item => {
             item.addEventListener('click', () => { document.getElementById('click-sound').play(); });
         });
