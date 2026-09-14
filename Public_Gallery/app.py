@@ -85,12 +85,7 @@ app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
 
 # Render production HTTPS ke liye
-app.config["SESSION_COOKIE_SECURE"] = (
-    os.environ.get(
-        "FLASK_ENV",
-        "production"
-    ).lower()
-    == "production"
+app.config["SESSION_COOKIE_SECURE"] = True
 )
 
 
@@ -98,7 +93,6 @@ app.config["SESSION_COOKIE_SECURE"] = (
 os.makedirs(
     app.config["UPLOAD_FOLDER"],
     exist_ok=True
-)
 
 
 # =========================================================
