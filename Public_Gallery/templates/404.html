@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>404 - Asset Not Found | Apna Gallery</title>
+    <style>
+        body {
+            font-family: 'Montserrat', system-ui, sans-serif;
+            background: linear-gradient(135deg, #08111f, #101b2d);
+            color: #f8fafc;
+            display: grid;
+            place-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .error-card {
+            width: min(90vw, 460px);
+            padding: 40px;
+            background: rgba(16, 27, 45, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(56, 189, 248, 0.2);
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+        }
+        h1 { color: #38bdf8; font-size: 2.5rem; margin-bottom: 10px; }
+        p { color: #94a3b8; margin-bottom: 25px; line-height: 1.5; }
+        .btn {
+            display: inline-block;
+            background: #38bdf8;
+            color: #08111f;
+            padding: 12px 24px;
+            border-radius: 10px;
+            text-decoration: none;
+            font-weight: 700;
+            transition: background 0.2s;
+        }
+        .btn:hover { background: #0ea5e9; }
+    </style>
+</head>
+<body>
+    <div class="error-card">
+        <h1>404</h1>
+        <p>The classified asset or route you are looking for does not exist or has been relocated.</p>
+        <a href="{{ url_for('dashboard') }}" class="btn">Return to Dashboard</a>
+    </div>
+</body>
+</html>
