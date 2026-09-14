@@ -86,13 +86,13 @@ app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
 # Render production HTTPS ke liye
 app.config["SESSION_COOKIE_SECURE"] = True
-)
 
 
 # Upload directory create
 os.makedirs(
     app.config["UPLOAD_FOLDER"],
     exist_ok=True
+)
 
 
 # =========================================================
@@ -428,345 +428,209 @@ def save_uploaded_file(file):
 )
 def login():
 
-    # Already logged in
     if session.get("username"):
-
-        return redirect(
-            url_for("dashboard")
-        )
-
+        return redirect(url_for("dashboard"))
 
     if request.method == "POST":
 
-        action = (
-            request.form
-            .get("action", "")
-            .strip()
-        )
+        action = request.form.get("action", "").strip()
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+        confirm_password = request.form.get("confirm_password", "")
 
-
-        username = (
-            request.form
-            .get("username", "")
-            .strip()
-        )
-
-
-        password = request.form.get(
-            "password",
-            ""
-        )
-
-
-        # -------------------------------------------------
-        # BASIC VALIDATION
-        # -------------------------------------------------
-
-        if not username:
-
-            flash(
-                "Please enter a username.",
-                "error"
-            )
-
-            return redirect(
-                url_for("login")
-            )
-
-
-        if len(username) > 40:
-
-            flash(
-                "Username is too long.",
-                "error"
-            )
-
-            return redirect(
-                url_for("login")
-            )
-
-
-        # =================================================
-        # GUEST LOGIN
-        # =================================================
-
+        # Guest login does not require username/password
         if action == "guest":
-
             session.clear()
-
-            session["username"] = (
-                f"{username} (Guest)"
-            )
-
+            session["username"] = f"Guest-{uuid4().hex[:8]}"
             session["is_registered"] = False
             session["is_admin"] = False
+            return redirect(url_for("dashboard"))
 
-            return redirect(
-                url_for("dashboard")
-            )
+        if not username:
+            flash("Please enter a username.", "error")
+            return redirect(url_for("login"))
 
+        if len(username) > 40:
+            flash("Username is too long.", "error")
+            return redirect(url_for("login"))
 
-        # Password required for register/login
-        if not password:
+        allowed_username_chars = (
+            "abcdefghijklmnopqrstuvwxyz"
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+            "0123456789"
+            "_-"
+        )
 
+        if not all(char in allowed_username_chars for char in username):
             flash(
-                "Please enter your password.",
+                "Username can contain only letters, numbers, _ and -.",
                 "error"
             )
+            return redirect(url_for("login"))
 
-            return redirect(
-                url_for("login")
-            )
-
-
-        # =================================================
-        # DATABASE CONNECTION
-        # =================================================
-
-        conn = get_db_connection()
-
-
-        # =================================================
-        # REGISTER
-        # =================================================
+        if not password:
+            flash("Please enter your password.", "error")
+            return redirect(url_for("login"))
 
         if action == "register":
 
             if len(password) < 6:
-
-                conn.close()
-
                 flash(
                     "Password must contain at least 6 characters.",
                     "error"
                 )
+                return redirect(url_for("login"))
 
-                return redirect(
-                    url_for("login")
-                )
+            if password != confirm_password:
+                flash("Passwords do not match.", "error")
+                return redirect(url_for("login"))
 
-
-            password_hash = (
-                generate_password_hash(
-                    password
-                )
-            )
-
+            conn = None
 
             try:
+                conn = get_db_connection()
+
+                existing_user = conn.execute(
+                    "SELECT id FROM users WHERE username = ?",
+                    (username,)
+                ).fetchone()
+
+                if existing_user:
+                    flash(
+                        "Username already exists. Please choose another.",
+                        "error"
+                    )
+                    return redirect(url_for("login"))
+
+                password_hash = generate_password_hash(password)
 
                 conn.execute(
                     """
-                    INSERT INTO users
-                    (
-                        username,
-                        password
-                    )
+                    INSERT INTO users (username, password)
                     VALUES (?, ?)
                     """,
-                    (
-                        username,
-                        password_hash,
-                    ),
+                    (username, password_hash)
                 )
-
-
                 conn.commit()
 
+                session.clear()
+                session["username"] = username
+                session["is_registered"] = True
+                session["is_admin"] = False
 
                 flash(
-                    "Account created successfully. Please login.",
+                    "Account created successfully! Welcome to Apna Gallery.",
                     "success"
                 )
-
+                return redirect(url_for("dashboard"))
 
             except sqlite3.IntegrityError:
-
+                if conn:
+                    conn.rollback()
                 flash(
-                    "Username already exists!",
+                    "Username already exists. Please choose another.",
                     "error"
                 )
+                return redirect(url_for("login"))
 
+            except Exception as e:
+                print("REGISTER ERROR:", repr(e))
+                if conn:
+                    conn.rollback()
+                flash(
+                    "Account creation failed. Please try again.",
+                    "error"
+                )
+                return redirect(url_for("login"))
 
             finally:
-
-                conn.close()
-
-
-            return redirect(
-                url_for("login")
-            )
-
-
-        # =================================================
-        # LOGIN
-        # =================================================
+                if conn:
+                    conn.close()
 
         if action == "login":
 
-            user = conn.execute(
-                """
-                SELECT *
-                FROM users
-                WHERE username = ?
-                """,
-                (username,),
-            ).fetchone()
+            conn = None
 
+            try:
+                conn = get_db_connection()
 
-            if not user:
+                user = conn.execute(
+                    """
+                    SELECT *
+                    FROM users
+                    WHERE username = ?
+                    """,
+                    (username,)
+                ).fetchone()
 
-                conn.close()
+                if not user:
+                    flash(
+                        "Invalid username or password.",
+                        "error"
+                    )
+                    return redirect(url_for("login"))
+
+                stored_password = user["password"] or ""
+                password_valid = False
+                legacy_password = False
+
+                if stored_password.startswith(("pbkdf2:", "scrypt:")):
+                    try:
+                        password_valid = check_password_hash(
+                            stored_password,
+                            password
+                        )
+                    except Exception as e:
+                        print("PASSWORD HASH ERROR:", repr(e))
+                        password_valid = False
+                else:
+                    if stored_password == password:
+                        password_valid = True
+                        legacy_password = True
+
+                if password_valid:
+
+                    if legacy_password:
+                        new_hash = generate_password_hash(password)
+                        conn.execute(
+                            """
+                            UPDATE users
+                            SET password = ?
+                            WHERE id = ?
+                            """,
+                            (new_hash, user["id"])
+                        )
+                        conn.commit()
+
+                    session.clear()
+                    session["username"] = user["username"]
+                    session["is_registered"] = True
+                    session["is_admin"] = False
+
+                    return redirect(url_for("dashboard"))
 
                 flash(
                     "Invalid username or password.",
                     "error"
                 )
+                return redirect(url_for("login"))
 
-                return redirect(
-                    url_for("login")
+            except Exception as e:
+                print("LOGIN ERROR:", repr(e))
+                flash(
+                    "Login failed. Please try again.",
+                    "error"
                 )
+                return redirect(url_for("login"))
 
+            finally:
+                if conn:
+                    conn.close()
 
-            stored_password = (
-                user["password"]
-                or ""
-            )
+        flash("Invalid request.", "error")
+        return redirect(url_for("login"))
 
-
-            password_valid = False
-
-            legacy_password = False
-
-
-            # -------------------------------------------------
-            # NEW SECURE HASH
-            # -------------------------------------------------
-
-            if stored_password.startswith(
-                (
-                    "pbkdf2:",
-                    "scrypt:",
-                )
-            ):
-
-                try:
-
-                    password_valid = (
-                        check_password_hash(
-                            stored_password,
-                            password
-                        )
-                    )
-
-                except ValueError:
-
-                    password_valid = False
-
-
-            # -------------------------------------------------
-            # OLD PLAINTEXT PASSWORD
-            # -------------------------------------------------
-
-            else:
-
-                if (
-                    stored_password
-                    == password
-                ):
-
-                    password_valid = True
-
-                    legacy_password = True
-
-
-            # -------------------------------------------------
-            # LOGIN SUCCESS
-            # -------------------------------------------------
-
-            if password_valid:
-
-
-                # ---------------------------------------------
-                # AUTO-MIGRATE OLD PASSWORD
-                # ---------------------------------------------
-
-                if legacy_password:
-
-                    new_hash = (
-                        generate_password_hash(
-                            password
-                        )
-                    )
-
-
-                    conn.execute(
-                        """
-                        UPDATE users
-                        SET password = ?
-                        WHERE id = ?
-                        """,
-                        (
-                            new_hash,
-                            user["id"],
-                        ),
-                    )
-
-
-                    conn.commit()
-
-
-                conn.close()
-
-
-                # Clear old session
-                session.clear()
-
-
-                session["username"] = (
-                    user["username"]
-                )
-
-                session["is_registered"] = True
-
-                session["is_admin"] = False
-
-
-                return redirect(
-                    url_for("dashboard")
-                )
-
-
-            # -------------------------------------------------
-            # LOGIN FAILED
-            # -------------------------------------------------
-
-            conn.close()
-
-
-            flash(
-                "Invalid username or password.",
-                "error"
-            )
-
-
-            return redirect(
-                url_for("login")
-            )
-
-
-        conn.close()
-
-
-        flash(
-            "Invalid request.",
-            "error"
-        )
-
-
-    return render_template(
-        "login.html"
-    )
+    return render_template("login.html")
 
 
 # =========================================================
