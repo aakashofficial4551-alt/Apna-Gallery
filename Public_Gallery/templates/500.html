@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>500 - System Fault | Apna Gallery</title>
+    <style>
+        body {
+            font-family: 'Montserrat', system-ui, sans-serif;
+            background: linear-gradient(135deg, #08111f, #101b2d);
+            color: #f8fafc;
+            display: grid;
+            place-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .error-card {
+            width: min(90vw, 460px);
+            padding: 40px;
+            background: rgba(16, 27, 45, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+        }
+        h1 { color: #ef4444; font-size: 2.5rem; margin-bottom: 10px; }
+        p { color: #94a3b8; margin-bottom: 25px; line-height: 1.5; }
+        .btn {
+            display: inline-block;
+            background: #ef4444;
+            color: #fff;
+            padding: 12px 24px;
+            border-radius: 10px;
+            text-decoration: none;
+            font-weight: 700;
+            transition: background 0.2s;
+        }
+        .btn:hover { background: #dc2626; }
+    </style>
+</head>
+<body>
+    <div class="error-card">
+        <h1>500</h1>
+        <p>The system encountered an unexpected internal fault. Security logs have recorded the event.</p>
+        <a href="{{ url_for('dashboard') }}" class="btn">Return to Dashboard</a>
+    </div>
+</body>
+</html>
