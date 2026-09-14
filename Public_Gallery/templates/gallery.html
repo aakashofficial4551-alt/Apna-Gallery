@@ -1,89 +1,244 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>{{ category }} Vault</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ category }} Vault | Sky Blue Premium</title>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;500;800&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Montserrat', sans-serif; background: #e0f7fa; color: #333; margin: 0; min-height:100vh;}
-        header { padding: 20px; background: #fff; text-align: center; border-bottom: 3px solid #00b4d8; box-shadow: 0 4px 10px rgba(0,0,0,0.05);}
-        header h1 { color: #023e8a; margin: 0; }
+        /* SKY BLUE THEME */
+        body { font-family: 'Montserrat', sans-serif; background: #e0f7fa; color: #333; margin: 0; min-height: 100vh; overflow-x: hidden; transition: background 0.5s; }
+        header { padding: 20px; background: #fff; text-align: center; border-bottom: 3px solid #00b4d8; box-shadow: 0 4px 15px rgba(0,180,216,0.15); position: sticky; top: 0; z-index: 1000;}
+        header h1 { color: #023e8a; margin: 0; font-size: 2em; letter-spacing: 2px;}
+        header h1 span { color: #00b4d8; }
         
-        .upload-box { max-width: 650px; margin: 30px auto; background: #fff; padding: 30px; border-radius: 15px; border: 2px solid #00b4d8; box-shadow: 0 10px 20px rgba(0,180,216,0.15);}
-        input, textarea { width: 100%; padding: 12px; background: #f0fcfd; color: #333; border: 1px solid #90e0ef; border-radius: 8px; margin-bottom: 15px; font-family:inherit;}
-        .btn { background: #0077b6; color: white; border: none; padding: 12px 20px; cursor: pointer; border-radius: 8px; font-weight: bold; width: 100%; text-transform:uppercase;}
+        .upload-box { max-width: 650px; margin: 30px auto; background: #fff; padding: 30px; border-radius: 15px; border: 2px solid #00b4d8; box-shadow: 0 10px 25px rgba(0,180,216,0.2);}
+        input, textarea { width: 100%; padding: 12px; background: #f0fcfd; color: #333; border: 1px solid #90e0ef; border-radius: 8px; margin-bottom: 15px; font-family: inherit; font-weight: bold;}
+        .btn { background: linear-gradient(45deg, #0077b6, #00b4d8); color: white; border: none; padding: 12px 20px; cursor: pointer; border-radius: 8px; font-weight: bold; width: 100%; text-transform: uppercase; transition: 0.3s; box-shadow: 0 5px 15px rgba(0,119,182,0.3);}
+        .btn:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,119,182,0.5); }
         
+        /* Gallery */
         .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 25px; padding: 20px; max-width: 1200px; margin: 0 auto; }
-        .media-card { background: #fff; border-radius: 15px; overflow: hidden; border: 1px solid #caf0f8; box-shadow: 0 8px 15px rgba(0,0,0,0.05); }
+        .media-card { background: #fff; border-radius: 15px; overflow: hidden; border: 2px solid #caf0f8; box-shadow: 0 8px 20px rgba(0,0,0,0.08); transition: 0.3s; }
+        .media-card:hover { transform: translateY(-8px); border-color: #00b4d8; box-shadow: 0 15px 30px rgba(0,180,216,0.2); }
         .media-card img, .media-card video { width: 100%; height: 250px; object-fit: cover; }
         .card-info { padding: 20px; }
-        .card-info h3 { margin:0; color:#023e8a; font-size:1.4em;}
+        .card-info h3 { margin:0 0 5px 0; color:#023e8a; font-size:1.4em;}
 
-        .action-bar button { flex:1; background:#e0f7fa; color:#023e8a; border:1px solid #00b4d8; padding:10px; border-radius:5px; cursor:pointer; font-weight:bold;}
-        .action-bar button:hover { background:#00b4d8; color:white; }
+        .action-bar { display:flex; gap:10px; margin-top:15px; }
+        .action-bar button, .action-bar a { flex:1; background:#e0f7fa; color:#023e8a; border:1px solid #00b4d8; padding:10px; border-radius:8px; cursor:pointer; font-weight:bold; transition:0.3s; text-align:center; text-decoration:none;}
+        .action-bar button:hover, .action-bar a:hover { background:#00b4d8; color:white; }
 
-        /* Mascot & AI */
-        .mascot-container { position: fixed; bottom: 30px; left: 30px; cursor: pointer; animation: float 3s infinite ease-in-out; }
-        .mascot { font-size: 55px; }
-        @keyframes float { 0%, 100% {transform: translateY(0);} 50% {transform: translateY(-15px);} }
+        /* --- 3D ANIMATED MASCOT & STAGE --- */
+        #mascot-stage { position: fixed; bottom: 0; left: 0; width: 100%; height: 200px; pointer-events: none; z-index: 9999; overflow: hidden; }
         
-        .ai-chat-box { display: none; position: fixed; bottom: 100px; left: 30px; width: 300px; background: #fff; border: 2px solid #00b4d8; border-radius: 15px; padding: 15px; box-shadow: 0 10px 30px rgba(0,180,216,0.3); z-index:999;}
-        .ai-messages { height: 200px; overflow-y: auto; color: #333; font-size: 0.9em; margin-bottom: 10px;}
-        .bot { background: #e0f7fa; padding: 10px; border-radius: 8px; border-left: 4px solid #00b4d8; margin-bottom:5px;}
-        .user { background: #0077b6; color:white; padding: 10px; border-radius: 8px; text-align:right; margin-bottom:5px;}
+        #mascot-box { 
+            position: absolute; bottom: 20px; right: 80px; width: 130px; height: 90px; 
+            background: linear-gradient(135deg, #00b4d8, #023e8a); border: 3px solid #e0f7fa; 
+            box-shadow: 0 0 25px rgba(0, 180, 216, 0.6), inset 0 0 15px rgba(255,255,255,0.4); 
+            color: #fff; text-align: center; font-weight: 900; font-size: 1.2em; border-radius: 10px; 
+            display: flex; justify-content: center; align-items: center; 
+            transform: translateY(200px); transition: transform 1s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+        }
+        
+        #ff-mascot-container { 
+            position: absolute; bottom: 20px; left: -200px; transition: all 3s linear; 
+            cursor: pointer; pointer-events: auto; /* Allows clicking on character */
+        }
+        
+        #ff-mascot { 
+            height: 170px; filter: drop-shadow(0 15px 10px rgba(0,0,0,0.5)); 
+            animation: walk-illusion 0.5s infinite alternate; /* The 3D Walking Illusion */
+        }
+        
+        .mascot-text { 
+            background: #023e8a; color: #fff; font-size: 0.8em; font-weight: bold; padding: 5px 12px; 
+            border-radius: 15px; border: 2px solid #00b4d8; position: absolute; top: -35px; left: 10px; 
+            white-space: nowrap; animation: float 2s infinite ease-in-out; 
+        }
+        
+        @keyframes walk-illusion { 0% { transform: translateY(0) rotate(-4deg); } 100% { transform: translateY(-12px) rotate(4deg); } }
+        @keyframes float { 0%, 100% {transform: translateY(0);} 50% {transform: translateY(-8px);} }
+        
+        /* JS Classes for Animation */
+        .box-up { transform: translateY(0) !important; }
+        .skate-in { transform: translateX(calc(100vw - 320px)); }
+        .jump-on-box { transform: translateX(calc(100vw - 200px)) translateY(-90px); transition: all 0.7s cubic-bezier(0.25, 1, 0.5, 1) !important; }
+
+        /* --- AI CHAT BOX --- */
+        .ai-chat-box { 
+            display: none; position: fixed; bottom: 100px; left: 30px; width: 320px; 
+            background: #fff; border: 3px solid #00b4d8; border-radius: 15px; padding: 20px; 
+            box-shadow: 0 15px 40px rgba(0,180,216,0.3); z-index:10000;
+        }
+        .ai-messages { height: 220px; overflow-y: auto; color: #333; font-size: 0.9em; margin-bottom: 10px; padding-right:5px;}
+        .ai-messages::-webkit-scrollbar { width: 6px; }
+        .ai-messages::-webkit-scrollbar-thumb { background: #00b4d8; border-radius: 5px;}
+        .bot { background: #e0f7fa; padding: 12px; border-radius: 10px; border-left: 4px solid #00b4d8; margin-bottom:8px; font-weight:500;}
+        .user { background: #0077b6; color:white; padding: 12px; border-radius: 10px; text-align:right; margin-bottom:8px; font-weight:500;}
+
+        /* --- FOCUS MODE --- */
+        body.focus-mode header, body.focus-mode .upload-box, body.focus-mode #mascot-stage { display: none !important; }
+        body.focus-mode { background: #000 !important; }
+        .focus-tools { display: none; position: fixed; top: 20px; left: 20px; background: rgba(255,255,255,0.9); padding: 20px; border: 2px solid #00b4d8; border-radius: 12px; color: #023e8a; font-family: monospace; font-size: 1.5em; z-index: 9999; box-shadow: 0 0 20px rgba(0,180,216,0.2);}
+        body.focus-mode .focus-tools { display: block; }
+        .focus-btn { position: fixed; top: 20px; right: 20px; background: #fff; color: #023e8a; border: 2px solid #00b4d8; padding: 10px 15px; border-radius: 8px; cursor: pointer; z-index: 9999; font-weight: bold; transition:0.3s;}
+        .focus-btn:hover { background: #00b4d8; color: #fff;}
     </style>
 </head>
 <body>
+
     <!-- Sound Effects -->
     <audio id="ui-sound" src="https://actions.google.com/sounds/v1/ui/button_click.ogg"></audio>
     <audio id="like-sound" src="https://actions.google.com/sounds/v1/cartoon/pop.ogg"></audio>
     <audio id="mascot-sound" src="https://actions.google.com/sounds/v1/cartoon/cartoon_boing.ogg"></audio>
 
-    <div class="mascot-container" onclick="toggleAI()">
-        <div class="mascot">🤖</div>
+    <button id="focus-btn" class="focus-btn" onclick="toggleFocus()">Focus Mode 👁️</button>
+
+    <!-- Focus Tools (Clock & Stopwatch) -->
+    <div class="focus-tools">
+        <div id="live-clock" style="font-weight:bold;">00:00:00</div>
+        <div id="live-date" style="font-size: 0.5em; color: #555; margin-bottom: 10px;">Date</div>
+        <hr style="border-color:#ccc;">
+        <div id="stopwatch" style="color: #e50914; font-weight:bold; margin-bottom: 10px;">00:00:00</div>
+        <div style="display:flex; gap:10px;">
+            <button onclick="startStopwatch()" style="flex:1; background:#0077b6; color:#fff; border:none; padding:5px; border-radius:5px; cursor:pointer;">Start</button>
+            <button onclick="resetStopwatch()" style="flex:1; background:#e50914; color:#fff; border:none; padding:5px; border-radius:5px; cursor:pointer;">Reset</button>
+        </div>
     </div>
 
+    <!-- 3D MASCOT STAGE -->
+    <div id="mascot-stage">
+        <div id="mascot-box">SOCHO</div>
+        
+        <!-- Click karne se AI khulega -->
+        <div id="ff-mascot-container" onclick="toggleAI()">
+            <div class="mascot-text">Talk to AI!</div>
+            <!-- Yahan aapki photo use ho rahi hai. Agar GitHub pe photo nahi mili, toh ek fallback robot load ho jayega -->
+            <img id="ff-mascot" src="{{ url_for('static', filename='mascot/cartoon_ff.png') }}" onerror="this.src='https://cdn-icons-png.flaticon.com/512/4712/4712010.png'" alt="Character">
+        </div>
+    </div>
+
+    <!-- AI CHAT BOX -->
     <div class="ai-chat-box" id="ai-chat">
-        <h3 style="margin-top:0; color:#023e8a;">VAULT A.I. ✖</h3>
-        <div class="ai-messages" id="ai-messages"><p class="bot">Namaste! Sky Blue theme kaisa laga? Boliye kya help karu?</p></div>
-        <div style="display:flex; gap:5px;">
-            <input type="text" id="ai-input" placeholder="Type here..." style="margin:0; padding:10px; border-color:#00b4d8;">
-            <button class="btn" style="width:auto;" onclick="sendAI()">➤</button>
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #e0f7fa; padding-bottom:10px; margin-bottom:10px;">
+            <h3 style="margin:0; color:#023e8a;">VAULT A.I. 🤖</h3>
+            <span style="color:#e50914; cursor:pointer; font-weight:bold;" onclick="toggleAI()">✖</span>
+        </div>
+        <div class="ai-messages" id="ai-messages"><p class="bot">Namaste Agent {{ session.username }}! Main aapka assistant hu. Boliye?</p></div>
+        <div style="display:flex; gap:8px;">
+            <input type="text" id="ai-input" placeholder="Type message..." style="margin:0; padding:10px; border-color:#00b4d8; background:#fff;">
+            <button class="btn" style="width:auto; padding:10px 15px;" onclick="sendAI()">➤</button>
         </div>
     </div>
 
     <header>
         <h1>{{ category }} <span>VAULT</span></h1>
-        <a href="/dashboard" style="color:#0077b6; font-weight:bold; text-decoration:none;">⬅ Back</a>
+        <a href="/dashboard" style="color:#0077b6; font-weight:bold; text-decoration:none;">⬅ Return to Dashboard</a>
     </header>
 
-    <div class="upload-box">
-        <form action="/gallery/{{ category }}" method="POST" enctype="multipart/form-data" onsubmit="playClick()">
-            <h2 style="color:#023e8a; margin-top:0;">Upload to {{ category }}</h2>
-            <input type="text" name="title" placeholder="Title" required>
-            <input type="file" name="media" required style="background:white;">
-            <button type="submit" class="btn">Submit for Admin Approval</button>
-        </form>
-    </div>
+    <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}{% for c, m in messages %}<div style="color:#023e8a; text-align:center; margin-bottom:20px; font-weight:bold; background:#e0f7fa; padding:15px; border:2px solid #00b4d8; border-radius:10px;">{{ m }}</div>{% endfor %}{% endif %}
+        {% endwith %}
 
-    <div class="gallery">
-        {% for item in media_files %}
-            <div class="media-card">
-                {% if item.category == 'Video' %}<video controls><source src="{{ url_for('static', filename='uploads/' + item.filename) }}"></video>
-                {% else %}<img src="{{ url_for('static', filename='uploads/' + item.filename) }}">{% endif %}
-                <div class="card-info">
-                    <h3>{{ item.title }}</h3>
-                    <p style="color:#777; font-size:0.8em;">Uploaded by: {{ item.uploaded_by }}</p>
-                    <div class="action-bar" style="display:flex; gap:10px; margin-top:15px;">
-                        <button onclick="likeMedia({{ item.id }})">🔥 <span id="like-{{ item.id }}">{{ item.likes }}</span></button>
-                        <button onclick="playClick(); navigator.clipboard.writeText(window.location.href); alert('Link Copied!');">🔗 Share</button>
+        <div class="upload-box">
+            <h2 style="color:#023e8a; margin-top:0; text-align:center;">UPLOAD TO {{ category|upper }}</h2>
+            <form action="/gallery/{{ category }}" method="POST" enctype="multipart/form-data" onsubmit="playClick()">
+                <input type="text" name="title" placeholder="Enter Title" required>
+                <textarea name="prompt" placeholder="{% if category == 'Shayari' %}Write Shayari / Quote...{% else %}Description / Details...{% endif %}" {% if category == 'Shayari' %}required{% endif %}></textarea>
+                
+                {% if category != 'Shayari' %}
+                <input type="file" name="media" required style="background:#fff;">
+                {% else %}
+                <input type="file" name="media" style="background:#fff;" title="Optional Background Image">
+                <p style="font-size:0.8em; color:#777; margin-top:-10px; text-align:center;">(Background Image Optional)</p>
+                {% endif %}
+                
+                <button type="submit" class="btn">Submit for Admin Approval</button>
+            </form>
+        </div>
+
+        <div class="gallery">
+            {% for item in media_files %}
+                <div class="media-card">
+                    {% if item.filename == 'SHAYARI_TEXT' %}
+                        <div style="padding: 30px; text-align:center; font-style:italic; font-size:1.3em; color: #fff; background: linear-gradient(45deg, #0077b6, #00b4d8); height:190px; display:flex; align-items:center; justify-content:center;">"{{ item.prompt }}"</div>
+                    {% elif item.category == 'Video' %}
+                        <video controls><source src="{{ url_for('static', filename='uploads/' + item.filename) }}"></video>
+                    {% elif item.category == 'Music' %}
+                        <audio controls style="width: 90%; margin: 100px 5%;"><source src="{{ url_for('static', filename='uploads/' + item.filename) }}"></audio>
+                    {% elif item.category == 'Document' %}
+                        <a href="{{ url_for('static', filename='uploads/' + item.filename) }}" target="_blank" style="color:#023e8a; text-decoration:none; text-align:center; display:block; padding-top:60px; height:190px; background:#e0f7fa;">
+                            <div style="font-size: 70px;">📄</div><div style="font-weight:bold; margin-top:10px;">View Document</div>
+                        </a>
+                    {% else %}
+                        <img src="{{ url_for('static', filename='uploads/' + item.filename) }}">
+                    {% endif %}
+                    
+                    <div class="card-info">
+                        <h3>{{ item.title }}</h3>
+                        <p style="font-size: 0.85em; color: #777; border-bottom: 1px solid #eee; padding-bottom:10px;">Agent: <b>{{ item.uploaded_by }}</b></p>
+                        
+                        <div class="action-bar">
+                            <button onclick="likeMedia({{ item.id }})">🔥 <span id="like-{{ item.id }}">{{ item.likes }}</span></button>
+                            <button onclick="playClick(); navigator.clipboard.writeText(window.location.href); alert('Secure Link Copied!');">🔗 Share</button>
+                            {% if session.is_admin %}
+                                <a href="/delete/{{ item.id }}" style="background:#e76f51; color:white; border-color:#e76f51;">🗑️ Delete</a>
+                            {% endif %}
+                        </div>
                     </div>
                 </div>
-            </div>
-        {% endfor %}
+            {% else %}
+                <h3 style="color: #777; text-align: center; grid-column: 1/-1; padding: 40px; background: #fff; border-radius: 10px; border: 2px dashed #ccc;">No items approved yet.</h3>
+            {% endfor %}
+        </div>
     </div>
 
+    <!-- ALL JAVASCRIPT LOGIC -->
     <script>
         function playClick() { document.getElementById('ui-sound').play(); }
+
+        // --- MASCOT ANIMATION LOOP ---
+        const mascotContainer = document.getElementById('ff-mascot-container');
+        const box = document.getElementById('mascot-box');
+        
+        function runMascotAnimation() {
+            box.classList.add('box-up'); // Box appears
+            
+            setTimeout(() => {
+                mascotContainer.style.transition = "all 3s linear";
+                mascotContainer.classList.add('skate-in'); // Skates in
+                mascotContainer.classList.remove('jump-on-box');
+            }, 1000);
+            
+            setTimeout(() => {
+                mascotContainer.style.transition = "all 0.8s cubic-bezier(0.25, 1, 0.5, 1)";
+                mascotContainer.classList.remove('skate-in');
+                mascotContainer.classList.add('jump-on-box'); // Jumps on box
+            }, 4500);
+            
+            setTimeout(() => {
+                mascotContainer.style.transition = "all 2s ease-in-out";
+                mascotContainer.classList.remove('jump-on-box');
+                mascotContainer.style.transform = "translateX(120vw)"; // Exits screen
+            }, 10000);
+            
+            setTimeout(() => {
+                box.classList.remove('box-up'); // Box disappears
+                setTimeout(() => {
+                    mascotContainer.style.transition = "none";
+                    mascotContainer.style.transform = ""; 
+                    mascotContainer.classList.remove('skate-in', 'jump-on-box'); // Reset position invisibly
+                }, 1000);
+            }, 13000);
+        }
+        
+        // Start Mascot loop
+        setTimeout(runMascotAnimation, 2000); // Pehli baar 2 second baad aayega
+        setInterval(runMascotAnimation, 25000); // Phir har 25 second baad aayega
+
+        // --- AI CHAT LOGIC ---
         function toggleAI() { 
             document.getElementById('mascot-sound').play();
             let b = document.getElementById('ai-chat'); 
@@ -94,21 +249,69 @@
             playClick();
             let input = document.getElementById('ai-input');
             let msgs = document.getElementById('ai-messages');
-            if(!input.value) return;
-            msgs.innerHTML += `<p class="user">${input.value}</p>`;
-            let query = input.value; input.value = ''; msgs.scrollTop = msgs.scrollHeight;
+            let query = input.value.trim();
+            if(!query) return;
             
-            fetch('/api/ai', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({query: query}) })
+            msgs.innerHTML += `<p class="user">${query}</p>`;
+            input.value = ''; msgs.scrollTop = msgs.scrollHeight;
+            
+            fetch('/api/ai', { 
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify({query: query}) 
+            })
             .then(res => res.json()).then(data => {
                 msgs.innerHTML += `<p class="bot">${data.reply}</p>`;
                 msgs.scrollTop = msgs.scrollHeight;
+            }).catch(err => {
+                msgs.innerHTML += `<p class="bot" style="color:red;">Error connecting to AI Server.</p>`;
             });
         }
 
+        // --- LIKE SYSTEM ---
         function likeMedia(id) {
             document.getElementById('like-sound').play();
             fetch('/like/' + id, { method: 'POST' }).then(res => res.json())
             .then(data => { document.getElementById('like-' + id).innerText = data.likes; });
+        }
+
+        // --- FOCUS MODE & STOPWATCH ---
+        function toggleFocus() { 
+            playClick();
+            document.body.classList.toggle('focus-mode'); 
+            let btn = document.getElementById('focus-btn');
+            if(document.body.classList.contains('focus-mode')){
+                btn.innerText = "Exit Focus ✖";
+                btn.style.borderColor = "#e50914";
+                btn.style.color = "#e50914";
+            } else {
+                btn.innerText = "Focus Mode 👁️";
+                btn.style.borderColor = "#00b4d8";
+                btn.style.color = "#023e8a";
+            }
+        }
+        
+        setInterval(() => {
+            let d = new Date();
+            document.getElementById('live-clock').innerText = d.toLocaleTimeString();
+            document.getElementById('live-date').innerText = d.toDateString();
+        }, 1000);
+
+        let swTimer; let swSeconds = 0;
+        function startStopwatch() {
+            playClick();
+            clearInterval(swTimer);
+            swTimer = setInterval(() => {
+                swSeconds++;
+                let hrs = Math.floor(swSeconds / 3600);
+                let mins = Math.floor((swSeconds - (hrs * 3600)) / 60);
+                let secs = swSeconds % 60;
+                document.getElementById('stopwatch').innerText = `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            }, 1000);
+        }
+        function resetStopwatch() { 
+            playClick();
+            clearInterval(swTimer); swSeconds = 0; document.getElementById('stopwatch').innerText = "00:00:00"; 
         }
     </script>
 </body>
