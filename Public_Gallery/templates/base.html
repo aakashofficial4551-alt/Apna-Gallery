@@ -1,1 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
 
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <meta
+        name="theme-color"
+        content="#0b0b0f"
+    >
+
+    <meta
+        name="description"
+        content="Apna Gallery - Socho Kya Hoga"
+    >
+
+    <title>
+        {% block title %}Apna Gallery{% endblock %}
+    </title>
+
+    <!-- Google Font -->
+    <link
+        rel="preconnect"
+        href="https://fonts.googleapis.com"
+    >
+
+    <link
+        rel="preconnect"
+        href="https://fonts.gstatic.com"
+        crossorigin
+    >
+
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet"
+    >
+
+    <!-- Main CSS -->
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='css/main.css') }}"
+    >
+
+    {% block head %}{% endblock %}
+</head>
+
+<body>
+
+    <!-- ================================
+         PAGE LOADER
+    ================================= -->
+    <div
+        id="pageLoader"
+        class="page-loader"
+        aria-hidden="true"
+    >
+        <div class="loader-content">
+            <div class="loader-logo">AG</div>
+
+            <div class="loader-spinner"></div>
+
+            <p>Loading...</p>
+        </div>
+    </div>
+
+
+    <!-- ================================
+         NAVBAR
+    ================================= -->
+    <header class="site-header">
+
+        <nav class="navbar">
+
+            <!-- LOGO -->
+            <a
+                href="{{ url_for('dashboard') }}"
+                class="brand"
+                aria-label="Apna Gallery Home"
+            >
+                <span class="brand-icon">AG</span>
+
+                <span class="brand-text">
+                    <span class="brand-name">
+                        Apna Gallery
+                    </span>
+
+                    <span class="brand-tagline">
+                        SOCHO KYA HOGA
+                    </span>
+                </span>
+            </a>
+
+
+            <!-- MOBILE MENU BUTTON -->
+            <button
+                type="button"
+                class="mobile-menu-btn"
+                id="mobileMenuBtn"
+                aria-label="Open navigation menu"
+                aria-expanded="false"
+            >
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+
+
+            <!-- NAVIGATION -->
+            <div
+                class="nav-menu"
+                id="navMenu"
+            >
+
+                {% if session.get('username') %}
+
+                    <a
+                        href="{{ url_for('dashboard') }}"
+                        class="nav-link"
+                    >
+                        <span class="nav-icon">⌂</span>
+                        <span>Home</span>
+                    </a>
+
+                    <a
+                        href="{{ url_for('games') }}"
+                        class="nav-link"
+                    >
+                        <span class="nav-icon">🎮</span>
+                        <span>Games</span>
+                    </a>
+
+                    <a
+                        href="{{ url_for('profile') }}"
+                        class="nav-link"
+                    >
+                        <span class="nav-icon">👤</span>
+                        <span>Profile</span>
+                    </a>
+
+                    {% if session.get('is_admin') %}
+
+                        <a
+                            href="{{ url_for('admin') }}"
+                            class="nav-link admin-nav-link"
+                        >
+                            <span class="nav-icon">🛡️</span>
+                            <span>Admin</span>
+                        </a>
+
+                    {% endif %}
+
+                    <a
+                        href="{{ url_for('logout') }}"
+                        class="nav-link logout-link"
+                    >
+                        <span class="nav-icon">↪</span>
+                        <span>Logout</span>
+                    </a>
+
+                {% else %}
+
+                    <a
+                        href="{{ url_for('login') }}"
+                        class="nav-link nav-login"
+                    >
+                        Login
+                    </a>
+
+                {% endif %}
+
+            </div>
+
+        </nav>
+
+    </header>
+
+
+    <!-- ================================
+         FLASH MESSAGES
+    ================================= -->
+    <div
+        class="flash-container"
+        id="flashContainer"
+    >
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+
+            {% if messages %}
+
+                {% for category, message in messages %}
+
+                    <div
+                        class="flash-message flash-{{ category }}"
+                        role="alert"
+                    >
+
+                        <span class="flash-icon">
+
+                            {% if category == 'success' %}
+                                ✓
+                            {% elif category == 'error' %}
+                                !
+                            {% elif category == 'warning' %}
+                                ⚠
+                            {% else %}
+                                i
+                            {% endif %}
+
+                        </span>
+
+                        <span class="flash-text">
+                            {{ message }}
+                        </span>
+
+                        <button
+                            type="button"
+                            class="flash-close"
+                            aria-label="Close message"
+                            onclick="this.parentElement.remove()"
+                        >
+                            ×
+                        </button>
+
+                    </div>
+
+                {% endfor %}
+
+            {% endif %}
+
+        {% endwith %}
+
+    </div>
+
+
+    <!-- ================================
+         MAIN CONTENT
+    ================================= -->
+    <main
+        id="mainContent"
+        class="main-content"
+    >
+
+        {% block content %}
+
+        {% endblock %}
+
+    </main>
+
+
+    <!-- ================================
+         GLOBAL FOOTER
+    ================================= -->
+    <footer class="site-footer">
+
+        <div class="footer-inner">
+
+            <div class="footer-brand">
+
+                <div class="footer-logo">
+                    AG
+                </div>
+
+                <div>
+                    <strong>
+                        Apna Gallery
+                    </strong>
+
+                    <p>
+                        SOCHO KYA HOGA
+                    </p>
+                </div>
+
+            </div>
+
+
+            <div class="footer-links">
+
+                {% if session.get('username') %}
+
+                    <a
+                        href="{{ url_for('dashboard') }}"
+                    >
+                        Home
+                    </a>
+
+                    <a
+                        href="{{ url_for('games') }}"
+                    >
+                        Games
+                    </a>
+
+                    <a
+                        href="{{ url_for('profile') }}"
+                    >
+                        Profile
+                    </a>
+
+                {% else %}
+
+                    <a
+                        href="{{ url_for('login') }}"
+                    >
+                        Login
+                    </a>
+
+                {% endif %}
+
+            </div>
+
+
+            <div class="footer-copy">
+
+                <p>
+                    © {{ current_year if current_year else 2026 }}
+                    Apna Gallery
+                </p>
+
+                <span>
+                    Made with ❤️
+                </span>
+
+            </div>
+
+        </div>
+
+    </footer>
+
+
+    <!-- ================================
+         GLOBAL BACK TO TOP BUTTON
+    ================================= -->
+    <button
+        type="button"
+        id="backToTop"
+        class="back-to-top"
+        aria-label="Back to top"
+    >
+        ↑
+    </button>
+
+
+    <!-- ================================
+         MAIN JAVASCRIPT
+    ================================= -->
+    <script
+        src="{{ url_for('static', filename='js/main.js') }}"
+        defer
+    ></script>
+
+
+    {% block scripts %}{% endblock %}
+
+</body>
+</html>
