@@ -170,6 +170,46 @@ def protect_state_changing_requests():
 @app.context_processor
 def inject_security_helpers():
     return {"csrf_token": get_csrf_token}
+    
+# =========================================================
+# SECURITY HEADERS
+# =========================================================
+
+@app.after_request
+def add_security_headers(response):
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+
+    response.headers["Permissions-Policy"] = (
+        "camera=(), microphone=(), geolocation=(), "
+        "payment=(), usb=(), bluetooth=()"
+    )
+
+    response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+    response.headers["Cross-Origin-Resource-Policy"] = "same-origin"
+
+    if request.is_secure:
+        response.headers["Strict-Transport-Security"] = (
+            "max-age=31536000; includeSubDomains"
+        )
+
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "base-uri 'self'; "
+        "frame-ancestors 'none'; "
+        "form-action 'self'; "
+        "script-src 'self' 'unsafe-inline' https:; "
+        "style-src 'self' 'unsafe-inline' https:; "
+        "img-src 'self' data: blob: https:; "
+        "media-src 'self' blob: https:; "
+        "font-src 'self' data: https:; "
+        "connect-src 'self' https:; "
+        "object-src 'none'; "
+        "worker-src 'self' blob:;"
+    )
+
+    return response
 
 
 
@@ -1754,6 +1794,41 @@ def delete(id):
 # MYSTERY
 # =========================================================
 
+# =========================================================
+# MYSTERY CODE BRUTE-FORCE PROTECTION
+# =========================================================
+
+@app.before_request
+def protect_mystery_code():
+    if request.path != "/mystery" or request.method != "POST":
+        return None
+
+    limited, retry_after = _rate_limited("mystery")
+
+    if limited:
+        flash(
+            "Too many incorrect mystery-code attempts. "
+            f"Please try again in about {retry_after // 60 + 1} minutes.",
+            "error",
+        )
+        return redirect(url_for("dashboard"))
+
+    entered_code = request.form.get("passcode", "")
+
+    if (
+        MYSTERY_CODE
+        and entered_code
+        and hmac.compare_digest(
+            entered_code,
+            MYSTERY_CODE,
+        )
+    ):
+        _clear_failed_attempts("mystery")
+        return None
+
+    _record_failed_attempt("mystery")
+    return None
+    
 @app.route(
     "/mystery",
     methods=["POST"]
