@@ -757,6 +757,78 @@ def admin():
     return render_template("admin.html", pending_media=pending_media, auth_required=False)
 
 
+@app.route("/admin/audit-logs")
+def admin_audit_logs():
+    if not current_user_is_admin():
+        session["is_admin"] = False
+        flash("Admin access required.", "error")
+        return redirect(url_for("admin"))
+
+    conn = get_db_connection()
+    logs = conn.execute(
+        """
+        SELECT * FROM audit_logs
+        ORDER BY id DESC
+        LIMIT 100
+        """
+    ).fetchall()
+    conn.close()
+
+    return render_template_string(
+        """
+        <!doctype html>
+        <html lang="en">
+        <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>Audit Logs | Apna Gallery Admin</title>
+            <style>
+                body { font-family: system-ui, sans-serif; background: #08111f; color: #fff; padding: 30px; margin: 0; }
+                .container { max-width: 900px; margin: auto; background: #101b2d; padding: 24px; border-radius: 16px; border: 1px solid #2b405c; }
+                table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 0.9rem; }
+                th, td { padding: 12px; text-align: left; border-bottom: 1px solid #1e293b; }
+                th { color: #38bdf8; }
+                a { color: #38bdf8; text-decoration: none; font-weight: bold; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>Security Audit Logs</h1>
+                <p><a href="{{ url_for('admin') }}">&larr; Back to Admin Dashboard</a></p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Actor</th>
+                            <th>Action</th>
+                            <th>Target</th>
+                            <th>Timestamp</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in logs %}
+                        <tr>
+                            <td>{{ log.id }}</td>
+                            <td>{{ log.actor_username }}</td>
+                            <td>{{ log.action }}</td>
+                            <td>{{ log.target_type }} #{{ log.target_id }}</td>
+                            <td>{{ log.created_at }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" style="text-align:center; color:#94a3b8;">No audit logs recorded yet.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </body>
+        </html>
+        """,
+        logs=logs
+    )
+
+
 @app.route("/approve/<int:id>", methods=["GET", "POST"])
 def approve(id):
     if not current_user_is_admin():
@@ -875,6 +947,14 @@ def mystery():
 # ERROR HANDLERS & APP EXECUTION
 # =========================================================
 
+@app.errorhandler(404)
+def not_found_error(error):
+    return render_template("404.html"), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    return render_template("500.html"), 500
+
 @app.errorhandler(413)
 def request_entity_too_large(error):
     flash("File is too large. Maximum allowed size is 50 MB.", "error")
@@ -884,11 +964,3 @@ def request_entity_too_large(error):
 if __name__ == "__main__":
     debug_mode = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=debug_mode)
-    @app.errorhandler(404)
-    
-def not_found_error(error):
-    return render_template("404.html"), 404
-
-@app.errorhandler(500)
-def internal_error(error):
-    return render_template("500.html"), 500
