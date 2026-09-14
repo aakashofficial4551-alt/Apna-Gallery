@@ -4,154 +4,232 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ category }} Vault | SOCHO KYA HOGA</title>
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;500;800&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
+    <!-- Sound Assets -->
     <audio id="ui-sound" src="https://actions.google.com/sounds/v1/ui/button_click.ogg" preload="auto"></audio>
     <audio id="like-sound" src="https://actions.google.com/sounds/v1/cartoon/pop.ogg" preload="auto"></audio>
     <audio id="mascot-sound" src="https://actions.google.com/sounds/v1/cartoon/cartoon_boing.ogg" preload="auto"></audio>
 
-    <button type="button" id="focus-btn" class="focus-btn" onclick="toggleFocus()">Focus Mode 👁️</button>
+    <!-- Floating Tools Button -->
+    <button type="button" id="focus-btn" style="position: fixed; top: 24px; right: 24px; z-index: 9999;" class="btn btn-secondary interactive-element" onclick="toggleFocus()">
+        Focus Mode 👁️
+    </button>
 
-    <!-- Focus Tools -->
-    <div class="focus-tools" aria-live="polite">
-        <div id="live-clock" style="font-weight:bold;">00:00:00</div>
-        <div id="live-date" style="font-size: 0.55rem; color: #aaa; margin-bottom: 12px;">Date</div>
-        <hr style="border-color:var(--border); margin-bottom: 12px;">
-        <div id="stopwatch" style="color: var(--danger); font-weight:bold; margin-bottom: 12px;">00:00:00</div>
-        <div style="display:flex; gap:10px;">
-            <button type="button" onclick="startStopwatch()" style="flex:1; background:var(--accent-dark); color:#fff; border:none; padding:8px; border-radius:var(--radius-sm); cursor:pointer; font-weight:700;">Start</button>
-            <button type="button" onclick="resetStopwatch()" style="flex:1; background:var(--danger); color:#fff; border:none; padding:8px; border-radius:var(--radius-sm); cursor:pointer; font-weight:700;">Reset</button>
+    <!-- HUD Focus Tools (Visible only in Focus Mode) -->
+    <aside class="focus-hud" aria-live="polite">
+        <div style="font-size: 0.8rem; color: var(--text-tertiary); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 8px;">System Clock</div>
+        <div id="live-clock" style="font-weight: 800; font-size: 2rem; color: var(--accent-primary);">00:00:00</div>
+        <div id="live-date" style="font-size: 0.85rem; color: #64748b; margin-bottom: 24px;">Date</div>
+        
+        <div style="height: 1px; background: rgba(255,255,255,0.1); margin-bottom: 24px;"></div>
+        
+        <div style="font-size: 0.8rem; color: var(--text-tertiary); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 8px;">Mission Timer</div>
+        <div id="stopwatch" style="color: var(--danger); font-weight: 800; font-size: 2rem; margin-bottom: 16px;">00:00:00</div>
+        <div style="display:flex; gap:12px;">
+            <button type="button" onclick="startStopwatch()" class="btn interactive-element" style="flex:1; padding: 10px;">Start</button>
+            <button type="button" onclick="resetStopwatch()" class="btn btn-danger interactive-element" style="flex:1; padding: 10px;">Reset</button>
         </div>
-    </div>
+    </aside>
 
-    <!-- ALWAYS VISIBLE MASCOT -->
+    <!-- Mascot Assistant -->
     <div id="mascot-widget" onclick="toggleAI()" role="button" aria-label="Toggle AI Assistant" tabindex="0">
-        <div class="mascot-bubble">Talk to A.I. 🤖</div>
+        <div class="mascot-bubble">Initialize A.I. 🤖</div>
         <img id="ff-mascot" 
-             src="{{ url_for('static', filename='mascot/cartoon_ff.gif') }}" 
+             src="{{ url_for('static', filename='mascot/cartoon_ff.png') }}" 
              onerror="this.onerror=null; this.src='https://cdn-icons-png.flaticon.com/512/4712/4712010.png';"
-             alt="FreeFire Mascot">
+             alt="A.I. Assistant Mascot">
     </div>
 
-    <!-- AI CHAT BOX -->
-    <div class="ai-chat-box" id="ai-chat" aria-hidden="true">
-        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid var(--bg-primary); padding-bottom:12px; margin-bottom:12px;">
-            <h3 style="margin:0; color:var(--accent-dark); font-size:1.1rem;">VAULT A.I. 🤖</h3>
-            <button type="button" style="background:none; border:none; color:var(--danger); cursor:pointer; font-weight:bold; font-size:1.2rem;" onclick="toggleAI()" aria-label="Close AI Chat">✖</button>
+    <!-- AI Chat Interface -->
+    <aside class="ai-chat-box" id="ai-chat" aria-hidden="true" aria-label="AI Chat Assistant">
+        <div class="ai-header">
+            <h3><span style="font-size: 1.2rem;">🤖</span> VAULT A.I.</h3>
+            <button type="button" style="background:none; border:none; color:var(--text-tertiary); cursor:pointer; font-size:1.5rem; transition:color 0.2s;" onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--text-tertiary)'" onclick="toggleAI()" aria-label="Close Chat">&times;</button>
         </div>
-        <div class="ai-messages" id="ai-messages" role="log">
-            <div class="bot">Namaste Agent {{ session.username }}! Main aapki kya madad kar sakti hu?</div>
+        <div class="ai-messages" id="ai-messages" role="log" aria-live="polite">
+            <div class="chat-bubble chat-bot">Agent {{ session.username }}, I am monitoring the {{ category }} vault. Commands?</div>
         </div>
-        <div style="display:flex; gap:8px;">
-            <input type="text" id="ai-input" placeholder="Type here..." autocomplete="off">
-            <button type="button" class="btn" style="width:auto; padding:10px 16px;" onclick="sendAI()">➤</button>
+        <div class="ai-input-group">
+            <input type="text" id="ai-input" class="form-input" placeholder="Type a command..." autocomplete="off">
+            <button type="button" class="btn" style="padding: 12px 16px;" onclick="sendAI()" aria-label="Send Message">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+            </button>
         </div>
-    </div>
+    </aside>
 
-    <header>
-        <h1>{{ category }} <span>VAULT</span></h1>
-        <div class="nav-links">
-            <a href="{{ url_for('dashboard') }}">⬅ Return to Dashboard</a>
-        </div>
+    <!-- Navigation -->
+    <header class="glass-header">
+        <h1>{{ category }} <span class="text-gradient">VAULT</span></h1>
+        <nav class="nav-links">
+            <a href="{{ url_for('dashboard') }}" class="btn btn-secondary interactive-element" style="padding: 10px 20px;">
+                <span style="margin-right: 6px;">←</span> Return to Base
+            </a>
+        </nav>
     </header>
 
-    <div class="container">
+    <main class="container">
+        <!-- Flash Messages -->
         {% with messages = get_flashed_messages(with_categories=true) %}
           {% if messages %}
-            {% for c, m in messages %}
-              <div style="color:var(--accent-dark); text-align:center; margin-bottom:20px; font-weight:700; background:var(--surface); padding:16px; border:2px solid var(--accent); border-radius:var(--radius-md); box-shadow:var(--shadow-sm);">{{ m }}</div>
-            {% endfor %}
+            <div style="margin-bottom: 30px;">
+                {% for c, m in messages %}
+                <div style="background: var(--surface); color: var(--accent-primary); border-left: 4px solid var(--accent-primary); padding: 16px 24px; border-radius: var(--radius-sm); box-shadow: var(--shadow-sm); font-weight: 600; animation: fadeUp 0.3s ease-out; margin-bottom: 12px;" role="alert">
+                    {{ m }}
+                </div>
+                {% endfor %}
+            </div>
           {% endif %}
         {% endwith %}
 
-        <div class="upload-box">
-            <h2 style="color:var(--accent-dark); margin-top:0; text-align:center; font-size:1.5rem; margin-bottom:20px;">UPLOAD TO {{ category|upper }}</h2>
+        <!-- Upload Panel -->
+        <section class="upload-panel">
+            <div style="text-align: center; margin-bottom: 24px;">
+                <h2 style="font-size: 1.5rem; color: var(--text-primary);">Contribute to {{ category }} Vault</h2>
+                <p style="color: var(--text-secondary); font-size: 0.9rem;">Assets are subject to clearance by Admin Level personnel.</p>
+            </div>
+            
             <form action="{{ url_for('gallery', category=category) }}" method="POST" enctype="multipart/form-data" onsubmit="playClick()">
-                <input type="text" name="title" placeholder="Enter Title" required>
-                <textarea name="prompt" rows="3" placeholder="{% if category == 'Shayari' %}Write Shayari / Quote...{% else %}Description / Details...{% endif %}" {% if category == 'Shayari' %}required{% endif %}></textarea>
+                <div class="form-group">
+                    <input type="text" name="title" class="form-input" placeholder="Asset Designation (Title)" required>
+                </div>
                 
-                {% if category != 'Shayari' %}
-                <input type="file" name="media" required style="background:var(--surface);">
-                {% else %}
-                <input type="file" name="media" style="background:var(--surface);" title="Optional Background Image">
-                <p style="font-size:0.85rem; color:var(--text-muted); margin-top:-10px; margin-bottom:15px; text-align:center;">(Background Image Optional)</p>
-                {% endif %}
+                <div class="form-group">
+                    <textarea name="prompt" rows="3" class="form-input" placeholder="{% if category == 'Shayari' %}Write Shayari / Quote text here...{% else %}Provide detailed classification metadata...{% endif %}" {% if category == 'Shayari' %}required{% endif %}></textarea>
+                </div>
                 
-                <button type="submit" class="btn">Submit for Admin Approval</button>
-            </form>
-        </div>
-
-        <div class="gallery">
-            {% for item in media_files %}
-                <div class="media-card">
-                    {% if item.filename == 'SHAYARI_TEXT' %}
-                        <div style="padding: 30px; text-align:center; font-style:italic; font-size:1.25rem; color: #fff; background: linear-gradient(45deg, var(--accent-dark), var(--accent)); height:220px; display:flex; align-items:center; justify-content:center;">"{{ item.prompt }}"</div>
-                    {% elif item.category == 'Video' %}
-                        <video controls preload="metadata"><source src="{{ url_for('static', filename='uploads/' + item.filename) }}"></video>
-                    {% elif item.category == 'Music' %}
-                        <audio controls preload="metadata" style="width: 90%; margin: 90px 5%;"><source src="{{ url_for('static', filename='uploads/' + item.filename) }}"></audio>
-                    {% elif item.category == 'Document' %}
-                        <a href="{{ url_for('static', filename='uploads/' + item.filename) }}" target="_blank" style="color:var(--accent-dark); text-decoration:none; text-align:center; display:flex; flex-direction:column; justify-content:center; align-items:center; height:260px; background:var(--bg-secondary);">
-                            <div style="font-size: 64px;">📄</div>
-                            <div style="font-weight:700; margin-top:10px; font-size:1.1rem;">View Document</div>
-                        </a>
+                <div class="form-group">
+                    {% if category != 'Shayari' %}
+                    <input type="file" name="media" class="form-input" required style="padding: 12px; background: white;">
                     {% else %}
-                        <img src="{{ url_for('static', filename='uploads/' + item.filename) }}" loading="lazy" alt="{{ item.title }}">
+                    <div style="position: relative;">
+                        <input type="file" name="media" class="form-input" style="padding: 12px; background: white;" title="Optional Background Image">
+                        <span style="position: absolute; right: 16px; top: 16px; font-size: 0.8rem; color: var(--text-tertiary); pointer-events: none;">(Optional Background)</span>
+                    </div>
                     {% endif %}
+                </div>
+                
+                <button type="submit" class="btn interactive-element" style="width: 100%;">Upload for Clearance</button>
+            </form>
+        </section>
+
+        <!-- Gallery Grid -->
+        <section class="gallery-grid">
+            {% for item in media_files %}
+                <article class="media-card">
+                    <!-- Media Presentation -->
+                    <div class="media-viewport">
+                        {% if item.filename == 'SHAYARI_TEXT' %}
+                            <div style="padding: 32px; text-align: center; font-style: italic; font-size: 1.25rem; font-weight: 500; color: white; background: linear-gradient(135deg, var(--accent-primary), var(--mystery)); width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; line-height: 1.6;">
+                                "{{ item.prompt }}"
+                            </div>
+                        {% elif item.category == 'Video' %}
+                            <video controls preload="metadata"><source src="{{ url_for('static', filename='uploads/' + item.filename) }}"></video>
+                        {% elif item.category == 'Music' %}
+                            <div style="background: linear-gradient(135deg, #1e293b, #0f172a); width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; position: relative;">
+                                <div style="font-size: 4rem; opacity: 0.1; position: absolute;">🎵</div>
+                                <audio controls preload="metadata" style="width: 80%; z-index: 1;"><source src="{{ url_for('static', filename='uploads/' + item.filename) }}"></audio>
+                            </div>
+                        {% elif item.category == 'Document' %}
+                            <a href="{{ url_for('static', filename='uploads/' + item.filename) }}" target="_blank" style="background: #f8fafc; color: var(--accent-primary); text-decoration: none; display: flex; flex-direction: column; justify-content: center; align-items: center; width: 100%; height: 100%; transition: background 0.3s;">
+                                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 12px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                                <span style="font-weight: 700; font-size: 1.1rem;">Access File</span>
+                            </a>
+                        {% else %}
+                            <img src="{{ url_for('static', filename='uploads/' + item.filename) }}" loading="lazy" alt="{{ item.title }}">
+                        {% endif %}
+                    </div>
                     
-                    <div class="card-info">
+                    <!-- Metadata & Actions -->
+                    <div class="media-content">
                         <div>
-                            <h3>{{ item.title }}</h3>
-                            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px;">Uploaded by: <b>{{ item.uploaded_by }}</b></p>
+                            <h3 class="media-title">{{ item.title }}</h3>
+                            <div class="media-meta">
+                                <span style="display:inline-block; padding: 2px 8px; background: var(--bg-base); border-radius: 4px; margin-right: 8px;">Agent: {{ item.uploaded_by }}</span>
+                            </div>
+                            {% if item.prompt and item.filename != 'SHAYARI_TEXT' %}
+                                <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 16px; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;" title="{{ item.prompt }}">
+                                    {{ item.prompt }}
+                                </p>
+                            {% endif %}
                         </div>
                         
-                        <div class="action-bar">
-                            <button type="button" onclick="likeMedia({{ item.id }})">🔥 <span id="like-{{ item.id }}">{{ item.likes }}</span></button>
-                            <button type="button" onclick="playClick(); navigator.clipboard.writeText(window.location.href); alert('Secure Link Copied!');">🔗 Share</button>
+                        <div class="media-actions">
+                            <button type="button" class="btn btn-secondary interactive-element" style="flex:1; padding: 8px;" onclick="likeMedia({{ item.id }})" aria-label="Like item">
+                                <span style="color:var(--warning);">🔥</span> <span id="like-{{ item.id }}" style="font-weight: 700; margin-left:4px;">{{ item.likes }}</span>
+                            </button>
+                            
+                            <button type="button" class="btn btn-secondary interactive-element" style="flex:1; padding: 8px;" onclick="playClick(); navigator.clipboard.writeText(window.location.href); alert('Secure Link Copied!');" aria-label="Share item">
+                                🔗 Share
+                            </button>
+                            
                             {% if session.is_admin %}
-                                <a href="{{ url_for('delete', id=item.id) }}" style="background:var(--danger); color:white; border-color:var(--danger);">🗑️ Delete</a>
+                                <a href="{{ url_for('delete', id=item.id) }}" class="btn btn-danger interactive-element" style="padding: 8px; text-decoration: none; width: auto;" title="Delete Asset" aria-label="Delete Asset">
+                                    🗑️
+                                </a>
                             {% endif %}
                         </div>
                     </div>
-                </div>
+                </article>
             {% else %}
-                <h3 style="color: var(--text-muted); text-align: center; grid-column: 1/-1; padding: 50px; background: var(--surface); border-radius: var(--radius-md); border: 2px dashed var(--border);">No items approved in this category yet.</h3>
+                <div style="grid-column: 1/-1; text-align: center; padding: 60px 20px; background: var(--surface); border-radius: var(--radius-lg); border: 2px dashed #cbd5e1; color: var(--text-tertiary);">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 16px; opacity: 0.5;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                    <h3 style="font-size: 1.2rem; margin-bottom: 8px; color: var(--text-secondary);">No Assets Cleared</h3>
+                    <p>The {{ category }} vault is currently empty. Upload assets for admin approval.</p>
+                </div>
             {% endfor %}
-        </div>
-    </div>
+        </section>
+    </main>
 
+    <!-- UI Scripts -->
     <script>
         function playClick() { 
             const sound = document.getElementById('ui-sound');
             if (sound) sound.play().catch(() => {}); 
         }
 
+        // --- AI Chat Logic ---
         function toggleAI() { 
             const mascotSound = document.getElementById('mascot-sound');
             if (mascotSound) mascotSound.play().catch(() => {});
-            let chatBox = document.getElementById('ai-chat'); 
+            
+            const chatBox = document.getElementById('ai-chat'); 
+            const input = document.getElementById('ai-input');
             if (chatBox) {
-                let isVisible = chatBox.style.display === 'block';
+                const isVisible = chatBox.style.display === 'block';
                 chatBox.style.display = isVisible ? 'none' : 'block';
                 chatBox.setAttribute('aria-hidden', isVisible ? 'true' : 'false');
+                if (!isVisible && input) {
+                    setTimeout(() => input.focus(), 100);
+                }
             }
         }
         
         function sendAI() {
             playClick();
-            let input = document.getElementById('ai-input');
-            let msgs = document.getElementById('ai-messages');
+            const input = document.getElementById('ai-input');
+            const msgs = document.getElementById('ai-messages');
             if (!input || !input.value.trim()) return;
             
-            let query = input.value.trim();
-            let userDiv = document.createElement('div');
-            userDiv.className = 'user';
+            const query = input.value.trim();
+            const userDiv = document.createElement('div');
+            userDiv.className = 'chat-bubble chat-user';
             userDiv.textContent = query;
             msgs.appendChild(userDiv);
             
             input.value = ''; 
+            msgs.scrollTop = msgs.scrollHeight;
+            
+            // Loading indicator
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'chat-bubble chat-bot';
+            typingDiv.textContent = 'Processing...';
+            typingDiv.id = 'ai-typing';
+            msgs.appendChild(typingDiv);
             msgs.scrollTop = msgs.scrollHeight;
             
             fetch("{{ url_for('ai_endpoint') }}", { 
@@ -161,17 +239,23 @@
             })
             .then(res => res.json())
             .then(data => {
-                let botDiv = document.createElement('div');
-                botDiv.className = 'bot';
+                const indicator = document.getElementById('ai-typing');
+                if(indicator) indicator.remove();
+                
+                const botDiv = document.createElement('div');
+                botDiv.className = 'chat-bubble chat-bot';
                 botDiv.textContent = data.reply;
                 msgs.appendChild(botDiv);
                 msgs.scrollTop = msgs.scrollHeight;
             })
             .catch(() => {
-                let errDiv = document.createElement('div');
-                errDiv.className = 'bot';
+                const indicator = document.getElementById('ai-typing');
+                if(indicator) indicator.remove();
+                
+                const errDiv = document.createElement('div');
+                errDiv.className = 'chat-bubble chat-bot';
                 errDiv.style.color = 'var(--danger)';
-                errDiv.textContent = 'A.I. service is currently offline.';
+                errDiv.textContent = 'Connection Error: A.I. module unresponsive.';
                 msgs.appendChild(errDiv);
                 msgs.scrollTop = msgs.scrollHeight;
             });
@@ -181,48 +265,54 @@
         if (aiInput) {
             aiInput.addEventListener('keypress', function(e) {
                 if (e.key === 'Enter') {
+                    e.preventDefault();
                     sendAI();
                 }
             });
         }
 
+        // --- Like System Logic ---
         function likeMedia(id) {
             const likeSound = document.getElementById('like-sound');
             if (likeSound) likeSound.play().catch(() => {});
+            
             fetch(`/like/${id}`, { method: 'POST' })
             .then(res => res.json())
             .then(data => { 
                 const span = document.getElementById(`like-${id}`);
                 if (span) span.innerText = data.likes; 
             })
-            .catch(() => {});
+            .catch(() => console.error("Like system offline."));
         }
 
+        // --- Focus Mode & HUD Logic ---
         function toggleFocus() { 
             playClick();
             document.body.classList.toggle('focus-mode'); 
-            let btn = document.getElementById('focus-btn');
+            const btn = document.getElementById('focus-btn');
             if (btn) {
                 if (document.body.classList.contains('focus-mode')) {
-                    btn.innerText = "Exit Focus ✖";
-                    btn.style.borderColor = "var(--danger)";
-                    btn.style.color = "var(--danger)";
+                    btn.innerHTML = "Exit Focus &times;";
+                    btn.style.background = "var(--danger)";
+                    btn.style.color = "white";
                 } else {
-                    btn.innerText = "Focus Mode 👁️";
-                    btn.style.borderColor = "var(--accent)";
-                    btn.style.color = "var(--accent-dark)";
+                    btn.innerHTML = "Focus Mode 👁️";
+                    btn.style.background = "var(--surface)";
+                    btn.style.color = "var(--text-primary)";
                 }
             }
         }
         
+        // System Clock
         setInterval(() => {
-            let d = new Date();
+            const d = new Date();
             const clock = document.getElementById('live-clock');
             const date = document.getElementById('live-date');
-            if (clock) clock.innerText = d.toLocaleTimeString();
+            if (clock) clock.innerText = d.toLocaleTimeString('en-US', { hour12: false });
             if (date) date.innerText = d.toDateString();
         }, 1000);
 
+        // Mission Timer (Stopwatch)
         let swTimer; 
         let swSeconds = 0;
         function startStopwatch() {
@@ -239,6 +329,7 @@
                 }
             }, 1000);
         }
+        
         function resetStopwatch() { 
             playClick();
             clearInterval(swTimer); 
@@ -246,6 +337,13 @@
             const sw = document.getElementById('stopwatch');
             if (sw) sw.innerText = "00:00:00"; 
         }
+        
+        // General Interactive Audio Binding
+        document.querySelectorAll('.interactive-element').forEach(item => {
+            if(!item.hasAttribute('onclick')) {
+                item.addEventListener('click', playClick);
+            }
+        });
     </script>
 </body>
 </html>
