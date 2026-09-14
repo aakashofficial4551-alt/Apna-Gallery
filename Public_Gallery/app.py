@@ -255,6 +255,25 @@ def init_db():
 
 
     # -----------------------------------------------------
+    # LIKES
+    # One user/session can like a media item only once.
+    # -----------------------------------------------------
+
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS likes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            media_id INTEGER NOT NULL,
+            username TEXT NOT NULL,
+            created_at TIMESTAMP
+                DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(media_id, username)
+        )
+        """
+    )
+
+
+    # -----------------------------------------------------
     # STORIES
     # -----------------------------------------------------
 
@@ -1273,71 +1292,84 @@ def like(media_id):
         ), 401
 
 
+    username = str(session["username"])
     conn = get_db_connection()
 
+    try:
+        # Check media exists and is published.
+        media = conn.execute(
+            """
+            SELECT id, likes
+            FROM media
+            WHERE id = ?
+              AND approved = 1
+            """,
+            (media_id,),
+        ).fetchone()
 
-    # Check media exists
-    media = conn.execute(
-        """
-        SELECT id
-        FROM media
-        WHERE id = ?
-        """,
-        (
-            media_id,
-        ),
-    ).fetchone()
+        if not media:
+            return jsonify(
+                {
+                    "error":
+                        "Media not found."
+                }
+            ), 404
 
+        # UNIQUE(media_id, username) prevents duplicate likes
+        # even if the same request is sent repeatedly.
+        cursor = conn.execute(
+            """
+            INSERT OR IGNORE INTO likes
+                (media_id, username)
+            VALUES (?, ?)
+            """,
+            (media_id, username),
+        )
 
-    if not media:
+        if cursor.rowcount == 1:
+            conn.execute(
+                """
+                UPDATE media
+                SET likes = likes + 1
+                WHERE id = ?
+                """,
+                (media_id,),
+            )
+            liked_now = True
+        else:
+            liked_now = False
 
-        conn.close()
+        conn.commit()
+
+        result = conn.execute(
+            """
+            SELECT likes
+            FROM media
+            WHERE id = ?
+            """,
+            (media_id,),
+        ).fetchone()
 
         return jsonify(
             {
-                "error":
-                    "Media not found."
+                "likes": result["likes"],
+                "liked": liked_now,
+                "already_liked": not liked_now,
             }
-        ), 404
+        )
 
+    except sqlite3.Error as e:
+        conn.rollback()
+        print("LIKE ERROR:", repr(e))
+        return jsonify(
+            {
+                "error":
+                    "Unable to process like right now."
+            }
+        ), 500
 
-    # Existing like system preserved
-    conn.execute(
-        """
-        UPDATE media
-        SET likes = likes + 1
-        WHERE id = ?
-        """,
-        (
-            media_id,
-        ),
-    )
-
-
-    conn.commit()
-
-
-    result = conn.execute(
-        """
-        SELECT likes
-        FROM media
-        WHERE id = ?
-        """,
-        (
-            media_id,
-        ),
-    ).fetchone()
-
-
-    conn.close()
-
-
-    return jsonify(
-        {
-            "likes":
-                result["likes"]
-        }
-    )
+    finally:
+        conn.close()
 
 
 # =========================================================
