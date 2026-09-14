@@ -7,7 +7,7 @@
         body { font-family: 'Montserrat', sans-serif; background: linear-gradient(135deg, #e0f7fa 0%, #80deea 100%); color: #333; margin: 0; padding: 0; min-height: 100vh;}
         header { text-align: center; padding: 20px; background: #fff; border-bottom: 3px solid #00b4d8; box-shadow: 0 5px 15px rgba(0,180,216,0.2);}
         .nav-links { margin-top: 10px; }
-        .nav-links a { color: #0077b6; margin: 0 15px; text-decoration: none; font-weight: bold; padding: 8px 15px; border-radius: 20px; transition: 0.3s;}
+        .nav-links a, .nav-links span { color: #0077b6; margin: 0 15px; text-decoration: none; font-weight: bold; padding: 8px 15px; border-radius: 20px; transition: 0.3s;}
         .nav-links a:hover { background: #00b4d8; color: white; }
         
         .container { max-width: 1200px; margin: 40px auto; padding: 20px; }
@@ -22,23 +22,72 @@
 
         .games-banner { background: linear-gradient(45deg, #00b4d8, #0077b6); border-radius: 15px; padding: 30px; text-align: center; text-decoration: none; color: white; display: block; font-size: 2em; font-weight: 800; transition: 0.4s; box-shadow: 0 10px 20px rgba(0,180,216,0.4);}
         .games-banner:hover { transform: scale(1.02); }
+
+        /* --- MASCOT WIDGET --- */
+        #mascot-widget {
+            position: fixed;
+            bottom: 20px;
+            left: 30px; /* Dashboard par left side me rakha hai */
+            z-index: 9999;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            animation: floatMascot 3s infinite ease-in-out;
+        }
+
+        #ff-mascot {
+            height: 180px;
+            filter: drop-shadow(0 10px 15px rgba(0, 180, 216, 0.4));
+            transition: transform 0.3s;
+        }
+        #ff-mascot:hover { transform: scale(1.1); }
+
+        .mascot-bubble {
+            background: #0077b6;
+            color: #fff;
+            font-size: 0.85em;
+            font-weight: bold;
+            padding: 6px 14px;
+            border-radius: 20px;
+            border: 2px solid #fff;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            margin-bottom: 5px;
+            white-space: nowrap;
+        }
+
+        @keyframes floatMascot {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-12px) rotate(2deg); }
+        }
+
+        /* --- AI CHAT BOX --- */
+        .ai-chat-box { 
+            display: none; position: fixed; bottom: 100px; left: 180px; width: 300px; 
+            background: #fff; border: 3px solid #00b4d8; border-radius: 15px; padding: 15px; 
+            box-shadow: 0 10px 30px rgba(0,180,216,0.3); z-index:9999;
+        }
+        .ai-messages { height: 200px; overflow-y: auto; color: #333; font-size: 0.9em; margin-bottom: 10px; padding-right: 5px;}
+        .bot { background: #e0f7fa; padding: 10px; border-radius: 8px; border-left: 4px solid #00b4d8; margin-bottom:5px; font-weight: 500;}
+        .user { background: #0077b6; color:white; padding: 10px; border-radius: 8px; text-align:right; margin-bottom:5px; font-weight: 500;}
+        input { width: 100%; padding: 10px; background: #f0fcfd; border: 1px solid #90e0ef; border-radius: 8px; font-family: inherit; box-sizing: border-box;}
+        .btn-ai { background: #0077b6; color: white; border: none; padding: 10px 15px; cursor: pointer; border-radius: 8px; font-weight: bold;}
     </style>
 </head>
 <body>
-    <!-- UI Sound Effect -->
     <audio id="click-sound" src="https://actions.google.com/sounds/v1/ui/button_click.ogg"></audio>
+    <audio id="mascot-sound" src="https://actions.google.com/sounds/v1/cartoon/cartoon_boing.ogg"></audio>
 
     <header>
         <h1 style="color:#0077b6; letter-spacing: 3px;">SOCHO KYA HOGA</h1>
         <div class="nav-links">
-            <span style="color:#555; font-weight:bold;">Agent {{ session.username }}</span>
+            <span style="color:#555;">Agent: {{ session.username }}</span>
             <a href="/profile">👤 My Profile</a>
             <a href="/logout">🚪 Logout</a>
         </div>
     </header>
 
     <div class="container">
-        <!-- HUGE ADMIN BUTTON SO YOU NEVER MISS IT -->
         <a href="/admin" class="admin-banner">🛠️ ADMIN APPROVAL PANEL (Click Here) 🛠️</a>
 
         <h2 style="text-align: center; color: #023e8a; font-weight: 800; margin-bottom: 30px;">VAULT CATEGORIES</h2>
@@ -55,10 +104,31 @@
         <a href="/games" class="games-banner">🎮 ENTER ARCADE ZONE</a>
     </div>
 
+    <!-- ALWAYS VISIBLE ROLLER SKATE CHARACTER -->
+    <div id="mascot-widget" onclick="toggleAI()">
+        <div class="mascot-bubble">Talk to A.I. 🤖</div>
+        <img id="ff-mascot" 
+             src="{{ url_for('static', filename='mascot/cartoon_ff.gif') }}" 
+             onerror="this.onerror=null; this.src='https://cdn-icons-png.flaticon.com/512/4712/4712010.png';"
+             alt="FreeFire Mascot">
+    </div>
+
+    <!-- AI CHAT BOX -->
+    <div class="ai-chat-box" id="ai-chat">
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #e0f7fa; padding-bottom:10px; margin-bottom:10px;">
+            <h3 style="margin:0; color:#023e8a;">VAULT A.I.</h3>
+            <span style="color:#e50914; cursor:pointer; font-weight:bold; font-size:1.2em;" onclick="toggleAI()">✖</span>
+        </div>
+        <div class="ai-messages" id="ai-messages"><p class="bot">Namaste! Dashboard par aapka swagat hai. Kahiye?</p></div>
+        <div style="display:flex; gap:5px;">
+            <input type="text" id="ai-input" placeholder="Type here..." autocomplete="off">
+            <button class="btn-ai" onclick="sendAI()">➤</button>
+        </div>
+    </div>
+
     <form id="mystery-form" action="/mystery" method="POST" style="display:none;"><input type="hidden" name="passcode" id="mystery-pass"></form>
     
     <script>
-        // Add sound to all clicks
         document.querySelectorAll('a, .card').forEach(item => {
             item.addEventListener('click', () => { document.getElementById('click-sound').play(); });
         });
@@ -68,16 +138,35 @@
             let pass = prompt("CLASSIFIED AREA: Enter Secret Code:");
             if (pass) { document.getElementById('mystery-pass').value = pass; document.getElementById('mystery-form').submit(); }
         }
-    </script>
-    <!-- PREMIUM FF MASCOT ANIMATION -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='mascot/mascot.css') }}">
-    
-    <div id="mascot-stage">
-        <div id="mascot-box">VAULT</div>
-        <!-- Apni background remove ki hui image yahan use karein -->
-        <img id="ff-mascot" src="{{ url_for('static', filename='mascot/cartoon_ff.png') }}" alt="FF Mascot">
-    </div>
 
-    <script src="{{ url_for('static', filename='mascot/mascot.js') }}"></script>
+        function toggleAI() { 
+            document.getElementById('mascot-sound').play();
+            let b = document.getElementById('ai-chat'); 
+            b.style.display = b.style.display === 'block' ? 'none' : 'block'; 
+        }
+        
+        function sendAI() {
+            document.getElementById('click-sound').play();
+            let input = document.getElementById('ai-input');
+            let msgs = document.getElementById('ai-messages');
+            let query = input.value.trim();
+            if(!query) return;
+            
+            msgs.innerHTML += `<p class="user">${query}</p>`;
+            input.value = ''; msgs.scrollTop = msgs.scrollHeight;
+            
+            fetch('/api/ai', { 
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify({query: query}) 
+            })
+            .then(res => res.json()).then(data => {
+                msgs.innerHTML += `<p class="bot">${data.reply}</p>`;
+                msgs.scrollTop = msgs.scrollHeight;
+            }).catch(err => {
+                msgs.innerHTML += `<p class="bot" style="color:red;">A.I. is offline.</p>`;
+            });
+        }
+    </script>
 </body>
 </html>
