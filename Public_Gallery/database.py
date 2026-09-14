@@ -120,3 +120,40 @@ if __name__ == '__main__':
     # Allows manual execution to setup schema
     init_db()
     print("Phase 2 Database Architecture initialized successfully.")
+    from werkzeug.security import generate_password_hash, check_password_hash
+
+def register_user(username, plaintext_password, role='USER'):
+    """
+    PHASE 3: AUTHENTICATION
+    Safely hashes passwords before inserting into the DB.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        hashed_password = generate_password_hash(plaintext_password)
+        cursor.execute(
+            'INSERT INTO users (username, password, role) VALUES (?, ?, ?)',
+            (username, hashed_password, role)
+        )
+        conn.commit()
+        return True, "User registered successfully."
+    except sqlite3.IntegrityError:
+        return False, "Username already exists."
+    finally:
+        conn.close()
+
+def verify_user_login(username, plaintext_password):
+    """
+    PHASE 3: AUTHENTICATION
+    Verifies Werkzeug password hash during login.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # We select the full user row to ensure future checks (like account status) are possible
+    user = cursor.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
+    conn.close()
+    
+    if user and check_password_hash(user['password'], plaintext_password):
+        return True, dict(user)
+    return False, None
