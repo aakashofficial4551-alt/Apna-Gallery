@@ -58,6 +58,10 @@ load_dotenv(
 # =========================================================
 
 app = Flask(__name__)
+from database import init_db
+
+# PHASE 2: Initialize Production-Grade Database Architecture
+init_db()
 
 
 # Secret key environment se
