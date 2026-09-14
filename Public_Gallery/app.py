@@ -112,6 +112,59 @@ def validate_csrf_token(token):
     )
 
 
+def _request_origin_matches():
+    """Return True when the request came from this same web origin."""
+    from urllib.parse import urlsplit
+
+    expected = urlsplit(request.host_url.rstrip("/"))
+    expected_origin = f"{expected.scheme}://{expected.netloc}"
+
+    origin = request.headers.get("Origin", "").strip().rstrip("/")
+    if origin:
+        return hmac.compare_digest(origin, expected_origin)
+
+    referer = request.headers.get("Referer", "").strip()
+    if referer:
+        parsed = urlsplit(referer)
+        referer_origin = f"{parsed.scheme}://{parsed.netloc}"
+        return hmac.compare_digest(referer_origin, expected_origin)
+
+    return False
+
+
+@app.before_request
+def protect_state_changing_requests():
+    """Protect every state-changing request with CSRF token or same-origin validation."""
+    if request.method in {"GET", "HEAD", "OPTIONS"}:
+        return None
+
+    token = request.form.get("csrf_token", "")
+
+    if not token:
+        token = request.headers.get("X-CSRF-Token", "")
+
+    if not token and request.is_json:
+        data = request.get_json(silent=True) or {}
+        token = data.get("csrf_token", "")
+
+    # Preferred protection: session-bound CSRF token.
+    if validate_csrf_token(token):
+        return None
+
+    # Compatibility protection for the existing live templates: browsers that
+    # submit same-origin forms/fetches send Origin or Referer. This prevents a
+    # third-party site from forging the request even before every template has
+    # been updated with a hidden token/header.
+    if _request_origin_matches():
+        return None
+
+    if request.is_json or request.path.startswith("/api/") or request.path.startswith("/like/"):
+        return jsonify({"error": "Security check failed. Please refresh and try again."}), 403
+
+    flash("Security check failed. Please refresh and try again.", "error")
+    return redirect(request.referrer or url_for("dashboard"))
+
+
 @app.context_processor
 def inject_security_helpers():
     return {"csrf_token": get_csrf_token}
