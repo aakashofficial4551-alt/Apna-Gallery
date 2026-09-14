@@ -1,5 +1,7 @@
 import os
 import sqlite3
+import secrets
+import hmac
 from uuid import uuid4
 
 from dotenv import load_dotenv
@@ -13,6 +15,7 @@ from flask import (
     flash,
     session,
     jsonify,
+    render_template_string,
 )
 
 from werkzeug.security import (
@@ -86,6 +89,33 @@ app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
 # Render production HTTPS ke liye
 app.config["SESSION_COOKIE_SECURE"] = True
+
+
+# =========================================================
+# CSRF PROTECTION FOR ADMIN ACTIONS
+# =========================================================
+
+def get_csrf_token():
+    """Return a session-bound CSRF token, creating one when needed."""
+    token = session.get("csrf_token")
+    if not token:
+        token = secrets.token_urlsafe(32)
+        session["csrf_token"] = token
+    return token
+
+
+def validate_csrf_token(token):
+    """Constant-time validation of a submitted CSRF token."""
+    stored = session.get("csrf_token", "")
+    return bool(token) and bool(stored) and hmac.compare_digest(
+        str(token), str(stored)
+    )
+
+
+@app.context_processor
+def inject_security_helpers():
+    return {"csrf_token": get_csrf_token}
+
 
 
 # Upload directory create
@@ -1402,53 +1432,64 @@ def admin():
 # =========================================================
 
 @app.route(
-    "/approve/<int:id>"
+    "/approve/<int:id>",
+    methods=["GET", "POST"]
 )
 def approve(id):
 
-    if not session.get(
-        "is_admin"
-    ):
+    if not session.get("is_admin"):
+        flash("Admin access required.", "error")
+        return redirect(url_for("admin"))
 
-        flash(
-            "Admin access required.",
-            "error"
+    # Existing admin.html uses a normal link. A GET request now only
+    # shows a confirmation page; it never changes database state.
+    if request.method == "GET":
+        token = get_csrf_token()
+        return render_template_string(
+            """
+            <!doctype html>
+            <html lang="en">
+            <head>
+                <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width,initial-scale=1">
+                <title>Confirm Approval | Apna Gallery</title>
+                <style>
+                    body{font-family:system-ui,sans-serif;background:#08111f;color:#fff;display:grid;place-items:center;min-height:100vh;margin:0}
+                    .box{width:min(92vw,520px);padding:32px;border:1px solid #2b405c;border-radius:18px;background:#101b2d;text-align:center;box-shadow:0 20px 60px #0008}
+                    button,a{display:inline-block;padding:12px 18px;border-radius:10px;text-decoration:none;font-weight:700;margin:6px;border:0;cursor:pointer}
+                    button{background:#22c55e;color:#04130a} a{background:#334155;color:#fff}
+                </style>
+            </head>
+            <body>
+                <div class="box">
+                    <h1>Approve this upload?</h1>
+                    <p>This action will publish the selected media.</p>
+                    <form method="post">
+                        <input type="hidden" name="csrf_token" value="{{ token }}">
+                        <button type="submit">Confirm Approval</button>
+                        <a href="{{ url_for('admin') }}">Cancel</a>
+                    </form>
+                </div>
+            </body>
+            </html>
+            """,
+            token=token,
         )
 
-        return redirect(
-            url_for("admin")
-        )
-
+    if not validate_csrf_token(request.form.get("csrf_token", "")):
+        flash("Security check failed. Please try again.", "error")
+        return redirect(url_for("admin"))
 
     conn = get_db_connection()
-
-
     conn.execute(
-        """
-        UPDATE media
-        SET approved = 1
-        WHERE id = ?
-        """,
-        (
-            id,
-        ),
+        "UPDATE media SET approved = 1 WHERE id = ?",
+        (id,),
     )
-
-
     conn.commit()
-
     conn.close()
 
-
-    flash(
-        "Item successfully approved and published!",
-        "success"
-    )
-
-
-    return redirect(
-        url_for("admin")
-    )
+    flash("Item successfully approved and published!", "success")
+    return redirect(url_for("admin"))
 
 
 # =========================================================
@@ -1456,97 +1497,83 @@ def approve(id):
 # =========================================================
 
 @app.route(
-    "/delete/<int:id>"
+    "/delete/<int:id>",
+    methods=["GET", "POST"]
 )
 def delete(id):
 
-    if not session.get(
-        "is_admin"
-    ):
+    if not session.get("is_admin"):
+        flash("Admin access required.", "error")
+        return redirect(url_for("admin"))
 
-        flash(
-            "Admin access required.",
-            "error"
+    # Existing admin.html uses a normal link. A GET request now only
+    # shows a confirmation page; it never deletes anything.
+    if request.method == "GET":
+        token = get_csrf_token()
+        return render_template_string(
+            """
+            <!doctype html>
+            <html lang="en">
+            <head>
+                <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width,initial-scale=1">
+                <title>Confirm Delete | Apna Gallery</title>
+                <style>
+                    body{font-family:system-ui,sans-serif;background:#08111f;color:#fff;display:grid;place-items:center;min-height:100vh;margin:0}
+                    .box{width:min(92vw,520px);padding:32px;border:1px solid #2b405c;border-radius:18px;background:#101b2d;text-align:center;box-shadow:0 20px 60px #0008}
+                    button,a{display:inline-block;padding:12px 18px;border-radius:10px;text-decoration:none;font-weight:700;margin:6px;border:0;cursor:pointer}
+                    button{background:#ef4444;color:#fff} a{background:#334155;color:#fff}
+                </style>
+            </head>
+            <body>
+                <div class="box">
+                    <h1>Delete this upload?</h1>
+                    <p>This action permanently removes the database record and uploaded file when present.</p>
+                    <form method="post">
+                        <input type="hidden" name="csrf_token" value="{{ token }}">
+                        <button type="submit">Confirm Delete</button>
+                        <a href="{{ url_for('admin') }}">Cancel</a>
+                    </form>
+                </div>
+            </body>
+            </html>
+            """,
+            token=token,
         )
 
-        return redirect(
-            url_for("admin")
-        )
-
+    if not validate_csrf_token(request.form.get("csrf_token", "")):
+        flash("Security check failed. Please try again.", "error")
+        return redirect(url_for("admin"))
 
     conn = get_db_connection()
-
-
     item = conn.execute(
-        """
-        SELECT *
-        FROM media
-        WHERE id = ?
-        """,
-        (
-            id,
-        ),
+        "SELECT * FROM media WHERE id = ?",
+        (id,),
     ).fetchone()
 
-
     if item:
+        filename = item["filename"]
 
-        filename = item[
-            "filename"
-        ]
-
-
-        # Delete actual uploaded file
-        if (
-            filename
-            and filename != "SHAYARI_TEXT"
-        ):
-
+        if filename and filename != "SHAYARI_TEXT":
             filepath = os.path.join(
-                app.config[
-                    "UPLOAD_FOLDER"
-                ],
-                filename
+                app.config["UPLOAD_FOLDER"],
+                filename,
             )
-
-
             try:
-
-                if os.path.exists(
-                    filepath
-                ):
-
-                    os.remove(
-                        filepath
-                    )
-
+                if os.path.exists(filepath):
+                    os.remove(filepath)
             except OSError:
-
                 pass
 
-
-        # Delete database entry
         conn.execute(
-            """
-            DELETE FROM media
-            WHERE id = ?
-            """,
-            (
-                id,
-            ),
+            "DELETE FROM media WHERE id = ?",
+            (id,),
         )
-
-
         conn.commit()
 
-
     conn.close()
-
-
-    return redirect(
-        request.referrer
-        or url_for("dashboard")
-    )
+    flash("Item deleted successfully.", "success")
+    return redirect(url_for("admin"))
 
 
 # =========================================================
