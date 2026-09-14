@@ -1,6 +1,75 @@
-.env
+# ==============================
+# Python
+# ==============================
 __pycache__/
-*.pyc
-.venv/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+
+# Virtual environment
 venv/
+env/
+.venv/
+
+# ==============================
+# Environment / Secrets
+# ==============================
+.env
+.env.*
+!.env.example
+
+# ==============================
+# Flask
+# ==============================
+instance/
+.webassets-cache/
+
+# ==============================
+# Database
+# ==============================
+*.db
+*.sqlite
+*.sqlite3
+
+# ==============================
+# Uploads
+# ==============================
+Public_Gallery/static/uploads/*
+!Public_Gallery/static/uploads/.gitkeep
+
+# ==============================
+# IDE / Editor
+# ==============================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ==============================
+# OS files
+# ==============================
 .DS_Store
+Thumbs.db
+desktop.ini
+
+# ==============================
+# Logs
+# ==============================
+*.log
+
+# ==============================
+# Testing / Coverage
+# ==============================
+.pytest_cache/
+.coverage
+htmlcov/
+.coverage.*
+.pytest_cache/
+
+# ==============================
+# Build files
+# ==============================
+build/
+dist/
+*.egg-info/
