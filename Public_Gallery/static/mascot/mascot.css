@@ -1,1 +1,57 @@
+/* Mascot Stage Container */
+#mascot-stage {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 200px;
+    pointer-events: none; /* Taaki click karne me dikkat na ho */
+    z-index: 10000;
+    overflow: hidden;
+}
 
+/* Premium Sci-Fi Box */
+#mascot-box {
+    position: absolute;
+    bottom: 20px;
+    right: 150px;
+    width: 100px;
+    height: 100px;
+    background: linear-gradient(45deg, #00b4d8, #023e8a);
+    border: 3px solid #e0f7fa;
+    box-shadow: 0 0 20px rgba(0, 180, 216, 0.8), inset 0 0 15px rgba(255,255,255,0.5);
+    color: #fff;
+    text-align: center;
+    font-weight: 900;
+    font-family: 'Montserrat', sans-serif;
+    border-radius: 15px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transform: translateY(150px); /* Shuru me box chhupa rahega */
+    transition: transform 1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* Character Styling */
+#ff-mascot {
+    position: absolute;
+    bottom: 20px;
+    left: -150px; /* Screen ke bahar se aayegi */
+    height: 150px; /* Character ki height */
+    transition: all 3s ease-in-out;
+    filter: drop-shadow(0 10px 10px rgba(0,0,0,0.5));
+}
+
+/* Animations Classes added by JS */
+.box-up {
+    transform: translateY(0) !important;
+}
+
+.skate-in {
+    transform: translateX(calc(100vw - 320px)); /* Box ke paas aakar rukegi */
+}
+
+.jump-on-box {
+    transform: translateX(calc(100vw - 230px)) translateY(-100px); /* Box ke upar jump */
+    transition: all 1s ease-in-out !important; /* Jump thodi fast hogi */
+}
