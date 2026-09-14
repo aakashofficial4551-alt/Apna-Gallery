@@ -208,7 +208,8 @@ def init_db():
                 'Classified Agent of SOCHO KYA HOGA.',
             country TEXT DEFAULT 'India',
             friends_count INTEGER DEFAULT 0,
-            profile_pic TEXT DEFAULT ''
+            profile_pic TEXT DEFAULT '',
+            role TEXT DEFAULT 'user'
         )
         """
     )
@@ -289,6 +290,24 @@ def init_db():
         """
     )
 
+
+    conn.commit()
+
+    # =====================================================
+    # ROLE MIGRATION
+    # =====================================================
+    # Existing users become normal users automatically.
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA table_info(users)")
+    user_columns = [column[1] for column in cursor.fetchall()]
+
+    if "role" not in user_columns:
+        try:
+            cursor.execute(
+                "ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'"
+            )
+        except sqlite3.OperationalError:
+            pass
 
     conn.commit()
 
@@ -465,6 +484,37 @@ def save_uploaded_file(file):
 
 
     return filename
+
+
+# =========================================================
+# ROLE / AUTHORIZATION HELPERS
+# =========================================================
+
+def get_current_user():
+    username = session.get("username")
+
+    if not username or not session.get("is_registered"):
+        return None
+
+    conn = get_db_connection()
+    try:
+        return conn.execute(
+            "SELECT * FROM users WHERE username = ?",
+            (username,),
+        ).fetchone()
+    finally:
+        conn.close()
+
+
+def current_user_is_admin():
+    user = get_current_user()
+    return bool(user and user["role"] == "admin")
+
+
+def sync_admin_session():
+    is_admin = current_user_is_admin()
+    session["is_admin"] = is_admin
+    return is_admin
 
 
 # =========================================================
@@ -654,7 +704,7 @@ def login():
                     session.clear()
                     session["username"] = user["username"]
                     session["is_registered"] = True
-                    session["is_admin"] = False
+                    session["is_admin"] = (user["role"] == "admin")
 
                     return redirect(url_for("dashboard"))
 
@@ -710,6 +760,7 @@ def dashboard():
             url_for("login")
         )
 
+    sync_admin_session()
 
     return render_template(
         "dashboard.html"
@@ -1039,11 +1090,7 @@ def gallery(category):
         # NORMAL USER = PENDING
         # =================================================
 
-        is_approved = (
-            1
-            if session.get("is_admin")
-            else 0
-        )
+        is_approved = 1 if current_user_is_admin() else 0
 
 
         conn = get_db_connection()
@@ -1382,63 +1429,45 @@ def like(media_id):
 )
 def admin():
 
-    # =====================================================
-    # ADMIN LOGIN
-    # =====================================================
-
+    # Admin role is now stored in the users table.
+    # A registered user must authenticate with the admin passcode
+    # once to receive the admin role.
     if request.method == "POST":
+        if not session.get("username") or not session.get("is_registered"):
+            flash("Please login with a registered account before admin access.", "error")
+            return redirect(url_for("login"))
 
-        entered_pass = (
-            request.form
-            .get("passcode", "")
-        )
+        entered_pass = request.form.get("passcode", "")
 
-
-        # Environment variable required
-        if (
-            ADMIN_PASSCODE
-            and entered_pass
-            == ADMIN_PASSCODE
+        if not ADMIN_PASSCODE or not hmac.compare_digest(
+            entered_pass,
+            ADMIN_PASSCODE,
         ):
+            flash("Access Denied: Incorrect Passcode!", "error")
+            return render_template("admin.html", auth_required=True)
 
-            session["is_admin"] = True
+        conn = get_db_connection()
+        conn.execute(
+            "UPDATE users SET role = 'admin' WHERE username = ?",
+            (session["username"],),
+        )
+        conn.commit()
+        conn.close()
 
+        session["is_admin"] = True
+        flash("Admin role activated for this account!", "success")
 
-            flash(
-                "Admin Access Granted!",
-                "success"
-            )
-
-
-        else:
-
-            flash(
-                "Access Denied: Incorrect Passcode!",
-                "error"
-            )
-
-
-    # =====================================================
-    # ADMIN ACCESS CHECK
-    # =====================================================
-
-    if not session.get(
-        "is_admin"
-    ):
-
+    # Never trust only the client session flag. Re-check the database role.
+    if not current_user_is_admin():
+        session["is_admin"] = False
         return render_template(
             "admin.html",
-            auth_required=True
+            auth_required=True,
         )
 
-
-    # =====================================================
-    # PENDING MEDIA
-    # =====================================================
+    session["is_admin"] = True
 
     conn = get_db_connection()
-
-
     pending_media = conn.execute(
         """
         SELECT *
@@ -1447,15 +1476,12 @@ def admin():
         ORDER BY id DESC
         """
     ).fetchall()
-
-
     conn.close()
-
 
     return render_template(
         "admin.html",
         pending_media=pending_media,
-        auth_required=False
+        auth_required=False,
     )
 
 
@@ -1469,7 +1495,8 @@ def admin():
 )
 def approve(id):
 
-    if not session.get("is_admin"):
+    if not current_user_is_admin():
+        session["is_admin"] = False
         flash("Admin access required.", "error")
         return redirect(url_for("admin"))
 
@@ -1534,7 +1561,8 @@ def approve(id):
 )
 def delete(id):
 
-    if not session.get("is_admin"):
+    if not current_user_is_admin():
+        session["is_admin"] = False
         flash("Admin access required.", "error")
         return redirect(url_for("admin"))
 
