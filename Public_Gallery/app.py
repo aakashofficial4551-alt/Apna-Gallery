@@ -884,3 +884,11 @@ def request_entity_too_large(error):
 if __name__ == "__main__":
     debug_mode = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=debug_mode)
+    @app.errorhandler(404)
+    
+def not_found_error(error):
+    return render_template("404.html"), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    return render_template("500.html"), 500
