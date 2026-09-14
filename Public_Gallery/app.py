@@ -286,6 +286,234 @@ def get_db_connection():
 
 
 # =========================================================
+# DATABASE INITIALIZATION
+# =========================================================
+
+def legacy_init_db():
+
+    conn = get_db_connection()
+
+    # -----------------------------------------------------
+    # USERS
+    # -----------------------------------------------------
+
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE,
+            password TEXT,
+            bio TEXT DEFAULT
+                'Classified Agent of SOCHO KYA HOGA.',
+            country TEXT DEFAULT 'India',
+            friends_count INTEGER DEFAULT 0,
+            profile_pic TEXT DEFAULT '',
+            role TEXT DEFAULT 'user'
+        )
+        """
+    )
+
+
+    # -----------------------------------------------------
+    # MEDIA
+    # -----------------------------------------------------
+
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS media (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            filename TEXT NOT NULL,
+            title TEXT,
+            category TEXT,
+            prompt TEXT,
+            uploaded_by TEXT,
+            approved INTEGER DEFAULT 0,
+            likes INTEGER DEFAULT 0,
+            created_at TIMESTAMP
+                DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+
+
+    # -----------------------------------------------------
+    # COMMENTS
+    # -----------------------------------------------------
+
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS comments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            media_id INTEGER,
+            user_name TEXT,
+            comment TEXT,
+            created_at TIMESTAMP
+                DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+
+
+    # -----------------------------------------------------
+    # LIKES
+    # One user/session can like a media item only once.
+    # -----------------------------------------------------
+
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS likes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            media_id INTEGER NOT NULL,
+            username TEXT NOT NULL,
+            created_at TIMESTAMP
+                DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(media_id, username)
+        )
+        """
+    )
+
+
+    # -----------------------------------------------------
+    # STORIES
+    # -----------------------------------------------------
+
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS stories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT,
+            filename TEXT,
+            created_at TIMESTAMP
+                DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+
+
+    conn.commit()
+
+    # =====================================================
+    # ROLE MIGRATION
+    # =====================================================
+    # Existing users become normal users automatically.
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA table_info(users)")
+    user_columns = [column[1] for column in cursor.fetchall()]
+
+    if "role" not in user_columns:
+        try:
+            cursor.execute(
+                "ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'"
+            )
+        except sqlite3.OperationalError:
+            pass
+            
+    # Phase 2 Status Migration
+    if "status" not in user_columns:
+        try:
+            cursor.execute(
+                "ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'ACTIVE'"
+            )
+        except sqlite3.OperationalError:
+            pass
+
+    conn.commit()
+
+
+    # =====================================================
+    # AUTO-HEAL OLD DATABASE
+    # =====================================================
+
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "PRAGMA table_info(media)"
+    )
+
+    columns = [
+        column[1]
+        for column in cursor.fetchall()
+    ]
+
+
+    # approved column
+    if "approved" not in columns:
+
+        try:
+
+            cursor.execute(
+                """
+                ALTER TABLE media
+                ADD COLUMN approved
+                INTEGER DEFAULT 0
+                """
+            )
+
+        except sqlite3.OperationalError:
+            pass
+
+
+    # likes column
+    if "likes" not in columns:
+
+        try:
+
+            cursor.execute(
+                """
+                ALTER TABLE media
+                ADD COLUMN likes
+                INTEGER DEFAULT 0
+                """
+            )
+
+        except sqlite3.OperationalError:
+            pass
+
+
+    # uploaded_by column
+    if "uploaded_by" not in columns:
+
+        try:
+
+            cursor.execute(
+                """
+                ALTER TABLE media
+                ADD COLUMN uploaded_by
+                TEXT DEFAULT 'Anonymous'
+                """
+            )
+
+        except sqlite3.OperationalError:
+            pass
+
+
+    # prompt column
+    if "prompt" not in columns:
+
+        try:
+
+            cursor.execute(
+                """
+                ALTER TABLE media
+                ADD COLUMN prompt
+                TEXT DEFAULT ''
+                """
+            )
+
+        except sqlite3.OperationalError:
+            pass
+
+
+    conn.commit()
+
+    conn.close()
+
+
+# Database initialize
+legacy_init_db()
+
+
+# =========================================================
 # FILE HELPERS
 # =========================================================
 
@@ -595,6 +823,17 @@ def login():
                 if not user:
                     flash(
                         "Invalid username or password.",
+                        "error"
+                    )
+                    return redirect(url_for("login"))
+                    
+                # =====================================================
+                # PHASE 3: ACCOUNT STATUS CHECK
+                # =====================================================
+                if "status" in user.keys() and user["status"] != "ACTIVE":
+                    _record_failed_attempt("login")
+                    flash(
+                        "Account is suspended or inactive. Contact Admin.",
                         "error"
                     )
                     return redirect(url_for("login"))
