@@ -69,5 +69,15 @@
             if (pass) { document.getElementById('mystery-pass').value = pass; document.getElementById('mystery-form').submit(); }
         }
     </script>
+    <!-- PREMIUM FF MASCOT ANIMATION -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='mascot/mascot.css') }}">
+    
+    <div id="mascot-stage">
+        <div id="mascot-box">VAULT</div>
+        <!-- Apni background remove ki hui image yahan use karein -->
+        <img id="ff-mascot" src="{{ url_for('static', filename='mascot/cartoon_ff.png') }}" alt="FF Mascot">
+    </div>
+
+    <script src="{{ url_for('static', filename='mascot/mascot.js') }}"></script>
 </body>
 </html>
