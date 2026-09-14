@@ -1,6 +1,8 @@
 import os
 import sqlite3
 import secrets
+import time
+from collections import defaultdict, deque
 import hmac
 from uuid import uuid4
 
@@ -540,6 +542,51 @@ def save_uploaded_file(file):
 
 
 # =========================================================
+# LOGIN / ADMIN BRUTE-FORCE PROTECTION
+# =========================================================
+# 5 failed attempts within 10 minutes -> 10 minute temporary block.
+# Stored in process memory so no extra dependency is required.
+RATE_LIMIT_WINDOW = 10 * 60
+RATE_LIMIT_MAX_FAILURES = 5
+RATE_LIMIT_BLOCK_TIME = 10 * 60
+_failed_attempts = defaultdict(deque)
+_blocked_until = {}
+
+def _rate_limit_key(scope):
+    forwarded = request.headers.get("X-Forwarded-For", "")
+    ip = forwarded.split(",")[0].strip() if forwarded else request.remote_addr
+    return f"{scope}:{ip or 'unknown'}"
+
+def _rate_limited(scope):
+    key = _rate_limit_key(scope)
+    now = time.monotonic()
+    blocked_until = _blocked_until.get(key, 0)
+    if blocked_until > now:
+        return True, int(blocked_until - now) + 1
+    _blocked_until.pop(key, None)
+    attempts = _failed_attempts[key]
+    while attempts and now - attempts[0] > RATE_LIMIT_WINDOW:
+        attempts.popleft()
+    return False, 0
+
+def _record_failed_attempt(scope):
+    key = _rate_limit_key(scope)
+    now = time.monotonic()
+    attempts = _failed_attempts[key]
+    while attempts and now - attempts[0] > RATE_LIMIT_WINDOW:
+        attempts.popleft()
+    attempts.append(now)
+    if len(attempts) >= RATE_LIMIT_MAX_FAILURES:
+        _blocked_until[key] = now + RATE_LIMIT_BLOCK_TIME
+        attempts.clear()
+
+def _clear_failed_attempts(scope):
+    key = _rate_limit_key(scope)
+    _failed_attempts.pop(key, None)
+    _blocked_until.pop(key, None)
+
+
+# =========================================================
 # ROLE / AUTHORIZATION HELPERS
 # =========================================================
 
@@ -584,6 +631,11 @@ def login():
         return redirect(url_for("dashboard"))
 
     if request.method == "POST":
+
+        limited, retry_after = _rate_limited("login")
+        if limited:
+            flash(f"Too many failed attempts. Please try again in about {retry_after // 60 + 1} minutes.", "error")
+            return redirect(url_for("login"))
 
         action = request.form.get("action", "").strip()
         username = request.form.get("username", "").strip()
@@ -758,9 +810,11 @@ def login():
                     session["username"] = user["username"]
                     session["is_registered"] = True
                     session["is_admin"] = (user["role"] == "admin")
+                    _clear_failed_attempts("login")
 
                     return redirect(url_for("dashboard"))
 
+                _record_failed_attempt("login")
                 flash(
                     "Invalid username or password.",
                     "error"
@@ -1486,6 +1540,11 @@ def admin():
     # A registered user must authenticate with the admin passcode
     # once to receive the admin role.
     if request.method == "POST":
+        limited, retry_after = _rate_limited("admin")
+        if limited:
+            flash(f"Too many failed admin passcode attempts. Please try again in about {retry_after // 60 + 1} minutes.", "error")
+            return render_template("admin.html", auth_required=True)
+
         if not session.get("username") or not session.get("is_registered"):
             flash("Please login with a registered account before admin access.", "error")
             return redirect(url_for("login"))
@@ -1496,6 +1555,7 @@ def admin():
             entered_pass,
             ADMIN_PASSCODE,
         ):
+            _record_failed_attempt("admin")
             flash("Access Denied: Incorrect Passcode!", "error")
             return render_template("admin.html", auth_required=True)
 
@@ -1508,6 +1568,7 @@ def admin():
         conn.close()
 
         session["is_admin"] = True
+        _clear_failed_attempts("admin")
         flash("Admin role activated for this account!", "success")
 
     # Never trust only the client session flag. Re-check the database role.
