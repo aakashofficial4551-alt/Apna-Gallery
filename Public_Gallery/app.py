@@ -370,8 +370,27 @@ def _clear_failed_attempts(scope):
 
 
 # =========================================================
-# AUTHORIZATION HELPERS
+# AUTHORIZATION & AUDIT LOGGING HELPERS (PHASE 4)
 # =========================================================
+
+def log_admin_action(actor_username, action, target_type, target_id, metadata=""):
+    """
+    Records sensitive admin actions into the audit_logs table.
+    """
+    try:
+        conn = get_db_connection()
+        conn.execute(
+            """
+            INSERT INTO audit_logs (actor_username, action, target_type, target_id, metadata)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (actor_username, action, target_type, target_id, metadata)
+        )
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print("AUDIT LOG ERROR:", repr(e))
+
 
 def get_current_user():
     username = session.get("username")
@@ -766,6 +785,10 @@ def approve(id):
     conn.execute("UPDATE media SET approved = 1 WHERE id = ?", (id,))
     conn.commit()
     conn.close()
+
+    # PHASE 4: Audit Logging for Approval Action
+    log_admin_action(session.get("username", "admin"), "APPROVE_MEDIA", "media", id)
+
     flash("Item successfully approved!", "success")
     return redirect(url_for("admin"))
 
@@ -808,6 +831,10 @@ def delete(id):
         conn.execute("DELETE FROM media WHERE id = ?", (id,))
         conn.commit()
     conn.close()
+
+    # PHASE 4: Audit Logging for Delete Action
+    log_admin_action(session.get("username", "admin"), "DELETE_MEDIA", "media", id)
+
     flash("Item deleted successfully.", "success")
     return redirect(url_for("admin"))
 
