@@ -27,13 +27,13 @@
     <main class="container">
         <!-- Admin Access Banner -->
         <a href="{{ url_for('admin') }}" class="admin-banner" aria-label="Access Admin Panel">
-            <span style="display: block; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 2px; color: var(--text-tertiary); margin-bottom: 4px;">Restricted Area</span>
+            <span style="display: block; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 2px; color: var(--accent-light); margin-bottom: 4px;">Restricted Area</span>
             🛠️ ADMIN APPROVAL PANEL 🛠️
         </a>
 
         <div style="text-align: center; margin-bottom: 40px;">
             <h2 class="text-gradient" style="font-size: 2rem;">VAULT CATEGORIES</h2>
-            <p style="color: var(--text-secondary); font-weight: 500;">Select a secure vault to manage classified assets.</p>
+            <p style="color: var(--text-secondary); font-weight: 700;">Select a secure vault to manage classified assets.</p>
         </div>
 
         <!-- Dashboard Grid -->
@@ -58,12 +58,12 @@
                 <h2>Doc Vault</h2>
             </a>
             
-            <a href="{{ url_for('gallery', category='Shayari') }}" class="category-card interactive-element" style="border-color: rgba(245, 158, 11, 0.3);">
+            <a href="{{ url_for('gallery', category='Shayari') }}" class="category-card interactive-element" style="border-color: rgba(255, 152, 0, 0.5);">
                 <span style="font-size: 3rem; margin-bottom: 12px;">✍️</span>
                 <h2 style="color: var(--warning);">Shayari</h2>
             </a>
             
-            <div class="category-card interactive-element" onclick="askMystery()" role="button" tabindex="0" aria-label="Access Mystery Vault" style="border-color: rgba(139, 92, 246, 0.3); cursor: pointer;">
+            <div class="category-card interactive-element" onclick="askMystery()" role="button" tabindex="0" aria-label="Access Mystery Vault" style="border-color: rgba(157, 78, 221, 0.5); cursor: pointer;">
                 <span style="font-size: 3rem; margin-bottom: 12px;">🔒</span>
                 <h2 style="color: var(--mystery);">Mystery</h2>
             </div>
@@ -74,13 +74,13 @@
         </a>
     </main>
 
-    <!-- Mascot Assistant -->
+    <!-- RESTORED: ALWAYS VISIBLE MASCOT (VIDEO MAGIC WITH AUTO BG REMOVER) -->
     <div id="mascot-widget" onclick="toggleAI()" role="button" aria-label="Toggle AI Assistant" tabindex="0">
-        <div class="mascot-bubble">Initialize A.I. 🤖</div>
-        <img id="ff-mascot" 
-             src="{{ url_for('static', filename='mascot/cartoon_ff.png') }}" 
-             onerror="this.onerror=null; this.src='https://cdn-icons-png.flaticon.com/512/4712/4712010.png';"
-             alt="A.I. Assistant Mascot">
+        <div class="mascot-bubble">Talk to A.I. 🤖</div>
+        <!-- Canvas that displays the background-removed character -->
+        <canvas id="ff-mascot"></canvas>
+        <!-- Hidden Original MP4 Video -->
+        <video id="ff-mascot-video" src="{{ url_for('static', filename='mascot/cartoon_ff.mp4') }}" autoplay loop muted playsinline style="display:none;" crossorigin="anonymous"></video>
     </div>
 
     <!-- AI Chat Interface -->
@@ -106,6 +106,39 @@
     </form>
     
     <script>
+        // --- RESTORED LIVE VIDEO BACKGROUND REMOVER LOGIC ---
+        window.addEventListener('load', function() {
+            const video = document.getElementById('ff-mascot-video');
+            const canvas = document.getElementById('ff-mascot');
+            if (video && canvas) {
+                const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                video.addEventListener('loadedmetadata', function() {
+                    canvas.width = video.videoWidth / 2;
+                    canvas.height = video.videoHeight / 2;
+                });
+                video.addEventListener('play', function() {
+                    function processFrame() {
+                        if (video.paused || video.ended) return;
+                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                        let frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                        let length = frame.data.length / 4;
+                        for (let i = 0; i < length; i++) {
+                            let r = frame.data[i * 4 + 0];
+                            let g = frame.data[i * 4 + 1];
+                            let b = frame.data[i * 4 + 2];
+                            // Auto remove Black & Green background from video frames
+                            if ((r < 30 && g < 30 && b < 30) || (g > 90 && r < 80 && b < 80)) {
+                                frame.data[i * 4 + 3] = 0; 
+                            }
+                        }
+                        ctx.putImageData(frame, 0, 0);
+                        requestAnimationFrame(processFrame);
+                    }
+                    requestAnimationFrame(processFrame);
+                });
+            }
+        });
+
         // Audio Feedback Interaction
         document.querySelectorAll('.interactive-element, .nav-link').forEach(item => {
             item.addEventListener('click', () => { 
