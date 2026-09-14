@@ -1,23 +1,77 @@
 import os
 import sqlite3
-from flask import Flask, request, render_template, redirect, url_for, flash, session, jsonify
+from uuid import uuid4
+
+from dotenv import load_dotenv
+from flask import (
+    Flask,
+    request,
+    render_template,
+    redirect,
+    url_for,
+    flash,
+    session,
+    jsonify,
+)
+from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
+
 from ai_service import get_ai_response
 
+
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+
+load_dotenv(os.path.join(BASE_DIR, "..", ".env"))
+
 app = Flask(__name__)
-app.secret_key = "socho_kya_hoga_secret_key_123"
-app.config['UPLOAD_FOLDER'] = 'static/uploads'
 
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'mp4', 'webm', 'mp3', 'wav', 'pdf', 'txt', 'docx'}
+app.config["SECRET_KEY"] = os.environ.get(
+    "SECRET_KEY",
+    "development-only-secret-change-me"
+)
 
-# SECRET ADMIN PASSCODE
-ADMIN_PASSCODE = "800123"
-MYSTERY_CODE = "SOCHO"
+app.config["UPLOAD_FOLDER"] = os.path.join(
+    BASE_DIR,
+    "static",
+    "uploads"
+)
+
+app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
+
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+
+
+ADMIN_PASSCODE = os.environ.get("ADMIN_PASSCODE", "")
+MYSTERY_CODE = os.environ.get("MYSTERY_CODE", "SOCHO")
+
+
+ALLOWED_EXTENSIONS = {
+    "png",
+    "jpg",
+    "jpeg",
+    "webp",
+    "gif",
+    "mp4",
+    "webm",
+    "mp3",
+    "wav",
+    "ogg",
+    "pdf",
+    "txt",
+    "docx",
+}
+
+
+os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
+DATABASE_PATH = os.path.join(BASE_DIR, "database.db")
+
+
 def get_db_connection():
-    conn = sqlite3.connect('database.db')
+    conn = sqlite3.connect(DATABASE_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -63,193 +117,213 @@ def init_db():
 init_db()
 
 def allowed_file(filename):
+    DATABASE_PATH = os.path.join(BASE_DIR, "database.db")
+
+
+def get_db_connection():
+    conn = sqlite3.connect(DATABASE_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-@app.route('/login', methods=['GET', 'POST'])
+@app.route("/login", methods=["GET", "POST"])
 def login():
-    if request.method == 'POST':
-        action = request.form.get('action')
-        username = request.form.get('username')
-        password = request.form.get('password', '')
-        
-        if action == 'guest':
-            session['username'] = username + " (Guest)"
-            return redirect(url_for('dashboard'))
-            
+
+    if session.get("username"):
+        return redirect(url_for("dashboard"))
+
+    if request.method == "POST":
+
+        action = request.form.get("action", "").strip()
+
+        username = request.form.get(
+            "username",
+            ""
+        ).strip()
+
+        password = request.form.get(
+            "password",
+            ""
+        )
+
+        # -----------------------
+        # Basic validation
+        # -----------------------
+
+        if not username:
+            flash("Please enter a username.", "error")
+            return redirect(url_for("login"))
+
+        if len(username) > 40:
+            flash("Username is too long.", "error")
+            return redirect(url_for("login"))
+
+        # -----------------------
+        # Guest Login
+        # -----------------------
+
+        if action == "guest":
+
+            session.clear()
+
+            session["username"] = f"{username} (Guest)"
+            session["is_registered"] = False
+
+            return redirect(url_for("dashboard"))
+
+        if not password:
+            flash("Please enter your password.", "error")
+            return redirect(url_for("login"))
+
         conn = get_db_connection()
-        if action == 'register':
+
+        # -----------------------
+        # Register
+        # -----------------------
+
+        if action == "register":
+
+            if len(password) < 6:
+                conn.close()
+
+                flash(
+                    "Password must contain at least 6 characters.",
+                    "error"
+                )
+
+                return redirect(url_for("login"))
+
+            password_hash = generate_password_hash(password)
+
             try:
-                conn.execute('INSERT INTO users (username, password) VALUES (?, ?)', (username, password))
+
+                conn.execute(
+                    """
+                    INSERT INTO users
+                    (username, password)
+                    VALUES (?, ?)
+                    """,
+                    (
+                        username,
+                        password_hash,
+                    ),
+                )
+
                 conn.commit()
-                flash('Account Created! Please Login.', 'success')
+
+                flash(
+                    "Account created successfully. You can now sign in.",
+                    "success"
+                )
+
             except sqlite3.IntegrityError:
-                flash('Username already exists!', 'error')
-        elif action == 'login':
-            user = conn.execute('SELECT * FROM users WHERE username = ? AND password = ?', (username, password)).fetchone()
-            if user:
-                session['username'] = user['username']
-                session['is_registered'] = True
-                return redirect(url_for('dashboard'))
-            else: flash('Invalid Credentials!', 'error')
-        conn.close()
-    return render_template('login.html')
 
-@app.route('/logout')
-def logout():
-    session.clear()
-    return redirect(url_for('login'))
+                flash(
+                    "That username is already registered.",
+                    "error"
+                )
 
-@app.route('/')
-@app.route('/dashboard')
-def dashboard():
-    if 'username' not in session: return redirect(url_for('login'))
-    return render_template('dashboard.html')
+            finally:
+                conn.close()
 
-@app.route('/games')
-def games():
-    if 'username' not in session: return redirect(url_for('login'))
-    return render_template('games.html')
+            return redirect(url_for("login"))
 
-@app.route('/profile', methods=['GET', 'POST'])
-def profile():
-    if 'username' not in session: return redirect(url_for('login'))
-    conn = get_db_connection()
-    if request.method == 'POST':
-        if 'bio' in request.form:
-            conn.execute('UPDATE users SET bio = ?, country = ? WHERE username = ?',
-                         (request.form['bio'], request.form['country'], session['username']))
-            conn.commit()
-        elif 'profile_pic' in request.files:
-            file = request.files['profile_pic']
-            if file and allowed_file(file.filename):
-                filename = secure_filename(file.filename)
-                file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-                conn.execute('UPDATE users SET profile_pic = ? WHERE username = ?', (filename, session['username']))
-                conn.commit()
-        elif 'story' in request.files:
-            file = request.files['story']
-            if file and allowed_file(file.filename):
-                filename = secure_filename(file.filename)
-                file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-                conn.execute('INSERT INTO stories (username, filename) VALUES (?, ?)', (session['username'], filename))
-                conn.commit()
+        # -----------------------
+        # Login
+        # -----------------------
 
-    user = conn.execute('SELECT * FROM users WHERE username = ?', (session['username'],)).fetchone()
-    my_uploads = conn.execute('SELECT * FROM media WHERE uploaded_by = ? ORDER BY id DESC', (session['username'],)).fetchall()
-    stories = conn.execute('SELECT * FROM stories WHERE username = ? ORDER BY id DESC', (session['username'],)).fetchall()
-    post_count = len(my_uploads)
-    conn.close()
-    return render_template('profile.html', user=user, my_uploads=my_uploads, post_count=post_count, stories=stories)
+        if action == "login":
 
-@app.route('/gallery/<category>', methods=['GET', 'POST'])
-def gallery(category):
-    if 'username' not in session: return redirect(url_for('login'))
-    if request.method == 'POST':
-        file = request.files.get('media')
-        filename = "SHAYARI_TEXT"
-        if file and file.filename != '':
-            if allowed_file(file.filename):
-                filename = secure_filename(file.filename)
-                file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+            user = conn.execute(
+                """
+                SELECT *
+                FROM users
+                WHERE username = ?
+                """,
+                (username,),
+            ).fetchone()
+
+            if not user:
+
+                conn.close()
+
+                flash(
+                    "Invalid username or password.",
+                    "error"
+                )
+
+                return redirect(url_for("login"))
+
+            stored_password = user["password"] or ""
+
+            password_valid = False
+            legacy_password = False
+
+            # Modern hashed password
+            if stored_password.startswith(
+                ("pbkdf2:", "scrypt:")
+            ):
+
+                try:
+                    password_valid = check_password_hash(
+                        stored_password,
+                        password
+                    )
+
+                except ValueError:
+                    password_valid = False
+
+            # Old Apna Gallery plaintext password
             else:
-                flash('Invalid file format!', 'error')
-                return redirect(url_for('gallery', category=category))
-        
-        # Admin upload karega toh direct approve, baaki logo ka pending (0)
-        is_approved = 1 if session.get('is_admin') else 0
-        
-        conn = get_db_connection()
-        conn.execute('INSERT INTO media (filename, title, category, prompt, uploaded_by, approved) VALUES (?, ?, ?, ?, ?, ?)',
-                     (filename, request.form.get('title', 'Untitled'), category, request.form.get('prompt', ''), session.get('username', 'Anonymous'), is_approved))
-        conn.commit()
+
+                if stored_password == password:
+                    password_valid = True
+                    legacy_password = True
+
+            if password_valid:
+
+                # Automatically secure old account
+                if legacy_password:
+
+                    new_hash = generate_password_hash(password)
+
+                    conn.execute(
+                        """
+                        UPDATE users
+                        SET password = ?
+                        WHERE id = ?
+                        """,
+                        (
+                            new_hash,
+                            user["id"],
+                        ),
+                    )
+
+                    conn.commit()
+
+                conn.close()
+
+                session.clear()
+
+                session["username"] = user["username"]
+                session["is_registered"] = True
+
+                return redirect(url_for("dashboard"))
+
+            conn.close()
+
+            flash(
+                "Invalid username or password.",
+                "error"
+            )
+
+            return redirect(url_for("login"))
+
         conn.close()
-        
-        if is_approved:
-            flash('File uploaded directly by Admin!', 'success')
-        else:
-            flash('Uploaded! Sent to Admin for approval.', 'success')
-        return redirect(url_for('gallery', category=category))
 
-    conn = get_db_connection()
-    # Sirf approved media gallery me dikhegi
-    media_files = conn.execute('SELECT * FROM media WHERE category = ? AND approved = 1 ORDER BY id DESC', (category,)).fetchall()
-    comments_db = conn.execute('SELECT * FROM comments ORDER BY id ASC').fetchall()
-    conn.close()
+        flash(
+            "Invalid request.",
+            "error"
+        )
 
-    comments = {}
-    for c in comments_db:
-        if c['media_id'] not in comments: comments[c['media_id']] = []
-        comments[c['media_id']].append(c)
-
-    return render_template('gallery.html', media_files=media_files, category=category, comments=comments)
-
-# AI Chat API
-@app.route('/api/ai', methods=['POST'])
-def ai_endpoint():
-    data = request.get_json()
-    user_query = data.get('query', '')
-    bot_reply = get_ai_response(user_query)
-    return jsonify({'reply': bot_reply})
-
-# Like
-@app.route('/like/<int:media_id>', methods=['POST'])
-def like(media_id):
-    conn = get_db_connection()
-    conn.execute('UPDATE media SET likes = likes + 1 WHERE id = ?', (media_id,))
-    conn.commit()
-    likes = conn.execute('SELECT likes FROM media WHERE id = ?', (media_id,)).fetchone()['likes']
-    conn.close()
-    return jsonify({'likes': likes})
-
-# ADMIN DASHBOARD
-@app.route('/admin', methods=['GET', 'POST'])
-def admin():
-    if request.method == 'POST':
-        entered_pass = request.form.get('passcode')
-        if entered_pass == ADMIN_PASSCODE:
-            session['is_admin'] = True
-            flash('Admin Access Granted!', 'success')
-        else: 
-            flash('Access Denied: Incorrect Passcode!', 'error')
-    
-    if not session.get('is_admin'): 
-        return render_template('admin.html', auth_required=True)
-    
-    conn = get_db_connection()
-    # Saare unapproved items layega
-    pending_media = conn.execute('SELECT * FROM media WHERE approved = 0 ORDER BY id DESC').fetchall()
-    conn.close()
-    return render_template('admin.html', pending_media=pending_media, auth_required=False)
-
-@app.route('/approve/<int:id>')
-def approve(id):
-    if session.get('is_admin'):
-        conn = get_db_connection()
-        conn.execute('UPDATE media SET approved = 1 WHERE id = ?', (id,))
-        conn.commit()
-        conn.close()
-        flash('Item successfully approved and published!', 'success')
-    return redirect(url_for('admin'))
-
-@app.route('/delete/<int:id>')
-def delete(id):
-    if session.get('is_admin'):
-        conn = get_db_connection()
-        item = conn.execute('SELECT * FROM media WHERE id = ?', (id,)).fetchone()
-        if item:
-            if item['filename'] != 'SHAYARI_TEXT':
-                try: os.remove(os.path.join(app.config['UPLOAD_FOLDER'], item['filename']))
-                except: pass
-            conn.execute('DELETE FROM media WHERE id = ?', (id,))
-            conn.commit()
-        conn.close()
-    return redirect(request.referrer or url_for('dashboard'))
-
-@app.route('/mystery', methods=['POST'])
-def mystery():
-    if request.form.get('passcode') == MYSTERY_CODE:
-        return render_template('mystery.html')
-    return redirect(url_for('dashboard'))
-
-if __name__ == '__main__':
-    app.run(debug=True)
+    return render_template("login.html")
