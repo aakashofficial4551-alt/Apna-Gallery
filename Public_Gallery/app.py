@@ -16,7 +16,7 @@ import requests
 from dotenv import load_dotenv
 
 from flask import (
-    Flask, request, render_template, redirect, url_for, flash, session, jsonify, render_template_string
+    Flask, request, render_template, redirect, url_for, flash, session, jsonify
 )
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -225,7 +225,7 @@ def login():
                           (username, email, generate_password_hash(password), code))
                 conn.commit()
                 session.update({"username": username, "is_registered": True, "is_admin": False, "role": "user"})
-                flash(f"Account created! ID: {code}. Welcome to Apna Gallery!", "success")
+                flash(f"Account created! Welcome to Apna Gallery!", "success")
                 return redirect(url_for("feed"))
             except:
                 flash("Username or Email exists.", "error")
@@ -290,7 +290,7 @@ def verify_otp():
             return redirect(url_for("login"))
         flash("Invalid OTP.", "error")
         conn.close()
-    return render_template_string("""<div style="max-width:400px; margin: 100px auto; background:#101b2d; padding:30px; border-radius:12px; color:white; text-align:center;"><h2 style="color:#38bdf8;">Enter OTP</h2><form method="POST"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="text" name="otp" placeholder="6-Digit OTP" required style="width:100%; padding:10px; margin-bottom:15px; border-radius:6px;"><br><input type="password" name="new_password" placeholder="New Password" required style="width:100%; padding:10px; margin-bottom:15px; border-radius:6px;"><br><button type="submit" style="background:#38bdf8; color:black; padding:10px 20px; border:none; border-radius:6px; cursor:pointer;">Reset Password</button></form></div>""")
+    return render_template("verify_otp.html")
 
 @app.route("/logout")
 def logout():
@@ -310,7 +310,36 @@ def request_delete():
     return redirect(url_for("login"))
 
 # =========================================================
-# CORE ROUTES
+# UNIVERSAL UPLOAD ROUTE (PHASE 30)
+# =========================================================
+@app.route("/upload_asset", methods=["POST"])
+def upload_asset():
+    if "username" not in session: return redirect(url_for("login"))
+    
+    category = request.form.get("category", "Photo")
+    file = request.files.get("media")
+    filename = "SHAYARI_TEXT"
+
+    if category != 'Shayari':
+        if file and file.filename != "":
+            filename = save_uploaded_file(file, category)
+            if not filename:
+                flash("Upload Failed! Check API keys.", "error")
+                return redirect(request.referrer or url_for("dashboard"))
+    
+    is_approved = 1 if current_user_is_admin() else 0
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved) VALUES (%s, %s, %s, %s, %s, %s)",
+              (filename, request.form.get("title", "Untitled"), category, "", session.get("username"), is_approved))
+    conn.commit()
+    conn.close()
+    
+    flash("Asset published successfully!" if is_approved else "Asset sent to Admin for approval.", "success")
+    return redirect(request.referrer or url_for("feed"))
+
+# =========================================================
+# CORE ROUTES (Feed, Explore, Dashboard, Studio)
 # =========================================================
 @app.route("/")
 def index():
@@ -466,8 +495,8 @@ def agent_profile(username):
     
     c.execute("SELECT id FROM followers WHERE follower = %s AND following = %s", (session["username"], username))
     is_following = bool(c.fetchone())
-    
     conn.close()
+    
     return render_template("agent.html", agent=agent, uploads=agent_uploads, post_count=len(agent_uploads), followers_count=followers_count, following_count=following_count, is_following=is_following)
 
 @app.route("/follow/<username>", methods=["POST"])
@@ -581,7 +610,7 @@ def gallery(category):
     for comment in comments_db: comments[comment["media_id"]].append(comment)
     return render_template("gallery.html", media_files=media_files, category=category, comments=comments)
 
-# NEW GLOBAL SEARCH ENGINE
+# GLOBAL SEARCH ENGINE
 @app.route("/search")
 def search():
     if "username" not in session: return redirect(url_for("login"))
@@ -592,14 +621,11 @@ def search():
     c = conn.cursor()
     search_term = f"%{query}%"
     
-    # Search Assets
     c.execute("SELECT m.*, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.approved = 1 AND m.filename != 'SHAYARI_TEXT' AND (m.title ILIKE %s OR m.prompt ILIKE %s) ORDER BY m.id DESC", (search_term, search_term))
     media_files = c.fetchall()
     
-    # Search Users (Agents)
     c.execute("SELECT username, profile_pic, role, bio FROM users WHERE username ILIKE %s LIMIT 20", (search_term,))
     found_users = c.fetchall()
-    
     conn.close()
     return render_template("search.html", media_files=media_files, found_users=found_users, query=query)
 
