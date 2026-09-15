@@ -173,12 +173,35 @@ def inject_global_vars():
         except: pass
     return vars_dict
 
+# =========================================================
+# PHASE 35: OPTIMIZED UPLOAD ENGINE
+# =========================================================
 def save_uploaded_file(file, category="Photo"):
+    """
+    Saves the file to Cloudinary. 
+    If it's an image, it uses q_auto and f_auto to aggressively compress
+    and optimize it on the fly, saving bandwidth and storage.
+    """
     if not file or not file.filename: return None
     try:
-        upload_result = cloudinary.uploader.upload(file, resource_type="auto")
+        if category == "Photo" or category == "Image":
+            # Apply auto-quality and auto-format for images
+            upload_result = cloudinary.uploader.upload(
+                file, 
+                resource_type="image",
+                quality="auto",
+                fetch_format="auto"
+            )
+        else:
+            # Fallback for Videos, Documents, etc.
+            upload_result = cloudinary.uploader.upload(
+                file, 
+                resource_type="auto"
+            )
         return upload_result["secure_url"]
-    except: return None
+    except Exception as e:
+        print(f"Cloudinary Error: {e}")
+        return None
 
 def send_otp_email(to_email, otp):
     sender = os.environ.get("SMTP_EMAIL")
@@ -365,7 +388,7 @@ def upload_asset():
     return redirect(request.referrer or url_for("feed"))
 
 # =========================================================
-# NEW: NETWORK EXPLORER API (PHASE 34)
+# NEW: NETWORK EXPLORER API
 # =========================================================
 @app.route("/api/network/<action_type>/<username>")
 def api_network(action_type, username):
@@ -633,7 +656,9 @@ def api_chat_history(username):
     c.execute("UPDATE messages SET is_read = TRUE WHERE sender = %s AND receiver = %s AND is_read = FALSE", (username, me))
     conn.commit()
     conn.close()
-    return jsonify(history)
+    
+    formatted_history = [{"sender": r['sender'], "message": r['message'], "time": r['time']} for r in history]
+    return jsonify(formatted_history)
 
 # =========================================================
 # GALLERY, SEARCH, AI STUDIO
