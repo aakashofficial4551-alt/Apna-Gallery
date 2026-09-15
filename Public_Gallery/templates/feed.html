@@ -4,9 +4,18 @@
 {% block content %}
 <div style="max-width: 650px; margin: 0 auto;">
     
-    <div style="text-align: center; margin-bottom: 30px;">
-        <h1 style="color: var(--accent); margin: 0;">📰 For You</h1>
-        <p style="color: var(--text-muted);">Double tap an image to like it! Try using #hashtags and @mentions.</p>
+    <div style="text-align: center; margin-bottom: 20px;">
+        <h1 style="color: var(--accent); margin: 0;">📰 Timeline</h1>
+    </div>
+
+    <!-- DUAL FEED TABS -->
+    <div style="display: flex; justify-content: center; gap: 20px; margin-bottom: 30px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
+        <a href="{{ url_for('feed', tab='foryou') }}" style="text-decoration: none; color: {% if current_tab == 'foryou' %}var(--accent){% else %}var(--text-muted){% endif %}; font-size: 1.2rem; font-weight: bold; padding-bottom: 5px; {% if current_tab == 'foryou' %}border-bottom: 3px solid var(--accent);{% endif %}">
+            👥 For You
+        </a>
+        <a href="{{ url_for('feed', tab='global') }}" style="text-decoration: none; color: {% if current_tab == 'global' %}var(--accent){% else %}var(--text-muted){% endif %}; font-size: 1.2rem; font-weight: bold; padding-bottom: 5px; {% if current_tab == 'global' %}border-bottom: 3px solid var(--accent);{% endif %}">
+            🌍 Global
+        </a>
     </div>
 
     <div style="display: flex; flex-direction: column; gap: 40px;">
@@ -21,10 +30,14 @@
                         <div style="width: 45px; height: 45px; border-radius: 50%; background: #1e293b; display: grid; place-items: center; border: 2px solid var(--accent);">👤</div>
                     {% endif %}
                     
-                    <h3 style="margin: 0; display: flex; align-items: center; gap: 5px; font-size: 1.1rem;">
-                        {{ post.uploaded_by }}
-                        {% if post.role == 'admin' %}<span style="color: #38bdf8; font-size: 1.1rem;" title="Verified Admin">☑️</span>{% endif %}
-                    </h3>
+                    <div>
+                        <h3 style="margin: 0; display: flex; align-items: center; gap: 5px; font-size: 1.1rem;">
+                            {{ post.uploaded_by }}
+                            {% if post.role == 'admin' %}<span style="color: #38bdf8; font-size: 1.1rem;" title="Verified Admin">☑️</span>{% endif %}
+                        </h3>
+                        <!-- NEW: TIME AGO FILTER -->
+                        <span style="font-size: 0.8rem; color: var(--text-muted);">{{ post.created_at | timeago }}</span>
+                    </div>
                 </a>
                 <span style="background: rgba(8,17,31,0.6); padding: 4px 10px; border-radius: 8px; font-size: 0.8rem; color: var(--text-muted);">{{ post.category }}</span>
             </div>
@@ -41,7 +54,6 @@
             </div>
 
             <div style="padding: 20px;">
-                <!-- MAGIC FORMATTER APPLIED HERE -->
                 <h3 style="margin: 0 0 15px 0; font-size: 1.2rem; line-height: 1.4;">{{ post.title | format_text | safe }}</h3>
                 
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
@@ -69,6 +81,8 @@
                                         {{ c.username }}
                                         {% if c.role == 'admin' %} <span style="font-size: 0.9rem;">☑️</span> {% endif %}
                                     </strong>: {{ c.comment_text | format_text | safe }}
+                                    <!-- TIME AGO ON COMMENTS -->
+                                    <span style="font-size: 0.7rem; color: var(--text-muted); float: right;">{{ c.created_at | timeago }}</span>
                                 </div>
                             {% endfor %}
                         {% else %}
@@ -88,7 +102,10 @@
         <div style="text-align: center; padding: 50px; background: var(--bg-card); border-radius: 16px; border: 1px solid var(--border-color);">
             <span style="font-size: 4rem;">🕵️‍♂️</span>
             <h2 style="color: var(--text-muted); margin-top: 15px;">It's quiet here.</h2>
-            <p style="color: var(--text-muted);">Go follow some agents or wait for them to upload to see their posts here!</p>
+            <p style="color: var(--text-muted);">
+                {% if current_tab == 'foryou' %} You aren't following anyone who has posted recently. Try checking the <strong>Global</strong> tab! 
+                {% else %} Wait for agents to upload to see their posts here! {% endif %}
+            </p>
         </div>
         {% endfor %}
     </div>
@@ -131,11 +148,7 @@ function handleDoubleTap(mediaId, element) {
 
 function sharePost(title, url) {
     if (navigator.share) {
-        navigator.share({
-            title: 'Apna Gallery',
-            text: 'Check out this post: ' + title,
-            url: url
-        }).catch(console.error);
+        navigator.share({ title: 'Apna Gallery', text: 'Check out this post: ' + title, url: url }).catch(console.error);
     } else {
         navigator.clipboard.writeText(url);
         alert("Link copied to clipboard! Share it anywhere.");
