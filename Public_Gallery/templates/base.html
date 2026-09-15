@@ -7,18 +7,19 @@
     <style>
         :root {
             --bg-main: #08111f;
-            --bg-card: rgba(16, 27, 45, 0.7);
+            --bg-card: #101b2d;
             --accent: #38bdf8;
             --accent-hover: #0ea5e9;
-            --text-main: #f8fafc;
+            --text-main: #ffffff;
             --text-muted: #94a3b8;
-            --border-glow: rgba(56, 189, 248, 0.2);
+            --border-color: #2b405c;
             --danger: #ef4444;
             --success: #22c55e;
+            --warning: #fbbf24;
         }
         body {
-            font-family: 'Montserrat', system-ui, sans-serif;
-            background: linear-gradient(135deg, var(--bg-main), #101b2d);
+            font-family: system-ui, sans-serif;
+            background: var(--bg-main);
             color: var(--text-main);
             min-height: 100vh;
             margin: 0;
@@ -27,9 +28,9 @@
         }
         /* Navbar */
         nav {
-            background: rgba(8, 17, 31, 0.8);
-            backdrop-filter: blur(12px);
-            border-bottom: 1px solid var(--border-glow);
+            background: rgba(16, 27, 45, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border-color);
             padding: 15px 30px;
             display: flex;
             justify-content: space-between;
@@ -39,14 +40,16 @@
             z-index: 100;
             flex-wrap: wrap;
             gap: 15px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
         }
         .nav-brand {
             font-size: 1.5rem;
             font-weight: 800;
-            color: var(--accent);
+            color: var(--text-main);
             text-decoration: none;
             letter-spacing: 1px;
         }
+        .nav-brand span { color: var(--accent); }
         .nav-links {
             display: flex;
             align-items: center;
@@ -54,46 +57,34 @@
             flex-wrap: wrap;
         }
         .nav-links a {
-            color: var(--text-main);
+            color: var(--text-muted);
             text-decoration: none;
             font-weight: 600;
             transition: color 0.3s;
         }
-        .nav-links a:hover {
-            color: var(--accent);
-        }
+        .nav-links a:hover { color: var(--text-main); }
+        
         /* Container */
         .container {
             flex: 1;
-            padding: 30px 15px;
+            padding: 40px 20px;
             max-width: 1200px;
             margin: 0 auto;
             width: 100%;
             box-sizing: border-box;
         }
+        
         /* Flash Messages */
-        .flash-messages {
-            margin-bottom: 20px;
-        }
         .alert {
             padding: 15px 20px;
             border-radius: 10px;
-            margin-bottom: 15px;
+            margin-bottom: 20px;
             font-weight: 600;
-            backdrop-filter: blur(5px);
+            border: 1px solid transparent;
         }
-        .alert.success { background: rgba(34, 197, 94, 0.2); border: 1px solid var(--success); color: #4ade80; }
-        .alert.error, .alert.danger { background: rgba(239, 68, 68, 0.2); border: 1px solid var(--danger); color: #f87171; }
+        .alert.success { background: rgba(34, 197, 94, 0.1); border-color: rgba(34, 197, 94, 0.3); color: #4ade80; }
+        .alert.error, .alert.danger { background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.3); color: #f87171; }
         
-        /* Global Glass Card */
-        .glass-card {
-            background: var(--bg-card);
-            backdrop-filter: blur(12px);
-            border: 1px solid var(--border-glow);
-            border-radius: 20px;
-            padding: 30px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-        }
         /* Buttons */
         .btn {
             display: inline-block;
@@ -109,28 +100,28 @@
         }
         .btn:hover { background: var(--accent-hover); transform: translateY(-2px); }
         
-        /* Footer */
         footer {
             text-align: center;
-            padding: 20px;
+            padding: 25px;
             color: var(--text-muted);
             font-size: 0.9rem;
-            border-top: 1px solid rgba(255,255,255,0.05);
+            border-top: 1px solid var(--border-color);
             margin-top: auto;
+            background: var(--bg-card);
         }
     </style>
     {% block head %}{% endblock %}
 </head>
 <body>
     <nav>
-        <a href="{{ url_for('dashboard') }}" class="nav-brand">APNA GALLERY</a>
+        <a href="{{ url_for('dashboard') }}" class="nav-brand">APNA <span>GALLERY</span></a>
         <div class="nav-links">
             {% if session.get('username') %}
                 <a href="{{ url_for('dashboard') }}">Dashboard</a>
                 <a href="{{ url_for('games') }}">Games</a>
                 <a href="{{ url_for('profile') }}">Profile</a>
                 {% if session.get('is_admin') %}
-                    <a href="{{ url_for('admin') }}" style="color: #fbbf24;">Admin HQ</a>
+                    <a href="{{ url_for('admin') }}" style="color: var(--warning);">Admin HQ</a>
                 {% endif %}
                 <a href="{{ url_for('logout') }}" class="btn" style="padding: 8px 16px;">Logout</a>
             {% else %}
