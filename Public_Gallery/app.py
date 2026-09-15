@@ -964,7 +964,3 @@ def request_entity_too_large(error):
 if __name__ == "__main__":
     debug_mode = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=debug_mode)
-
-git add requirements.txt app.py
-git commit -m "Fix dependency version and app.py indentation"
-git push
