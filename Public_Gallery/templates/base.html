@@ -79,7 +79,6 @@
                 <a href="{{ url_for('dashboard') }}">HQ</a>
                 <a href="{{ url_for('profile') }}" style="color: var(--accent);">Profile</a>
                 
-                <!-- NEW: SETTINGS BUTTON -->
                 <span onclick="document.getElementById('settingsModal').style.display='flex'" style="font-size: 1.3rem; cursor: pointer;" title="Settings">⚙️</span>
                 
                 {% if session.get('role') == 'admin' %}
@@ -111,7 +110,7 @@
         +
     </button>
 
-    <!-- UPLOAD MODAL -->
+    <!-- UPLOAD MODAL WITH PRIVACY CONTROL -->
     <div id="uploadModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
         <div style="background: var(--bg-card); padding: 30px; border-radius: 20px; border: 1px solid var(--border-color); width: 90%; max-width: 450px; position: relative; box-shadow: 0 10px 40px rgba(0,0,0,0.5);">
             <span onclick="document.getElementById('uploadModal').style.display='none'" style="position: absolute; top: 15px; right: 20px; font-size: 2rem; color: white; cursor: pointer;">&times;</span>
@@ -119,6 +118,7 @@
             
             <form method="POST" action="{{ url_for('upload_asset') }}" enctype="multipart/form-data" style="display: flex; flex-direction: column; gap: 15px; margin-top: 20px;">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                
                 <label style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: -10px;">Select Vault</label>
                 <select name="category" required style="padding: 12px; border-radius: 8px; background: rgba(8,17,31,0.8); color: white; border: 1px solid var(--border-color); outline: none;">
                     <option value="Photo">📸 Photo</option>
@@ -127,16 +127,27 @@
                     <option value="Document">📁 Document</option>
                     <option value="Shayari">✍️ Shayari (Add #tags!)</option>
                 </select>
+                
+                <!-- NEW: PRIVACY OPTIONS -->
+                <label style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: -10px;">Visibility (Privacy)</label>
+                <select name="visibility" required style="padding: 12px; border-radius: 8px; background: rgba(8,17,31,0.8); color: white; border: 1px solid var(--border-color); outline: none;">
+                    <option value="public">🌍 Public (Everyone can see)</option>
+                    <option value="followers">👥 Followers Only (Only your network)</option>
+                    <option value="private">🔒 Private (Only you)</option>
+                </select>
+
                 <label style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: -10px;">Caption / Hashtags</label>
                 <input type="text" name="title" placeholder="e.g., Beautiful day! #nature #vibes" required style="padding: 12px; border-radius: 8px; background: rgba(8,17,31,0.8); color: white; border: 1px solid var(--border-color); outline: none;">
+                
                 <label style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: -10px;">Upload File</label>
                 <input type="file" name="media" style="padding: 12px; border-radius: 8px; background: rgba(8,17,31,0.8); color: white; border: 1px solid var(--border-color); outline: none;">
+                
                 <button type="submit" class="btn" style="width: 100%; font-size: 1.1rem; padding: 12px; margin-top: 10px;">Upload to Network</button>
             </form>
         </div>
     </div>
 
-    <!-- NEW: UNIVERSAL SETTINGS MODAL -->
+    <!-- UNIVERSAL SETTINGS MODAL -->
     <div id="settingsModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
         <div style="background: var(--bg-card); padding: 30px; border-radius: 20px; border: 1px solid var(--border-color); width: 90%; max-width: 450px; position: relative; box-shadow: 0 10px 40px rgba(0,0,0,0.5); max-height: 85vh; overflow-y: auto;">
             <span onclick="document.getElementById('settingsModal').style.display='none'" style="position: absolute; top: 15px; right: 20px; font-size: 2rem; color: white; cursor: pointer;">&times;</span>
