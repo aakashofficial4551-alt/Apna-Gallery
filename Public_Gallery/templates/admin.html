@@ -77,6 +77,22 @@
     </div>
 
     <div class="admin-card" style="max-width: 100%; text-align: left;">
+        <!-- NEW: Admin Analytics -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px;">
+    <div style="background: var(--bg-card); border: 1px solid var(--border-color); padding: 20px; border-radius: 12px; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.3);">
+        <h3 style="margin: 0; color: var(--text-muted); font-size: 1rem;">Total Agents</h3>
+        <p style="margin: 10px 0 0 0; font-size: 2rem; font-weight: 900; color: var(--accent);">{{ user_count }}</p>
+    </div>
+    <div style="background: var(--bg-card); border: 1px solid var(--border-color); padding: 20px; border-radius: 12px; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.3);">
+        <h3 style="margin: 0; color: var(--text-muted); font-size: 1rem;">Approved Assets</h3>
+        <p style="margin: 10px 0 0 0; font-size: 2rem; font-weight: 900; color: var(--success);">{{ media_count }}</p>
+    </div>
+    <div style="background: var(--bg-card); border: 1px solid var(--border-color); padding: 20px; border-radius: 12px; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.3);">
+        <h3 style="margin: 0; color: var(--text-muted); font-size: 1rem;">Total Engagement</h3>
+        <p style="margin: 10px 0 0 0; font-size: 2rem; font-weight: 900; color: var(--danger);">❤️ {{ likes_count }}</p>
+    </div>
+</div>
+<!-- End Analytics -->
         <h3 style="margin-top: 0; border-bottom: 1px solid var(--border-color); padding-bottom: 15px;">Pending Uploads Request</h3>
         
         {% if pending_media %}
