@@ -77,9 +77,18 @@
         </div>
 
         <div style="height: 160px; background: #000; border-radius: 8px; margin-bottom: 10px; overflow: hidden; display: grid; place-items: center;">
-            {% if item.category == 'Photo' %}<img src="{{ item.filename }}" style="width: 100%; height: 100%; object-fit: cover;">
-            {% elif item.category == 'Video' %}<video src="{{ item.filename }}" style="width: 100%; height: 100%; object-fit: cover;"></video>
-            {% else %}<span style="font-size: 3rem;">📁</span>{% endif %}
+            {% if item.category == 'Photo' %}
+                <img src="{{ item.filename }}" style="width: 100%; height: 100%; object-fit: cover;">
+            {% elif item.category == 'Video' %}
+                <video src="{{ item.filename }}" style="width: 100%; height: 100%; object-fit: cover;"></video>
+            {% elif item.category == 'Music' %}
+                <div style="width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: linear-gradient(135deg, rgba(8,17,31,1), rgba(15,23,42,1)); padding: 10px; box-sizing: border-box;">
+                    <span style="font-size: 2rem; margin-bottom: 5px; filter: drop-shadow(0 0 5px var(--accent));">🎵</span>
+                    <audio src="{{ item.filename }}" controls style="width: 100%; outline: none; height: 30px;"></audio>
+                </div>
+            {% else %}
+                <span style="font-size: 3rem;">📁</span>
+            {% endif %}
         </div>
         
         <p style="margin: 0 0 10px 0; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ item.title }}</p>
@@ -100,9 +109,18 @@
     {% for item in saved_uploads %}
     <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px;">
         <div style="height: 160px; background: #000; border-radius: 8px; margin-bottom: 10px; overflow: hidden; display: grid; place-items: center;">
-            {% if item.category == 'Photo' %}<img src="{{ item.filename }}" style="width: 100%; height: 100%; object-fit: cover;">
-            {% elif item.category == 'Video' %}<video src="{{ item.filename }}" style="width: 100%; height: 100%; object-fit: cover;"></video>
-            {% else %}<span style="font-size: 3rem;">📁</span>{% endif %}
+            {% if item.category == 'Photo' %}
+                <img src="{{ item.filename }}" style="width: 100%; height: 100%; object-fit: cover;">
+            {% elif item.category == 'Video' %}
+                <video src="{{ item.filename }}" style="width: 100%; height: 100%; object-fit: cover;"></video>
+            {% elif item.category == 'Music' %}
+                <div style="width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: linear-gradient(135deg, rgba(8,17,31,1), rgba(15,23,42,1)); padding: 10px; box-sizing: border-box;">
+                    <span style="font-size: 2rem; margin-bottom: 5px; filter: drop-shadow(0 0 5px var(--accent));">🎵</span>
+                    <audio src="{{ item.filename }}" controls style="width: 100%; outline: none; height: 30px;"></audio>
+                </div>
+            {% else %}
+                <span style="font-size: 3rem;">📁</span>
+            {% endif %}
         </div>
         <p style="margin: 0; font-weight: bold;">{{ item.title }}</p>
         <p style="margin: 5px 0 0 0; font-size: 0.85rem; color: var(--text-muted);">From: {{ item.uploaded_by }}</p>
