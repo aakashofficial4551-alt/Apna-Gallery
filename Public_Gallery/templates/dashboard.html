@@ -8,6 +8,20 @@
     <p style="color: var(--text-muted); margin-top: 5px;">Access your secure vaults and agent tools below.</p>
 </div>
 
+<!-- NEW: DAILY REWARD BANNER (FREE ECONOMY) -->
+{% if can_claim and session.get('role') not in ['admin', 'pro'] %}
+<div style="background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(16, 185, 129, 0.1)); border: 1px solid var(--success); padding: 20px; border-radius: 12px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 5px 15px rgba(34,197,94,0.15);">
+    <div>
+        <h3 style="margin: 0; color: var(--success); display: flex; align-items: center; gap: 8px;">🎁 Daily Bonus Available!</h3>
+        <p style="margin: 5px 0 0 0; color: var(--text-main); font-size: 0.9rem;">Claim your free 20 Apna Coins to use the AI Studio.</p>
+    </div>
+    <form method="POST" action="{{ url_for('claim_reward') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn" style="background: var(--success); color: white; padding: 10px 20px;">Claim Now</button>
+    </form>
+</div>
+{% endif %}
+
 <!-- INSTAGRAM STYLE LIVE STORIES -->
 {% if stories %}
 <div style="margin-bottom: 30px;">
@@ -37,13 +51,9 @@
         {% for item in trending %}
         <div style="min-width: 200px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.3);">
             <div style="height: 120px; background: #000; border-radius: 8px; margin-bottom: 10px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
-                {% if item.category == 'Photo' %}
-                    <img src="{{ item.filename }}" style="width: 100%; height: 100%; object-fit: cover;">
-                {% elif item.category == 'Video' %}
-                    <video src="{{ item.filename }}" style="width: 100%; height: 100%; object-fit: cover;"></video>
-                {% else %}
-                    <span style="font-size: 2.5rem;">📁</span>
-                {% endif %}
+                {% if item.category == 'Photo' %}<img src="{{ item.filename }}" style="width: 100%; height: 100%; object-fit: cover;">
+                {% elif item.category == 'Video' %}<video src="{{ item.filename }}" style="width: 100%; height: 100%; object-fit: cover;"></video>
+                {% else %}<span style="font-size: 2.5rem;">📁</span>{% endif %}
             </div>
             <p style="margin: 0; font-weight: bold; font-size: 0.9rem; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ item.title }}</p>
             <p style="margin: 5px 0 0 0; font-size: 0.8rem; color: var(--danger);">❤️ {{ item.likes }} Likes</p>
