@@ -43,7 +43,7 @@ app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "development-only-secret
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
 
 # =========================================================
-# DATABASE AUTO-UPGRADER & AUTO-HEAL (FIXED)
+# DATABASE AUTO-HEALER (FIXES 500 ADMIN ERRORS)
 # =========================================================
 def upgrade_db():
     conn = get_db_connection()
@@ -60,7 +60,7 @@ def upgrade_db():
     """)
     conn.commit()
 
-    # 2. Safely add ALL possible missing columns to avoid 500 Errors
+    # 2. Add Missing Columns
     queries = [
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(120) UNIQUE",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS user_code VARCHAR(10) UNIQUE",
@@ -80,7 +80,15 @@ def upgrade_db():
         except:
             conn.rollback()
             
-    # 3. Generate 10-Digit codes for existing users
+    # 3. THE FIX: Repair old users with NULL roles/status to prevent Admin Page Crash
+    try:
+        c.execute("UPDATE users SET role = 'user' WHERE role IS NULL")
+        c.execute("UPDATE users SET status = 'ACTIVE' WHERE status IS NULL")
+        conn.commit()
+    except:
+        conn.rollback()
+
+    # 4. Generate 10-Digit codes for existing users
     try:
         c.execute("SELECT id FROM users WHERE user_code IS NULL")
         for row in c.fetchall():
@@ -95,7 +103,7 @@ def upgrade_db():
 upgrade_db()
 
 # =========================================================
-# AUTO-CLEANUP (Runs randomly to save server)
+# AUTO-CLEANUP
 # =========================================================
 def cleanup_database():
     conn = get_db_connection()
@@ -106,10 +114,8 @@ def cleanup_database():
         c.execute("DELETE FROM users WHERE role = 'user' AND last_active < NOW() - INTERVAL '90 days'")
         c.execute("DELETE FROM stories WHERE created_at < NOW() - INTERVAL '12 hours'")
         conn.commit()
-    except Exception as e:
-        print("Cleanup Error:", e)
-    finally:
-        conn.close()
+    except: pass
+    finally: conn.close()
 
 # =========================================================
 # SECURITY & HELPERS
@@ -141,25 +147,7 @@ def save_uploaded_file(file, category="Photo"):
     try:
         upload_result = cloudinary.uploader.upload(file, resource_type="auto")
         return upload_result["secure_url"]
-    except Exception as e: return None
-
-def send_otp_email(to_email, otp):
-    sender = os.environ.get("SMTP_EMAIL")
-    password = os.environ.get("SMTP_PASSWORD")
-    if not sender or not password:
-        print(f"⚠️ SMTP NOT CONFIGURED. OTP for {to_email} is: {otp}")
-        return True 
-    try:
-        server = smtplib.SMTP('smtp.gmail.com', 587)
-        server.starttls()
-        server.login(sender, password)
-        msg = f"Subject: Apna Gallery Verification\n\nYour OTP is: {otp}\nDo not share this with anyone."
-        server.sendmail(sender, to_email, msg)
-        server.quit()
-        return True
-    except Exception as e:
-        print("EMAIL ERROR:", e)
-        return False
+    except: return None
 
 def current_user_is_admin():
     username = session.get("username")
@@ -201,9 +189,6 @@ def login():
 
         if action == "register":
             email = request.form.get("email", "").strip()
-            if len(password) < 6:
-                flash("Password too short.", "error")
-                return redirect(url_for("login"))
             code = ''.join(secrets.choice("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ") for _ in range(10))
             try:
                 conn = get_db_connection()
@@ -212,10 +197,10 @@ def login():
                           (username, email, generate_password_hash(password), code))
                 conn.commit()
                 session.update({"username": username, "is_registered": True, "is_admin": False})
-                flash(f"Account created! Your unique ID is {code}", "success")
+                flash(f"Account created! ID: {code}", "success")
                 return redirect(url_for("dashboard"))
-            except psycopg2.IntegrityError:
-                flash("Username or Email already exists.", "error")
+            except:
+                flash("Username or Email exists.", "error")
             finally: conn.close()
             return redirect(url_for("login"))
 
@@ -229,11 +214,6 @@ def login():
                 if user.get("status") == "BANNED":
                     flash("Account suspended.", "error")
                     return redirect(url_for("login"))
-                
-                if user.get("deletion_requested"):
-                    c.execute("UPDATE users SET deletion_requested = NULL WHERE id = %s", (user['id'],))
-                    conn.commit()
-                    flash("Welcome back! Account deletion cancelled.", "success")
                     
                 session.update({"username": user["username"], "is_registered": True, "is_admin": (user["role"] == "admin")})
                 conn.close()
@@ -241,75 +221,16 @@ def login():
             
             conn.close()
             flash("Invalid credentials.", "error")
-            
-        elif action == "forgot":
-            email = request.form.get("email", "").strip()
-            conn = get_db_connection()
-            c = conn.cursor()
-            c.execute("SELECT * FROM users WHERE email = %s", (email,))
-            user = c.fetchone()
-            if user:
-                otp = ''.join(secrets.choice("0123456789") for _ in range(6))
-                c.execute("UPDATE users SET otp = %s WHERE email = %s", (otp, email))
-                conn.commit()
-                send_otp_email(email, otp)
-                session['reset_email'] = email
-                flash("OTP sent to email.", "success")
-                return redirect(url_for("verify_otp"))
-            else:
-                flash("Email not found.", "error")
-            conn.close()
 
     return render_template("login.html")
-
-@app.route("/verify_otp", methods=["GET", "POST"])
-def verify_otp():
-    if 'reset_email' not in session: return redirect(url_for("login"))
-    if request.method == "POST":
-        otp = request.form.get("otp")
-        new_pass = request.form.get("new_password")
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute("SELECT * FROM users WHERE email = %s AND otp = %s", (session['reset_email'], otp))
-        if c.fetchone():
-            c.execute("UPDATE users SET password = %s, otp = NULL WHERE email = %s", (generate_password_hash(new_pass), session['reset_email']))
-            conn.commit()
-            session.pop('reset_email', None)
-            flash("Password updated successfully! You can now login.", "success")
-            return redirect(url_for("login"))
-        flash("Invalid OTP.", "error")
-        conn.close()
-    return render_template_string("""
-    <div style="max-width:400px; margin: 100px auto; background:#101b2d; padding:30px; border-radius:12px; color:white; text-align:center;">
-        <h2 style="color:#38bdf8;">Enter OTP</h2>
-        <form method="POST">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="text" name="otp" placeholder="6-Digit OTP" required style="width:100%; padding:10px; margin-bottom:15px; border-radius:6px;"><br>
-            <input type="password" name="new_password" placeholder="New Password" required style="width:100%; padding:10px; margin-bottom:15px; border-radius:6px;"><br>
-            <button type="submit" style="background:#38bdf8; color:black; padding:10px 20px; border:none; border-radius:6px; cursor:pointer;">Reset Password</button>
-        </form>
-    </div>
-    """)
 
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect(url_for("login"))
 
-@app.route("/request_delete", methods=["POST"])
-def request_delete():
-    if "username" not in session: return redirect(url_for("login"))
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("UPDATE users SET deletion_requested = CURRENT_TIMESTAMP WHERE username = %s", (session["username"],))
-    conn.commit()
-    conn.close()
-    session.clear()
-    flash("Account scheduled for deletion in 7 days. Login before that to cancel.", "warning")
-    return redirect(url_for("login"))
-
 # =========================================================
-# CORE ROUTES (Dashboard, Profile, Games)
+# CORE ROUTES (Dashboard, Profile)
 # =========================================================
 @app.route("/")
 @app.route("/dashboard")
@@ -320,13 +241,7 @@ def dashboard():
     c = conn.cursor()
     c.execute("SELECT * FROM media WHERE approved = 1 AND filename != 'SHAYARI_TEXT' ORDER BY likes DESC LIMIT 3")
     trending = c.fetchall()
-    
-    # Fetch active stories
-    c.execute("""
-        SELECT s.*, u.profile_pic FROM stories s 
-        JOIN users u ON s.username = u.username 
-        WHERE s.created_at >= NOW() - INTERVAL '12 hours' ORDER BY s.id DESC
-    """)
+    c.execute("SELECT s.*, u.profile_pic FROM stories s JOIN users u ON s.username = u.username WHERE s.created_at >= NOW() - INTERVAL '12 hours' ORDER BY s.id DESC")
     stories = c.fetchall()
     conn.close()
     return render_template("dashboard.html", trending=trending, stories=stories)
@@ -365,13 +280,25 @@ def profile():
     return render_template("profile.html", user=user, my_uploads=my_uploads, post_count=len(my_uploads))
 
 # =========================================================
-# ROUTES: GALLERY, SEARCH, LEADERBOARD
+# ROUTES: GALLERY & PHASE 18 (SAAS LIMIT)
 # =========================================================
 @app.route("/gallery/<category>", methods=["GET", "POST"])
 def gallery(category):
     if "username" not in session: return redirect(url_for("login"))
     
+    conn = get_db_connection()
+    c = conn.cursor()
+    
     if request.method == "POST":
+        # PHASE 18: Check 5 Upload Limit for non-admins
+        if not current_user_is_admin():
+            c.execute("SELECT COUNT(id) as cnt FROM media WHERE uploaded_by = %s", (session["username"],))
+            total_uploads = c.fetchone()['cnt']
+            if total_uploads >= 5:
+                flash("SAAS LIMIT REACHED: Upgrade to PRO to upload more than 5 assets.", "error")
+                conn.close()
+                return redirect(url_for("dashboard"))
+
         filename = "SHAYARI_TEXT"
         if category != 'Shayari':
             file = request.files.get("media")
@@ -382,17 +309,12 @@ def gallery(category):
                     return redirect(url_for("gallery", category=category))
         
         is_approved = 1 if current_user_is_admin() else 0
-        conn = get_db_connection()
-        c = conn.cursor()
         c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved) VALUES (%s, %s, %s, %s, %s, %s)",
                   (filename, request.form.get("title", "Untitled"), category, request.form.get("prompt", ""), session.get("username"), is_approved))
         conn.commit()
-        conn.close()
         flash("File live!" if is_approved else "Sent to Admin for approval.", "success")
         return redirect(url_for("gallery", category=category))
 
-    conn = get_db_connection()
-    c = conn.cursor()
     c.execute("SELECT * FROM media WHERE category = %s AND approved = 1 AND filename != 'SHAYARI_TEXT' ORDER BY id DESC", (category,))
     if category == 'Shayari': c.execute("SELECT * FROM media WHERE category = %s AND approved = 1 ORDER BY id DESC", (category,))
     media_files = c.fetchall()
@@ -410,37 +332,26 @@ def search():
     if "username" not in session: return redirect(url_for("login"))
     query = request.args.get("q", "").strip()
     if not query: return redirect(url_for("dashboard"))
-    
     conn = get_db_connection()
     c = conn.cursor()
     search_term = f"%{query}%"
     c.execute("SELECT * FROM media WHERE approved = 1 AND filename != 'SHAYARI_TEXT' AND (title ILIKE %s OR prompt ILIKE %s) ORDER BY id DESC", (search_term, search_term))
     media_files = c.fetchall()
-    
-    c.execute("SELECT * FROM comments ORDER BY id ASC")
-    comments_db = c.fetchall()
     conn.close()
-    
-    comments = defaultdict(list)
-    for comment in comments_db: comments[comment["media_id"]].append(comment)
-    
-    return render_template("search.html", media_files=media_files, query=query, comments=comments)
+    return render_template("search.html", media_files=media_files, query=query)
 
 @app.route("/leaderboard")
 def leaderboard():
     if "username" not in session: return redirect(url_for("login"))
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("""
-        SELECT uploaded_by as username, COUNT(id) as total_uploads, COALESCE(SUM(likes), 0) as total_likes 
-        FROM media WHERE approved = 1 GROUP BY uploaded_by ORDER BY total_likes DESC
-    """)
+    c.execute("SELECT uploaded_by as username, COUNT(id) as total_uploads, COALESCE(SUM(likes), 0) as total_likes FROM media WHERE approved = 1 GROUP BY uploaded_by ORDER BY total_likes DESC")
     leaders = c.fetchall()
     conn.close()
     return render_template("leaderboard.html", leaders=leaders)
 
 # =========================================================
-# ROUTES: UNIFIED AI STUDIO
+# ROUTES: AI STUDIO
 # =========================================================
 @app.route("/ai-studio", methods=["GET", "POST"])
 def ai_studio():
@@ -449,7 +360,7 @@ def ai_studio():
         prompt = request.form.get("prompt", "").strip()
         if not prompt: return redirect(url_for("ai_studio"))
         
-        trigger_words = ["create", "generate", "draw", "make an image", "image of", "picture of"]
+        trigger_words = ["create", "generate", "draw", "make an image"]
         wants_image = any(word in prompt.lower() for word in trigger_words)
         
         if wants_image:
@@ -476,31 +387,20 @@ def ai_studio():
     return render_template("ai_studio.html")
 
 # =========================================================
-# ROUTES: API, SOCIAL (LIKES & COMMENTS)
+# LIKES & COMMENTS
 # =========================================================
-@app.route("/api/ai", methods=["POST"])
-def ai_endpoint():
-    if "username" not in session: return jsonify({"reply": "Login first."}), 401
-    try: reply = get_ai_response(request.get_json(silent=True).get("query", "")[:1000])
-    except: reply = "Assistant unavailable."
-    return jsonify({"reply": reply})
-
 @app.route("/like/<int:media_id>", methods=["POST"])
 def like(media_id):
     if "username" not in session: return jsonify({"error": "Login required."}), 401
     username = str(session["username"])
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("SELECT id FROM media WHERE id = %s AND approved = 1", (media_id,))
-    if not c.fetchone(): return jsonify({"error": "Media not found."}), 404
-    
     c.execute("INSERT INTO likes (media_id, username) VALUES (%s, %s) ON CONFLICT (media_id, username) DO NOTHING", (media_id, username))
     if c.rowcount == 1:
         c.execute("UPDATE media SET likes = likes + 1 WHERE id = %s", (media_id,))
         conn.commit()
         liked_now = True
     else: liked_now = False
-
     c.execute("SELECT likes FROM media WHERE id = %s", (media_id,))
     likes = c.fetchone()["likes"]
     conn.close()
@@ -524,17 +424,14 @@ def delete_own(media_id):
     if "username" not in session: return redirect(url_for("login"))
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("SELECT * FROM media WHERE id = %s AND uploaded_by = %s", (media_id, session["username"]))
-    if c.fetchone():
-        c.execute("DELETE FROM media WHERE id = %s", (media_id,))
-        conn.commit()
-        flash("Asset permanently deleted.", "success")
-    else: flash("Unauthorized action.", "error")
+    c.execute("DELETE FROM media WHERE id = %s AND uploaded_by = %s", (media_id, session["username"]))
+    conn.commit()
     conn.close()
+    flash("Asset permanently deleted.", "success")
     return redirect(url_for("profile"))
 
 # =========================================================
-# ROUTES: ADMIN GOD MODE & MYSTERY (FIXED)
+# ROUTES: ADMIN GOD MODE (CRASH FIXED)
 # =========================================================
 @app.route("/admin", methods=["GET", "POST"])
 def admin():
@@ -549,6 +446,7 @@ def admin():
             session["is_admin"] = True
             flash("Admin active!", "success")
         else: flash("Access Denied!", "error")
+        return redirect(url_for("admin")) # FIXED REDIRECT ISSUE
 
     if not current_user_is_admin(): return render_template("admin.html", auth_required=True)
     
@@ -565,7 +463,7 @@ def admin():
     c.execute("SELECT SUM(likes) as total FROM media")
     likes_count = c.fetchone()['total'] or 0
     
-    # FIXED: Using SELECT * to avoid crash if any column is slightly misnamed in DB
+    # Safe fetch for all users
     c.execute("SELECT * FROM users ORDER BY id DESC")
     all_users = c.fetchall()
     conn.close()
@@ -592,20 +490,9 @@ def admin_user_action(user_id, action):
     conn.close()
     return redirect(url_for("admin"))
 
-@app.route("/admin/audit-logs")
-def admin_audit_logs():
-    if not current_user_is_admin(): return redirect(url_for("admin"))
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("SELECT * FROM audit_logs ORDER BY id DESC LIMIT 100")
-    logs = c.fetchall()
-    conn.close()
-    return render_template("audit_logs.html", logs=logs)
-
-@app.route("/approve/<int:id>", methods=["GET", "POST"])
+@app.route("/approve/<int:id>", methods=["POST"])
 def approve(id):
     if not current_user_is_admin(): return redirect(url_for("admin"))
-    if request.method == "GET": return f'<form method="post"><input type="hidden" name="csrf_token" value="{get_csrf_token()}"><button type="submit">Confirm</button></form>'
     conn = get_db_connection()
     c = conn.cursor()
     c.execute("UPDATE media SET approved = 1 WHERE id = %s", (id,))
@@ -614,10 +501,9 @@ def approve(id):
     flash("Approved!", "success")
     return redirect(url_for("admin"))
 
-@app.route("/delete/<int:id>", methods=["GET", "POST"])
+@app.route("/delete/<int:id>", methods=["POST"])
 def delete(id):
     if not current_user_is_admin(): return redirect(url_for("admin"))
-    if request.method == "GET": return f'<form method="post"><input type="hidden" name="csrf_token" value="{get_csrf_token()}"><button type="submit">Confirm</button></form>'
     conn = get_db_connection()
     c = conn.cursor()
     c.execute("DELETE FROM media WHERE id = %s", (id,))
@@ -625,21 +511,6 @@ def delete(id):
     conn.close()
     flash("Deleted!", "success")
     return redirect(url_for("admin"))
-
-@app.route("/mystery", methods=["POST"])
-def mystery():
-    if hmac.compare_digest(request.form.get("passcode", ""), MYSTERY_CODE): return render_template("mystery.html")
-    flash("Incorrect code.", "error")
-    return redirect(url_for("dashboard"))
-
-@app.errorhandler(404)
-def not_found_error(error): return render_template("404.html"), 404
-@app.errorhandler(500)
-def internal_error(error): return render_template("500.html"), 500
-@app.errorhandler(413)
-def request_entity_too_large(error):
-    flash("File too large (Max 50MB).", "error")
-    return redirect(request.referrer or url_for("dashboard"))
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=False)
