@@ -61,6 +61,12 @@
         
         <div class="nav-links">
             {% if session.get('username') %}
+                
+                <!-- COIN WALLET (WITH ID FOR JS) -->
+                <div style="background: rgba(0,0,0,0.4); padding: 5px 12px; border-radius: 20px; border: 1px solid var(--warning); color: var(--warning); font-weight: bold; display: flex; align-items: center; gap: 5px; margin-right: 10px;" title="Apna Coins">
+                    🪙 <span id="wallet-balance">{{ my_coins }}</span>
+                </div>
+
                 <form action="{{ url_for('search') }}" method="GET" class="search-form">
                     <input type="text" name="q" placeholder="Search #tags or users...">
                     <button type="submit">🔍</button>
@@ -68,7 +74,6 @@
                 
                 <a href="{{ url_for('feed') }}">📰 Feed</a>
                 
-                <!-- NEW: GLOBAL CHAT LINK -->
                 <a href="{{ url_for('global_chat') }}" style="color: var(--success);">🌐 Chatroom</a>
                 
                 <a href="{{ url_for('inbox') }}" style="font-size: 1.3rem; margin-left: 5px;">
