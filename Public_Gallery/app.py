@@ -27,7 +27,7 @@ BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 load_dotenv(os.path.join(BASE_DIR, "..", ".env"))
 
 # =========================================================
-# CLOUDINARY CONFIG (PERMANENT STORAGE)
+# CLOUDINARY CONFIG
 # =========================================================
 cloudinary.config(
     cloud_name=os.environ.get("CLOUDINARY_CLOUD_NAME"),
@@ -43,13 +43,13 @@ app = Flask(__name__)
 init_db()
 
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "development-only-secret-change-me")
-app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024 # 50MB
+app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_SECURE"] = True
 
 # =========================================================
-# CSRF PROTECTION & SECURITY HEADERS
+# CSRF & SECURITY HEADERS
 # =========================================================
 def get_csrf_token():
     token = session.get("csrf_token")
@@ -83,7 +83,6 @@ def protect_state_changing_requests():
         data = request.get_json(silent=True) or {}
         token = data.get("csrf_token", "")
     if validate_csrf_token(token) or _request_origin_matches(): return None
-    
     if request.is_json or request.path.startswith("/api/") or request.path.startswith("/like/"):
         return jsonify({"error": "Security check failed."}), 403
     flash("Security check failed. Please refresh.", "error")
@@ -105,7 +104,7 @@ def add_security_headers(response):
     return response
 
 # =========================================================
-# SECRETS & FILE VALIDATION
+# FILE VALIDATION
 # =========================================================
 ADMIN_PASSCODE = os.environ.get("ADMIN_PASSCODE", "")
 MYSTERY_CODE = os.environ.get("MYSTERY_CODE", "SOCHO")
@@ -120,8 +119,7 @@ SECURE_ALLOWED_CATEGORIES = {
 }
 
 def validate_file_security(file, category="Photo"):
-    if not file or not file.filename or '.' not in file.filename:
-        return False, "Invalid file."
+    if not file or not file.filename or '.' not in file.filename: return False, "Invalid file."
     ext = file.filename.rsplit('.', 1)[1].lower()
     if ext not in ALLOWED_EXTENSIONS or (category in SECURE_ALLOWED_CATEGORIES and ext not in SECURE_ALLOWED_CATEGORIES[category]):
         return False, f"Extension .{ext} not allowed."
@@ -130,15 +128,11 @@ def validate_file_security(file, category="Photo"):
 def save_uploaded_file(file, category="Photo"):
     if not file or not file.filename: return None
     is_valid, err_msg = validate_file_security(file, category)
-    if not is_valid:
-        print(f"UPLOAD REJECTED: {err_msg}")
-        return None
+    if not is_valid: return None
     try:
         upload_result = cloudinary.uploader.upload(file, resource_type="auto")
         return upload_result["secure_url"]
-    except Exception as e:
-        print("CLOUDINARY ERROR:", repr(e))
-        return None
+    except Exception as e: return None
 
 # =========================================================
 # RATE LIMITING & AUDIT LOGS
@@ -167,13 +161,11 @@ def log_admin_action(actor_username, action, target_type, target_id, metadata=""
     try:
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute(
-            "INSERT INTO audit_logs (actor_username, action, target_type, target_id, metadata) VALUES (%s, %s, %s, %s, %s)",
-            (actor_username, action, target_type, target_id, metadata)
-        )
+        c.execute("INSERT INTO audit_logs (actor_username, action, target_type, target_id, metadata) VALUES (%s, %s, %s, %s, %s)",
+                  (actor_username, action, target_type, target_id, metadata))
         conn.commit()
         conn.close()
-    except Exception as e: print("AUDIT LOG ERROR:", repr(e))
+    except Exception: pass
 
 def get_current_user():
     username = session.get("username")
@@ -243,14 +235,19 @@ def login():
             user = c.fetchone()
             conn.close()
 
-            if user and user.get("status") == "ACTIVE" and check_password_hash(user["password"], password):
+            # UPDATED: Checks if user exists, password is correct, and NOT Banned.
+            if user and check_password_hash(user["password"], password):
+                if user.get("status") == "BANNED":
+                    flash("Your account has been suspended by HQ. Access Denied.", "error")
+                    return redirect(url_for("login"))
+                
                 session.clear()
                 session.update({"username": user["username"], "is_registered": True, "is_admin": (user["role"] == "admin")})
                 _failed_attempts.pop(f"login:{request.remote_addr}", None)
                 return redirect(url_for("dashboard"))
             
             _record_failed_attempt("login")
-            flash("Invalid credentials or suspended.", "error")
+            flash("Invalid credentials.", "error")
             return redirect(url_for("login"))
     return render_template("login.html")
 
@@ -273,7 +270,6 @@ def dashboard():
     c.execute("SELECT * FROM media WHERE approved = 1 AND filename != 'SHAYARI_TEXT' ORDER BY likes DESC LIMIT 3")
     trending = c.fetchall()
     conn.close()
-    
     return render_template("dashboard.html", trending=trending)
 
 @app.route("/games")
@@ -318,16 +314,14 @@ def gallery(category):
             if file and file.filename != "":
                 filename = save_uploaded_file(file, category)
                 if not filename:
-                    flash("Upload Failed! Please check your Cloudinary API keys.", "error")
+                    flash("Upload Failed! Check API keys.", "error")
                     return redirect(url_for("gallery", category=category))
         
         is_approved = 1 if current_user_is_admin() else 0
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute(
-            "INSERT INTO media (filename, title, category, prompt, uploaded_by, approved) VALUES (%s, %s, %s, %s, %s, %s)",
-            (filename, request.form.get("title", "Untitled"), category, request.form.get("prompt", ""), session.get("username"), is_approved)
-        )
+        c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved) VALUES (%s, %s, %s, %s, %s, %s)",
+                  (filename, request.form.get("title", "Untitled"), category, request.form.get("prompt", ""), session.get("username"), is_approved))
         conn.commit()
         conn.close()
         flash("File live!" if is_approved else "Sent to Admin for approval.", "success")
@@ -335,10 +329,8 @@ def gallery(category):
 
     conn = get_db_connection()
     c = conn.cursor()
-    # Filter out broken uploads from old errors
     c.execute("SELECT * FROM media WHERE category = %s AND approved = 1 AND filename != 'SHAYARI_TEXT' ORDER BY id DESC", (category,))
-    if category == 'Shayari':
-        c.execute("SELECT * FROM media WHERE category = %s AND approved = 1 ORDER BY id DESC", (category,))
+    if category == 'Shayari': c.execute("SELECT * FROM media WHERE category = %s AND approved = 1 ORDER BY id DESC", (category,))
     media_files = c.fetchall()
     
     c.execute("SELECT * FROM comments ORDER BY id ASC")
@@ -350,59 +342,74 @@ def gallery(category):
     return render_template("gallery.html", media_files=media_files, category=category, comments=comments)
 
 # =========================================================
-# ROUTES: AI IMAGE STUDIO (FIXED)
+# ROUTES: SEARCH & LEADERBOARD
+# =========================================================
+@app.route("/search")
+def search():
+    if "username" not in session: return redirect(url_for("login"))
+    query = request.args.get("q", "").strip()
+    if not query: return redirect(url_for("dashboard"))
+    conn = get_db_connection()
+    c = conn.cursor()
+    search_term = f"%{query}%"
+    c.execute("SELECT * FROM media WHERE approved = 1 AND filename != 'SHAYARI_TEXT' AND (title ILIKE %s OR prompt ILIKE %s) ORDER BY id DESC", (search_term, search_term))
+    media_files = c.fetchall()
+    conn.close()
+    return render_template("search.html", media_files=media_files, query=query)
+
+@app.route("/leaderboard")
+def leaderboard():
+    if "username" not in session: return redirect(url_for("login"))
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT uploaded_by as username, COUNT(id) as total_uploads, COALESCE(SUM(likes), 0) as total_likes FROM media WHERE approved = 1 GROUP BY uploaded_by ORDER BY total_likes DESC")
+    leaders = c.fetchall()
+    conn.close()
+    return render_template("leaderboard.html", leaders=leaders)
+
+# =========================================================
+# ROUTES: AI STUDIO
 # =========================================================
 @app.route("/ai-studio", methods=["GET", "POST"])
 def ai_studio():
     if "username" not in session: return redirect(url_for("login"))
-    
     if request.method == "POST":
         prompt = request.form.get("prompt", "").strip()
         if not prompt:
             flash("Prompt cannot be empty.", "error")
             return redirect(url_for("ai_studio"))
         
-        # Robust AI Generation Fetch
         encoded_prompt = urllib.parse.quote(prompt)
         image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?nologo=true"
         
         try:
-            # Check if Cloudinary works, else fallback to direct URL
             r = requests.get(image_url, timeout=15)
             if r.status_code == 200:
                 upload_result = cloudinary.uploader.upload(r.content, resource_type="image")
                 secure_url = upload_result.get("secure_url", image_url)
-            else:
-                secure_url = image_url
+            else: secure_url = image_url
                 
             is_approved = 1 if current_user_is_admin() else 0
             conn = get_db_connection()
             c = conn.cursor()
-            c.execute(
-                "INSERT INTO media (filename, title, category, prompt, uploaded_by, approved) VALUES (%s, %s, %s, %s, %s, %s)",
-                (secure_url, f"AI Art: {prompt[:20]}...", "Photo", prompt, session["username"], is_approved)
-            )
+            c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved) VALUES (%s, %s, %s, %s, %s, %s)",
+                      (secure_url, f"AI Art: {prompt[:20]}...", "Photo", prompt, session["username"], is_approved))
             conn.commit()
             conn.close()
-            
             flash("AI Image successfully generated!", "success")
             return redirect(url_for("gallery", category="Photo"))
-            
         except Exception as e:
-            print("AI GEN/CLOUDINARY ERROR:", repr(e))
-            flash("Error processing image. Check Cloudinary Keys in Render.", "error")
+            flash("Error processing image.", "error")
             return redirect(url_for("ai_studio"))
-            
     return render_template("ai_studio.html")
 
 # =========================================================
-# ROUTES: API & LIKES
+# ROUTES: API, LIKES, COMMENTS
 # =========================================================
 @app.route("/api/ai", methods=["POST"])
 def ai_endpoint():
     if "username" not in session: return jsonify({"reply": "Login first."}), 401
-    try:
-        reply = get_ai_response(request.get_json(silent=True).get("query", "")[:1000])
+    try: reply = get_ai_response(request.get_json(silent=True).get("query", "")[:1000])
     except: reply = "Assistant unavailable."
     return jsonify({"reply": reply})
 
@@ -427,9 +434,6 @@ def like(media_id):
     conn.close()
     return jsonify({"likes": likes, "liked": liked_now})
 
-# =========================================================
-# ROUTES: SOCIAL & ADMIN
-# =========================================================
 @app.route("/add_comment/<int:media_id>", methods=["POST"])
 def add_comment(media_id):
     if "username" not in session: return redirect(url_for("login"))
@@ -453,11 +457,13 @@ def delete_own(media_id):
         c.execute("DELETE FROM media WHERE id = %s", (media_id,))
         conn.commit()
         flash("Asset permanently deleted.", "success")
-    else:
-        flash("Unauthorized action.", "error")
+    else: flash("Unauthorized action.", "error")
     conn.close()
     return redirect(url_for("profile"))
 
+# =========================================================
+# ROUTES: ADMIN GOD MODE & MYSTERY
+# =========================================================
 @app.route("/admin", methods=["GET", "POST"])
 def admin():
     if request.method == "POST":
@@ -476,17 +482,43 @@ def admin():
     
     conn = get_db_connection()
     c = conn.cursor()
+    
     c.execute("SELECT * FROM media WHERE approved = 0 ORDER BY id DESC")
     pending_media = c.fetchall()
+    
     c.execute("SELECT COUNT(*) as count FROM users")
     user_count = c.fetchone()['count']
     c.execute("SELECT COUNT(*) as count FROM media WHERE approved = 1")
     media_count = c.fetchone()['count']
     c.execute("SELECT SUM(likes) as total FROM media")
     likes_count = c.fetchone()['total'] or 0
+    
+    # NEW: Fetch all users for God Mode Management
+    c.execute("SELECT id, username, role, status, country FROM users ORDER BY id DESC")
+    all_users = c.fetchall()
     conn.close()
     
-    return render_template("admin.html", pending_media=pending_media, user_count=user_count, media_count=media_count, likes_count=likes_count, auth_required=False)
+    return render_template("admin.html", pending_media=pending_media, user_count=user_count, media_count=media_count, likes_count=likes_count, all_users=all_users, auth_required=False)
+
+@app.route("/admin/user_action/<int:user_id>/<action>", methods=["POST"])
+def admin_user_action(user_id, action):
+    if not current_user_is_admin(): return redirect(url_for("admin"))
+    conn = get_db_connection()
+    c = conn.cursor()
+    
+    if action == "ban":
+        c.execute("UPDATE users SET status = 'BANNED' WHERE id = %s", (user_id,))
+        flash("Agent Suspended successfully!", "success")
+    elif action == "unban":
+        c.execute("UPDATE users SET status = 'ACTIVE' WHERE id = %s", (user_id,))
+        flash("Agent Reactivated!", "success")
+    elif action == "make_admin":
+        c.execute("UPDATE users SET role = 'admin' WHERE id = %s", (user_id,))
+        flash("Agent promoted to Admin HQ!", "success")
+        
+    conn.commit()
+    conn.close()
+    return redirect(url_for("admin"))
 
 @app.route("/admin/audit-logs")
 def admin_audit_logs():
@@ -501,8 +533,7 @@ def admin_audit_logs():
 @app.route("/approve/<int:id>", methods=["GET", "POST"])
 def approve(id):
     if not current_user_is_admin(): return redirect(url_for("admin"))
-    if request.method == "GET":
-        return f'<form method="post"><input type="hidden" name="csrf_token" value="{get_csrf_token()}"><button type="submit">Confirm Approve</button></form>'
+    if request.method == "GET": return f'<form method="post"><input type="hidden" name="csrf_token" value="{get_csrf_token()}"><button type="submit">Confirm</button></form>'
     conn = get_db_connection()
     c = conn.cursor()
     c.execute("UPDATE media SET approved = 1 WHERE id = %s", (id,))
@@ -515,8 +546,7 @@ def approve(id):
 @app.route("/delete/<int:id>", methods=["GET", "POST"])
 def delete(id):
     if not current_user_is_admin(): return redirect(url_for("admin"))
-    if request.method == "GET":
-        return f'<form method="post"><input type="hidden" name="csrf_token" value="{get_csrf_token()}"><button type="submit">Confirm Delete</button></form>'
+    if request.method == "GET": return f'<form method="post"><input type="hidden" name="csrf_token" value="{get_csrf_token()}"><button type="submit">Confirm</button></form>'
     conn = get_db_connection()
     c = conn.cursor()
     c.execute("DELETE FROM media WHERE id = %s", (id,))
@@ -528,49 +558,9 @@ def delete(id):
 
 @app.route("/mystery", methods=["POST"])
 def mystery():
-    if hmac.compare_digest(request.form.get("passcode", ""), MYSTERY_CODE):
-        return render_template("mystery.html")
+    if hmac.compare_digest(request.form.get("passcode", ""), MYSTERY_CODE): return render_template("mystery.html")
     flash("Incorrect code.", "error")
     return redirect(url_for("dashboard"))
-
-# =========================================================
-# ROUTES: SEARCH & LEADERBOARD (PHASE 16)
-# =========================================================
-@app.route("/search")
-def search():
-    if "username" not in session: return redirect(url_for("login"))
-    query = request.args.get("q", "").strip()
-    if not query: return redirect(url_for("dashboard"))
-    
-    conn = get_db_connection()
-    c = conn.cursor()
-    search_term = f"%{query}%"
-    # Title ya Prompt mein search karega (ILIKE means case-insensitive in Postgres)
-    c.execute("SELECT * FROM media WHERE approved = 1 AND filename != 'SHAYARI_TEXT' AND (title ILIKE %s OR prompt ILIKE %s) ORDER BY id DESC", (search_term, search_term))
-    media_files = c.fetchall()
-    
-    c.execute("SELECT * FROM comments ORDER BY id ASC")
-    comments_db = c.fetchall()
-    conn.close()
-    
-    comments = defaultdict(list)
-    for comment in comments_db: comments[comment["media_id"]].append(comment)
-    
-    return render_template("search.html", media_files=media_files, query=query, comments=comments)
-
-@app.route("/leaderboard")
-def leaderboard():
-    if "username" not in session: return redirect(url_for("login"))
-    conn = get_db_connection()
-    c = conn.cursor()
-    # Find top users based on Total Likes
-    c.execute("""
-        SELECT uploaded_by as username, COUNT(id) as total_uploads, COALESCE(SUM(likes), 0) as total_likes 
-        FROM media WHERE approved = 1 GROUP BY uploaded_by ORDER BY total_likes DESC
-    """)
-    leaders = c.fetchall()
-    conn.close()
-    return render_template("leaderboard.html", leaders=leaders)
 
 @app.errorhandler(404)
 def not_found_error(error): return render_template("404.html"), 404
