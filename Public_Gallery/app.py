@@ -43,58 +43,16 @@ app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "development-only-secret
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
 
 # =========================================================
-# DATABASE AUTO-HEALER & PHASE 24 UPGRADE
+# DATABASE AUTO-HEALER
 # =========================================================
 def upgrade_db():
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS stories (
-            id SERIAL PRIMARY KEY,
-            username VARCHAR(100) NOT NULL,
-            filename TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS notifications (
-            id SERIAL PRIMARY KEY,
-            username VARCHAR(100) NOT NULL,
-            message TEXT NOT NULL,
-            link TEXT,
-            is_read BOOLEAN DEFAULT FALSE,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS followers (
-            id SERIAL PRIMARY KEY,
-            follower VARCHAR(100) NOT NULL,
-            following VARCHAR(100) NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(follower, following)
-        )
-    """)
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS messages (
-            id SERIAL PRIMARY KEY,
-            sender VARCHAR(100) NOT NULL,
-            receiver VARCHAR(100) NOT NULL,
-            message TEXT NOT NULL,
-            is_read BOOLEAN DEFAULT FALSE,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    # NEW: BOOKMARKS TABLE (PHASE 24)
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS bookmarks (
-            id SERIAL PRIMARY KEY,
-            username VARCHAR(100) NOT NULL,
-            media_id INTEGER NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(username, media_id)
-        )
-    """)
+    c.execute("CREATE TABLE IF NOT EXISTS stories (id SERIAL PRIMARY KEY, username VARCHAR(100) NOT NULL, filename TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
+    c.execute("CREATE TABLE IF NOT EXISTS notifications (id SERIAL PRIMARY KEY, username VARCHAR(100) NOT NULL, message TEXT NOT NULL, link TEXT, is_read BOOLEAN DEFAULT FALSE, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
+    c.execute("CREATE TABLE IF NOT EXISTS followers (id SERIAL PRIMARY KEY, follower VARCHAR(100) NOT NULL, following VARCHAR(100) NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE(follower, following))")
+    c.execute("CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, sender VARCHAR(100) NOT NULL, receiver VARCHAR(100) NOT NULL, message TEXT NOT NULL, is_read BOOLEAN DEFAULT FALSE, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
+    c.execute("CREATE TABLE IF NOT EXISTS bookmarks (id SERIAL PRIMARY KEY, username VARCHAR(100) NOT NULL, media_id INTEGER NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE(username, media_id))")
     conn.commit()
 
     queries = [
@@ -120,8 +78,7 @@ def upgrade_db():
         c.execute("UPDATE users SET role = 'user' WHERE role IS NULL")
         c.execute("UPDATE users SET status = 'ACTIVE' WHERE status IS NULL")
         conn.commit()
-    except:
-        conn.rollback()
+    except: conn.rollback()
 
     try:
         c.execute("SELECT id FROM users WHERE user_code IS NULL")
@@ -129,8 +86,7 @@ def upgrade_db():
             code = ''.join(secrets.choice("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ") for _ in range(10))
             c.execute("UPDATE users SET user_code = %s WHERE id = %s", (code, row['id']))
         conn.commit()
-    except:
-        conn.rollback()
+    except: conn.rollback()
         
     conn.close()
 
@@ -189,7 +145,6 @@ def inject_global_vars():
             c.execute("SELECT COUNT(id) as cnt FROM messages WHERE receiver = %s AND is_read = FALSE", (session.get("username"),))
             res2 = c.fetchone()
             if res2: vars_dict["unread_messages"] = res2['cnt']
-            
             conn.close()
         except: pass
     return vars_dict
@@ -279,7 +234,6 @@ def login():
                 if user.get("status") == "BANNED":
                     flash("Account suspended.", "error")
                     return redirect(url_for("login"))
-                
                 if user.get("deletion_requested"):
                     c.execute("UPDATE users SET deletion_requested = NULL WHERE id = %s", (user['id'],))
                     conn.commit()
@@ -288,7 +242,6 @@ def login():
                 session.update({"username": user["username"], "is_registered": True, "is_admin": (user["role"] == "admin"), "role": user["role"]})
                 conn.close()
                 return redirect(url_for("feed"))
-            
             conn.close()
             flash("Invalid credentials.", "error")
 
@@ -354,12 +307,76 @@ def request_delete():
     return redirect(url_for("login"))
 
 # =========================================================
-# CORE ROUTES (Dashboard, Feed, Profile)
+# CORE ROUTES (Feed, Explore, Dashboard, Studio)
 # =========================================================
 @app.route("/")
 def index():
     if "username" not in session: return redirect(url_for("login"))
     return redirect(url_for("feed"))
+
+@app.route("/feed")
+def feed():
+    if "username" not in session: return redirect(url_for("login"))
+    conn = get_db_connection()
+    c = conn.cursor()
+    
+    c.execute("""
+        SELECT m.*, u.profile_pic, u.role 
+        FROM media m 
+        JOIN users u ON m.uploaded_by = u.username 
+        JOIN followers f ON f.following = m.uploaded_by 
+        WHERE f.follower = %s AND m.approved = 1 AND m.filename != 'SHAYARI_TEXT' 
+        ORDER BY m.id DESC LIMIT 50
+    """, (session["username"],))
+    feed_posts = c.fetchall()
+    
+    if not feed_posts:
+        c.execute("SELECT m.*, u.profile_pic, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.approved = 1 AND m.filename != 'SHAYARI_TEXT' ORDER BY m.id DESC LIMIT 30")
+        feed_posts = c.fetchall()
+
+    c.execute("SELECT c.*, u.role FROM comments c JOIN users u ON c.username = u.username ORDER BY c.id ASC")
+    comments_db = c.fetchall()
+    comments = defaultdict(list)
+    for comment in comments_db: comments[comment["media_id"]].append(comment)
+    
+    c.execute("SELECT media_id FROM bookmarks WHERE username = %s", (session["username"],))
+    saved_ids = [row['media_id'] for row in c.fetchall()]
+    conn.close()
+    return render_template("feed.html", posts=feed_posts, comments=comments, saved_ids=saved_ids)
+
+@app.route("/explore")
+def explore():
+    if "username" not in session: return redirect(url_for("login"))
+    conn = get_db_connection()
+    c = conn.cursor()
+    # Fetch random 40 public posts for explore grid
+    c.execute("""
+        SELECT m.id, m.filename, m.title, m.category, m.likes, m.uploaded_by 
+        FROM media m 
+        WHERE m.approved = 1 AND m.filename != 'SHAYARI_TEXT' 
+        ORDER BY RANDOM() LIMIT 40
+    """)
+    explore_posts = c.fetchall()
+    conn.close()
+    return render_template("explore.html", posts=explore_posts)
+
+@app.route("/creator")
+def creator_studio():
+    if "username" not in session: return redirect(url_for("login"))
+    conn = get_db_connection()
+    c = conn.cursor()
+    
+    c.execute("SELECT COUNT(id) as total_posts, COALESCE(SUM(likes), 0) as total_likes FROM media WHERE uploaded_by = %s", (session["username"],))
+    stats = c.fetchone()
+    
+    c.execute("SELECT COUNT(*) as followers FROM followers WHERE following = %s", (session["username"],))
+    followers = c.fetchone()['followers']
+    
+    c.execute("SELECT * FROM media WHERE uploaded_by = %s ORDER BY id DESC", (session["username"],))
+    my_media = c.fetchall()
+    
+    conn.close()
+    return render_template("creator.html", stats=stats, followers=followers, my_media=my_media)
 
 @app.route("/dashboard")
 def dashboard():
@@ -374,47 +391,6 @@ def dashboard():
     conn.close()
     return render_template("dashboard.html", trending=trending, stories=stories)
 
-@app.route("/feed")
-def feed():
-    if "username" not in session: return redirect(url_for("login"))
-    conn = get_db_connection()
-    c = conn.cursor()
-    
-    # Try getting posts from followed users first
-    c.execute("""
-        SELECT m.*, u.profile_pic, u.role 
-        FROM media m 
-        JOIN users u ON m.uploaded_by = u.username 
-        JOIN followers f ON f.following = m.uploaded_by 
-        WHERE f.follower = %s AND m.approved = 1 AND m.filename != 'SHAYARI_TEXT' 
-        ORDER BY m.id DESC LIMIT 50
-    """, (session["username"],))
-    feed_posts = c.fetchall()
-    
-    # If no followers or empty feed, show global recent feed
-    if not feed_posts:
-        c.execute("""
-            SELECT m.*, u.profile_pic, u.role 
-            FROM media m 
-            JOIN users u ON m.uploaded_by = u.username 
-            WHERE m.approved = 1 AND m.filename != 'SHAYARI_TEXT' 
-            ORDER BY m.id DESC LIMIT 30
-        """)
-        feed_posts = c.fetchall()
-
-    # Get comments
-    c.execute("SELECT c.*, u.role FROM comments c JOIN users u ON c.username = u.username ORDER BY c.id ASC")
-    comments_db = c.fetchall()
-    comments = defaultdict(list)
-    for comment in comments_db: comments[comment["media_id"]].append(comment)
-    
-    # Get user's saved/bookmarked IDs
-    c.execute("SELECT media_id FROM bookmarks WHERE username = %s", (session["username"],))
-    saved_ids = [row['media_id'] for row in c.fetchall()]
-    
-    conn.close()
-    return render_template("feed.html", posts=feed_posts, comments=comments, saved_ids=saved_ids)
-
 @app.route("/notifications")
 def notifications():
     if "username" not in session: return redirect(url_for("login"))
@@ -426,11 +402,6 @@ def notifications():
     conn.commit()
     conn.close()
     return render_template("notifications.html", notifications=notifs)
-
-@app.route("/games")
-def games():
-    if "username" not in session: return redirect(url_for("login"))
-    return render_template("games.html")
 
 @app.route("/profile", methods=["GET", "POST"])
 def profile():
@@ -455,23 +426,15 @@ def profile():
 
     c.execute("SELECT * FROM users WHERE username = %s", (session["username"],))
     user = c.fetchone()
-    
-    # User's own uploads
     c.execute("SELECT * FROM media WHERE uploaded_by = %s ORDER BY id DESC", (session["username"],))
     my_uploads = c.fetchall()
     
-    # Network Stats
     c.execute("SELECT COUNT(*) as cnt FROM followers WHERE following = %s", (session["username"],))
     followers_count = c.fetchone()['cnt']
     c.execute("SELECT COUNT(*) as cnt FROM followers WHERE follower = %s", (session["username"],))
     following_count = c.fetchone()['cnt']
     
-    # SAVED/BOOKMARKED UPLOADS
-    c.execute("""
-        SELECT m.* FROM media m 
-        JOIN bookmarks b ON m.id = b.media_id 
-        WHERE b.username = %s ORDER BY b.id DESC
-    """, (session["username"],))
+    c.execute("SELECT m.* FROM media m JOIN bookmarks b ON m.id = b.media_id WHERE b.username = %s ORDER BY b.id DESC", (session["username"],))
     saved_uploads = c.fetchall()
     
     conn.close()
@@ -490,7 +453,7 @@ def agent_profile(username):
     if not agent:
         flash("Agent not found.", "error")
         conn.close()
-        return redirect(url_for("dashboard"))
+        return redirect(url_for("feed"))
         
     c.execute("SELECT m.*, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.uploaded_by = %s AND m.approved = 1 AND m.filename != 'SHAYARI_TEXT' ORDER BY m.id DESC", (username,))
     agent_uploads = c.fetchall()
@@ -548,18 +511,13 @@ def inbox():
     c.execute("""
         SELECT u.username, u.profile_pic, u.role 
         FROM users u 
-        WHERE u.username IN (
-            SELECT receiver FROM messages WHERE sender = %s
-            UNION 
-            SELECT sender FROM messages WHERE receiver = %s
-        )
+        WHERE u.username IN (SELECT receiver FROM messages WHERE sender = %s UNION SELECT sender FROM messages WHERE receiver = %s)
     """, (me, me))
     contacts = c.fetchall()
     
     for contact in contacts:
         c.execute("SELECT COUNT(id) as cnt FROM messages WHERE sender = %s AND receiver = %s AND is_read = FALSE", (contact['username'], me))
         contact['unread'] = c.fetchone()['cnt']
-        
     conn.close()
     return render_template("inbox.html", contacts=contacts)
 
@@ -675,7 +633,7 @@ def leaderboard():
     return render_template("leaderboard.html", leaders=leaders)
 
 # =========================================================
-# AI STUDIO, LIKES, COMMENTS, BOOKMARKS (PHASE 24)
+# AI STUDIO, LIKES, COMMENTS, BOOKMARKS
 # =========================================================
 @app.route("/bookmark/<int:media_id>", methods=["POST"])
 def bookmark(media_id):
@@ -700,7 +658,6 @@ def ai_studio():
     if request.method == "POST":
         prompt = request.form.get("prompt", "").strip()
         if not prompt: return redirect(url_for("ai_studio"))
-        
         trigger_words = ["create", "generate", "draw", "make an image"]
         wants_image = any(word in prompt.lower() for word in trigger_words)
         
@@ -717,14 +674,12 @@ def ai_studio():
                 conn.commit()
                 conn.close()
                 flash("Image created and saved to Photo Vault!", "success")
-                return redirect(url_for("gallery", Photo))
-            except:
-                flash("Image generation failed.", "error")
+                return redirect(url_for("gallery", category="Photo"))
+            except: flash("Image generation failed.", "error")
         else:
             try: reply = get_ai_response(prompt)
             except: reply = "I am currently offline."
             return render_template("ai_studio.html", chat_reply=reply, user_prompt=prompt)
-            
     return render_template("ai_studio.html")
 
 @app.route("/api/ai", methods=["POST"])
@@ -787,7 +742,7 @@ def delete_own(media_id):
     conn.commit()
     conn.close()
     flash("Asset permanently deleted.", "success")
-    return redirect(url_for("profile"))
+    return redirect(request.referrer or url_for("profile"))
 
 # =========================================================
 # ROUTES: ADMIN GOD MODE & MYSTERY
