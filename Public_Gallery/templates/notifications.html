@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Notifications | Apna Gallery{% endblock %}
+
+{% block content %}
+<div style="max-width: 800px; margin: 0 auto;">
+    
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; border-bottom: 1px solid var(--border-color); padding-bottom: 15px;">
+        <h1 style="color: var(--accent); margin: 0;">🔔 Activity Center</h1>
+        <a href="{{ url_for('dashboard') }}" class="btn" style="background: #334155; color: white;">&larr; Back</a>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 15px;">
+        {% for n in notifications %}
+        <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-left: 4px solid {% if n.is_read %}var(--border-color){% else %}var(--accent){% endif %}; border-radius: 12px; padding: 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 5px 15px rgba(0,0,0,0.2); transition: 0.3s;">
+            
+            <div>
+                <p style="margin: 0; font-size: 1.1rem; color: {% if n.is_read %}var(--text-muted){% else %}var(--text-main){% endif %};">
+                    {{ n.message }}
+                </p>
+                <p style="margin: 5px 0 0 0; font-size: 0.8rem; color: var(--text-muted);">
+                    {{ n.created_at.strftime('%Y-%m-%d %H:%M') }}
+                </p>
+            </div>
+            
+            {% if n.link %}
+            <a href="{{ n.link }}" class="btn" style="background: rgba(56, 189, 248, 0.1); color: var(--accent); border: 1px solid var(--accent); padding: 8px 15px;">View</a>
+            {% endif %}
+            
+        </div>
+        {% else %}
+        <div style="text-align: center; padding: 50px; background: var(--bg-card); border-radius: 16px; border: 1px solid var(--border-color);">
+            <span style="font-size: 4rem;">📭</span>
+            <h2 style="color: var(--text-muted); margin-top: 15px;">All caught up!</h2>
+            <p style="color: var(--text-muted);">You have no new notifications.</p>
+        </div>
+        {% endfor %}
+    </div>
+
+</div>
+{% endblock %}
