@@ -1,170 +1,112 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="utf-8">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Apna Gallery{% endblock %}</title>
-    
-    <!-- PWA MOBILE APP LINKS (ADDED) -->
+    <!-- Favicon & PWA tags -->
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
-    <meta name="theme-color" content="#08111f">
-    
+    <meta name="theme-color" content="#0f172a">
     <style>
         :root {
-            --bg-main: #08111f;
-            --bg-card: #101b2d;
-            --accent: #38bdf8;
-            --accent-hover: #0ea5e9;
-            --text-main: #ffffff;
+            --bg-main: #0f172a;
+            --bg-card: rgba(30, 41, 59, 0.7);
+            --border-color: rgba(255, 255, 255, 0.1);
+            --text-main: #f8fafc;
             --text-muted: #94a3b8;
-            --border-color: #2b405c;
-            --danger: #ef4444;
+            --accent: #38bdf8;
+            --danger: #f43f5e;
             --success: #22c55e;
             --warning: #fbbf24;
         }
-        body {
-            font-family: system-ui, sans-serif;
-            background: var(--bg-main);
-            color: var(--text-main);
-            min-height: 100vh;
-            margin: 0;
-            display: flex;
-            flex-direction: column;
-        }
-        /* Navbar */
-        nav {
-            background: rgba(16, 27, 45, 0.95);
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid var(--border-color);
-            padding: 15px 30px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            flex-wrap: wrap;
-            gap: 15px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-        }
-        .nav-brand {
-            font-size: 1.5rem;
-            font-weight: 800;
-            color: var(--text-main);
-            text-decoration: none;
-            letter-spacing: 1px;
-        }
-        .nav-brand span { color: var(--accent); }
-        .nav-links {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-            flex-wrap: wrap;
-        }
-        .nav-links a {
-            color: var(--text-muted);
-            text-decoration: none;
-            font-weight: 600;
-            transition: color 0.3s;
-        }
-        .nav-links a:hover { color: var(--text-main); }
+        body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg-main); color: var(--text-main); min-height: 100vh; display: flex; flex-direction: column; }
         
-        /* Container */
-        .container {
-            flex: 1;
-            padding: 40px 20px;
-            max-width: 1200px;
-            margin: 0 auto;
-            width: 100%;
-            box-sizing: border-box;
-        }
+        /* Navbar */
+        .navbar { background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(10px); padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); position: sticky; top: 0; z-index: 1000; }
+        .logo { font-size: 1.5rem; font-weight: 900; color: white; text-decoration: none; letter-spacing: 1px; }
+        .logo span { color: var(--accent); }
+        
+        /* Navigation Links */
+        .nav-links { display: flex; gap: 15px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
+        .nav-links a { color: var(--text-muted); text-decoration: none; font-weight: 600; transition: color 0.3s; }
+        .nav-links a:hover { color: var(--accent); }
+        
+        /* Search Bar in Nav */
+        .search-form { display: flex; gap: 5px; margin-right: 15px; }
+        .search-form input { padding: 8px 15px; border-radius: 20px; border: 1px solid var(--border-color); background: rgba(8, 17, 31, 0.8); color: white; outline: none; width: 180px; }
+        .search-form button { padding: 8px 15px; border-radius: 20px; background: var(--accent); color: #000; border: none; font-weight: bold; cursor: pointer; }
+        
+        /* Generic Buttons */
+        .btn { background: var(--accent); color: #000; border: none; padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.3s; text-decoration: none; display: inline-block; }
+        .btn:hover { opacity: 0.9; transform: translateY(-2px); }
         
         /* Flash Messages */
-        .alert {
-            padding: 15px 20px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            font-weight: 600;
-            border: 1px solid transparent;
-        }
-        .alert.success { background: rgba(34, 197, 94, 0.1); border-color: rgba(34, 197, 94, 0.3); color: #4ade80; }
-        .alert.error, .alert.danger { background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.3); color: #f87171; }
+        .flash-messages { padding: 20px; max-width: 1200px; margin: 0 auto; width: 100%; box-sizing: border-box; }
+        .flash { padding: 15px; border-radius: 8px; margin-bottom: 10px; font-weight: bold; animation: slideDown 0.3s ease-out; }
+        .flash.success { background: rgba(34, 197, 94, 0.2); border: 1px solid var(--success); color: var(--success); }
+        .flash.error { background: rgba(244, 63, 94, 0.2); border: 1px solid var(--danger); color: var(--danger); }
+        .flash.warning { background: rgba(251, 191, 36, 0.2); border: 1px solid var(--warning); color: var(--warning); }
         
-        /* Buttons */
-        .btn {
-            display: inline-block;
-            background: var(--accent);
-            color: #08111f;
-            padding: 10px 20px;
-            border-radius: 8px;
-            text-decoration: none;
-            font-weight: 700;
-            border: none;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .btn:hover { background: var(--accent-hover); transform: translateY(-2px); }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
         
-        footer {
-            text-align: center;
-            padding: 25px;
-            color: var(--text-muted);
-            font-size: 0.9rem;
-            border-top: 1px solid var(--border-color);
-            margin-top: auto;
-            background: var(--bg-card);
-        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; flex: 1; width: 100%; box-sizing: border-box; }
+        
+        /* Go Pro Button Animation */
+        .pro-btn { background: linear-gradient(45deg, #fbbf24, #f59e0b); color: #000; box-shadow: 0 0 15px rgba(251,191,36,0.4); animation: pulsePro 2s infinite; }
+        @keyframes pulsePro { 0% { box-shadow: 0 0 0 0 rgba(251,191,36,0.7); } 70% { box-shadow: 0 0 0 10px rgba(251,191,36,0); } 100% { box-shadow: 0 0 0 0 rgba(251,191,36,0); } }
     </style>
     {% block head %}{% endblock %}
 </head>
 <body>
-    <nav>
-        <a href="{{ url_for('dashboard') }}" class="nav-brand">APNA <span>GALLERY</span></a>
-        <div class="nav-links" style="display: flex; gap: 15px; align-items: center; width: 100%; justify-content: flex-end; flex-wrap: wrap;">
+
+    <nav class="navbar">
+        <a href="{{ url_for('dashboard') }}" class="logo">APNA <span>GALLERY</span></a>
+        
+        <div class="nav-links">
             {% if session.get('username') %}
-                <!-- SEARCH BAR -->
-                <form action="{{ url_for('search') }}" method="GET" style="display: flex; gap: 5px; margin-right: 15px;">
-                    <input type="text" name="q" placeholder="Search assets..." style="padding: 8px 15px; border-radius: 20px; border: 1px solid var(--border-color); background: rgba(8, 17, 31, 0.8); color: white; outline: none; width: 200px;">
-                    <button type="submit" class="btn" style="padding: 8px 15px; border-radius: 20px;">🔍</button>
+                <form action="{{ url_for('search') }}" method="GET" class="search-form">
+                    <input type="text" name="q" placeholder="Search assets...">
+                    <button type="submit">🔍</button>
                 </form>
                 
-                <a href="{{ url_for('dashboard') }}">Dashboard</a>
-                <a href="{{ url_for('leaderboard') }}" style="color: var(--success);">🏆 Top Agents</a>
-                <a href="{{ url_for('games') }}">Games</a>
-                <a href="{{ url_for('profile') }}">Profile</a>
-                {% if session.get('is_admin') %}
-                    <a href="{{ url_for('admin') }}" style="color: var(--warning);">Admin HQ</a>
+                <!-- NEW: GO PRO BUTTON -->
+                {% if session.get('role') == 'user' %}
+                    <a href="{{ url_for('pro_upgrade') }}" class="btn pro-btn" style="padding: 8px 15px; margin-right: 10px;">💎 Upgrade to PRO</a>
                 {% endif %}
-                <a href="{{ url_for('logout') }}" class="btn" style="padding: 8px 16px;">Logout</a>
+                
+                <a href="{{ url_for('dashboard') }}">Dashboard</a>
+                <a href="{{ url_for('leaderboard') }}" style="color: var(--success);">🏆 Agents</a>
+                <a href="{{ url_for('profile') }}">Profile</a>
+                
+                {% if session.get('role') == 'admin' %}
+                    <a href="{{ url_for('admin') }}" style="color: var(--danger);">Admin HQ</a>
+                {% endif %}
+                
+                <a href="{{ url_for('logout') }}" class="btn" style="padding: 8px 16px; background: #334155; color: white;">Logout</a>
             {% else %}
                 <a href="{{ url_for('login') }}" class="btn">Login</a>
             {% endif %}
         </div>
     </nav>
 
+    <div class="flash-messages">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
     <div class="container">
-        <div class="flash-messages">
-            {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    {% for category, message in messages %}
-                        <div class="alert {{ category }}">{{ message }}</div>
-                    {% endfor %}
-                {% endif %}
-            {% endwith %}
-        </div>
-        
         {% block content %}{% endblock %}
     </div>
 
-    <footer>
-        &copy; 2026 Apna Gallery. Secure Asset Vault.
-    </footer>
-
-    <!-- PWA SERVICE WORKER SCRIPT (ADDED) -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register("{{ url_for('static', filename='sw.js') }}");
+                navigator.serviceWorker.register("{{ url_for('static', filename='service-worker.js') }}");
             });
         }
     </script>
