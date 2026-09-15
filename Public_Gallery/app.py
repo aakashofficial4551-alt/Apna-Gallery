@@ -410,7 +410,7 @@ def add_view(media_id):
     return jsonify({"success": True})
 
 # =========================================================
-# CORE ROUTES (FEED, EXPLORE, DASHBOARD)
+# CORE ROUTES (FEED, EXPLORE, REELS, DASHBOARD)
 # =========================================================
 @app.route("/")
 def index():
@@ -451,12 +451,23 @@ def feed():
     
     return render_template("feed.html", posts=feed_posts, comments=comments, saved_ids=saved_ids, current_tab=tab)
 
+# 💥 PHASE 48: REELS ENGINE 💥
+@app.route("/reels")
+def reels():
+    if "username" not in session: return redirect(url_for("login"))
+    conn = get_db_connection()
+    c = conn.cursor()
+    # Fetch random public videos for infinite scrolling feel
+    c.execute("SELECT m.*, u.profile_pic, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.approved = 1 AND m.visibility = 'public' AND m.category = 'Video' ORDER BY RANDOM() LIMIT 20")
+    videos = c.fetchall()
+    conn.close()
+    return render_template("reels.html", videos=videos)
+
 @app.route("/explore")
 def explore():
     if "username" not in session: return redirect(url_for("login"))
     conn = get_db_connection()
     c = conn.cursor()
-    
     c.execute("SELECT m.id, m.filename, m.title, m.category, m.likes, m.views, m.uploaded_by FROM media m WHERE m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' ORDER BY RANDOM() LIMIT 40")
     explore_posts = c.fetchall()
     
@@ -624,7 +635,7 @@ def api_network(action_type, username):
     return jsonify(results)
 
 # =========================================================
-# DIRECT MESSAGING & GLOBAL CHAT
+# DIRECT MESSAGING & STORY DM (PHASE 49)
 # =========================================================
 @app.route("/inbox")
 def inbox():
@@ -690,6 +701,20 @@ def unsend_message(msg_id):
     conn.close()
     return jsonify({"success": True})
 
+# 💥 PHASE 49: STORY REPLY DIRECTLY TO DM 💥
+@app.route("/reply_story/<username>", methods=["POST"])
+def reply_story(username):
+    if "username" not in session: return jsonify({"error": "Login required"}), 401
+    msg = request.form.get("message", "").strip()
+    if msg:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("INSERT INTO messages (sender, receiver, message) VALUES (%s, %s, %s)", (session["username"], username, f"Replying to your story: {msg}"))
+        conn.commit()
+        conn.close()
+        return jsonify({"success": True})
+    return jsonify({"error": "Empty message"}), 400
+
 @app.route("/global_chat", methods=["GET", "POST"])
 def global_chat():
     if "username" not in session: return redirect(url_for("login"))
@@ -718,7 +743,6 @@ def api_global_chat_history():
 # =========================================================
 # LIKES, COMMENTS, SEARCH, & GALLERY
 # =========================================================
-# 💥 THE MISSING SEARCH ROUTE FIX IS HERE 💥
 @app.route("/search")
 def search():
     if "username" not in session: return redirect(url_for("login"))
@@ -785,13 +809,11 @@ def bookmark(media_id):
     conn.close()
     return jsonify({"bookmarked": bookmarked})
 
-# 💥 NEW AI CAPTION GENERATOR API 💥
 @app.route("/api/ai", methods=["POST"])
 def ai_endpoint():
     if "username" not in session: return jsonify({"reply": "Login first."}), 401
     query = request.get_json(silent=True).get("query", "")[:1000]
     try: 
-        # Making sure AI responds without quotes to fit cleanly in input fields
         reply = get_ai_response(query).replace('"', '').replace("'", "")
     except: 
         reply = "Beautiful day! #vibes #nature"
@@ -916,7 +938,8 @@ def report_asset(media_id):
         c.execute("INSERT INTO reports (media_id, reported_by, reason) VALUES (%s, %s, 'Inappropriate Content')", (media_id, session["username"]))
         conn.commit()
         return jsonify({"success": True})
-    except: return jsonify({"error": "Already reported"}), 400
+    except:
+        return jsonify({"error": "Already reported"}), 400
     finally: conn.close()
 
 # =========================================================
@@ -1024,13 +1047,6 @@ def dismiss_report(report_id):
     conn.close()
     flash("Report dismissed.", "success")
     return redirect(url_for("admin"))
-
-@app.route("/mystery", methods=["POST"])
-def mystery():
-    if hmac.compare_digest(request.form.get("passcode", ""), os.environ.get("MYSTERY_CODE", "SOCHO")): 
-        return render_template("mystery.html")
-    flash("Incorrect code.", "error")
-    return redirect(url_for("dashboard"))
 
 @app.errorhandler(404)
 def not_found_error(error): return render_template("404.html"), 404
