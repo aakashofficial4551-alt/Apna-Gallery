@@ -80,12 +80,12 @@
                 </a>
                 
                 <a href="{{ url_for('dashboard') }}">HQ</a>
+                
                 <a href="{{ url_for('profile') }}" style="color: var(--accent);">
-                    <!-- NEW: DYNAMIC AVATAR IN NAVBAR -->
                     <img src="{{ get_avatar(my_profile_pic, session.username) }}" style="width: 25px; height: 25px; border-radius: 50%; vertical-align: middle; border: 1px solid var(--accent); margin-right: 5px;"> Profile
                 </a>
                 
-                <span onclick="document.getElementById('settingsModal').style.display='flex'" style="font-size: 1.3rem; cursor: pointer;" title="Settings">⚙️</span>
+                <span onclick="document.getElementById('settingsModal').style.display='flex'" style="font-size: 1.3rem; cursor: pointer; margin-left: 5px;" title="Settings">⚙️</span>
                 
                 {% if session.get('role') == 'admin' %}
                     <a href="{{ url_for('admin') }}" style="color: var(--danger);">Admin</a>
@@ -155,7 +155,7 @@
         </div>
     </div>
 
-    <!-- UNIVERSAL SETTINGS MODAL -->
+    <!-- UNIVERSAL SETTINGS MODAL WITH WEBSITE INPUT -->
     <div id="settingsModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
         <div style="background: var(--bg-card); padding: 30px; border-radius: 20px; border: 1px solid var(--border-color); width: 90%; max-width: 450px; position: relative; box-shadow: 0 10px 40px rgba(0,0,0,0.5); max-height: 85vh; overflow-y: auto;">
             <span onclick="document.getElementById('settingsModal').style.display='none'" style="position: absolute; top: 15px; right: 20px; font-size: 2rem; color: white; cursor: pointer;">&times;</span>
@@ -165,8 +165,14 @@
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="action" value="update_profile">
                 <h3 style="margin: 0; font-size: 1.1rem; color: var(--text-main);">Profile Settings</h3>
+                
                 <label style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: -10px;">Bio</label>
                 <input type="text" name="bio" value="{{ my_bio }}" placeholder="Write something about yourself..." style="padding: 12px; border-radius: 8px; background: rgba(8,17,31,0.8); color: white; border: 1px solid var(--border-color); outline: none;">
+                
+                <!-- NEW: WEBSITE LINK INPUT -->
+                <label style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: -10px;">Website / Portfolio Link</label>
+                <input type="url" name="website" value="{{ my_website }}" placeholder="https://your-link.com" style="padding: 12px; border-radius: 8px; background: rgba(8,17,31,0.8); color: white; border: 1px solid var(--border-color); outline: none;">
+                
                 <label style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: -10px;">Theme</label>
                 <select name="theme" style="padding: 12px; border-radius: 8px; background: rgba(8,17,31,0.8); color: white; border: 1px solid var(--border-color); outline: none;">
                     <option value="cyan" {% if my_theme == 'cyan' %}selected{% endif %}>Cyan (Default)</option>
