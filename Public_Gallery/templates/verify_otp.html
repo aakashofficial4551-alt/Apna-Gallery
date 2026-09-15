@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Verify Security | Apna Gallery{% endblock %}
+
+{% block content %}
+<div style="max-width: 450px; margin: 50px auto; background: var(--bg-card); padding: 40px; border-radius: 20px; border: 1px solid var(--border-color); box-shadow: 0 10px 40px rgba(0,0,0,0.4); text-align: center;">
+    
+    <span style="font-size: 4rem; display: block; margin-bottom: 20px;">🔐</span>
+    <h1 style="color: var(--accent); margin-top: 0; font-size: 2rem;">Security Check</h1>
+    <p style="color: var(--text-muted); margin-bottom: 30px; font-size: 0.95rem;">An OTP has been sent to your registered email. Enter it below to secure your vault.</p>
+    
+    <form method="POST" style="text-align: left;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        
+        <div style="margin-bottom: 20px;">
+            <label style="color: var(--text-main); font-size: 0.85rem; font-weight: bold; margin-bottom: 8px; display: block;">6-Digit Authorization Code</label>
+            <input type="text" name="otp" placeholder="Enter 6-digit OTP" required style="width: 100%; padding: 15px; border-radius: 10px; border: 1px solid var(--border-color); background: rgba(8,17,31,0.8); color: white; outline: none; box-sizing: border-box; letter-spacing: 3px; text-align: center; font-size: 1.3rem; font-weight: bold;">
+        </div>
+
+        <div style="margin-bottom: 30px;">
+            <label style="color: var(--text-main); font-size: 0.85rem; font-weight: bold; margin-bottom: 8px; display: block;">New Vault Password</label>
+            <input type="password" name="new_password" placeholder="Create a strong password" required style="width: 100%; padding: 15px; border-radius: 10px; border: 1px solid var(--border-color); background: rgba(8,17,31,0.8); color: white; outline: none; box-sizing: border-box;">
+        </div>
+        
+        <button type="submit" class="btn" style="width: 100%; font-size: 1.1rem; padding: 15px; background: linear-gradient(135deg, var(--accent), #0ea5e9); color: #000;">Authorize Rest</button>
+    </form>
+    
+    <div style="margin-top: 25px;">
+        <a href="{{ url_for('login') }}" style="color: var(--text-muted); text-decoration: none; font-size: 0.9rem; font-weight: bold;">&larr; Abort & Return to Login</a>
+    </div>
+</div>
+{% endblock %}
