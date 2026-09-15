@@ -4,10 +4,13 @@
 {% block content %}
 <div style="display: flex; gap: 30px; align-items: center; flex-wrap: wrap; background: var(--bg-card); padding: 30px; border-radius: 20px; border: 1px solid var(--border-color); margin-bottom: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); position: relative;">
     
-    <!-- ID CARD BUTTON (Top Right Corner) -->
-    <button onclick="document.getElementById('idCardModal').style.display='flex'" class="btn" style="position: absolute; top: 20px; right: 20px; background: rgba(56, 189, 248, 0.2); border: 1px solid var(--accent); color: var(--accent);">💳 View ID Card</button>
+    <!-- ID CARD & SHARE BUTTONS -->
+    <div style="position: absolute; top: 20px; right: 20px; display: flex; gap: 10px;">
+        <button onclick="shareProfile()" class="btn" style="background: rgba(34, 197, 94, 0.2); border: 1px solid var(--success); color: var(--success);">🔗 Share Profile</button>
+        <button onclick="document.getElementById('idCardModal').style.display='flex'" class="btn" style="background: rgba(56, 189, 248, 0.2); border: 1px solid var(--accent); color: var(--accent);">💳 View ID Card</button>
+    </div>
 
-    <!-- CLICKABLE AVATAR UPLOAD -->
+    <!-- CLICKABLE AVATAR -->
     <div style="position: relative; cursor: pointer;" onclick="document.getElementById('avatarInput').click()">
         {% if user.profile_pic %}
             <img src="{{ user.profile_pic }}" style="width: 130px; height: 130px; border-radius: 50%; object-fit: cover; border: 4px solid var(--accent);">
@@ -24,10 +27,16 @@
     </form>
 
     <div style="flex: 1;">
-        <h1 style="color: var(--accent); margin: 0 0 10px 0;">{{ user.username }}</h1>
+        <!-- VERIFIED BLUE TICK LOGIC -->
+        <h1 style="color: var(--accent); margin: 0 0 10px 0; display: flex; align-items: center; gap: 8px;">
+            {{ user.username }}
+            {% if user.role in ['pro', 'admin'] %}
+                <span style="color: #38bdf8; font-size: 1.5rem;" title="Verified PRO Agent">☑️</span>
+            {% endif %}
+        </h1>
         <p style="color: var(--text-muted); margin: 0 0 5px 0;">{{ user.bio }}</p>
         
-        <!-- UPLOAD STORY BUTTON -->
+        <!-- STORY UPLOAD -->
         <form id="storyForm" method="POST" enctype="multipart/form-data" style="margin-top: 15px;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="action" value="story">
@@ -39,14 +48,12 @@
     </div>
 </div>
 
-<!-- MEDIA GRID (Shows PENDING BADGE) -->
 <h2 style="color: var(--accent); border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">My Assets</h2>
 <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px;">
     {% for item in my_uploads %}
     <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px; position: relative;">
-        <!-- PENDING STATUS LOGIC -->
         {% if item.approved == 0 %}
-            <div style="position: absolute; top: 20px; left: 20px; background: rgba(239, 68, 68, 0.9); color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.8rem; font-weight: bold; z-index: 10;">⏳ PENDING ADMIN APPROVAL</div>
+            <div style="position: absolute; top: 20px; left: 20px; background: rgba(239, 68, 68, 0.9); color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.8rem; font-weight: bold; z-index: 10;">⏳ PENDING</div>
         {% endif %}
         
         <div style="height: 160px; background: #000; border-radius: 8px; margin-bottom: 10px; overflow: hidden; display: grid; place-items: center;">
@@ -69,11 +76,24 @@
         </div>
         <p style="color: var(--text-muted); font-size: 0.9rem;">Share this unique 10-digit ID to prove your identity.</p>
         
-        <!-- PERMANENT DELETE OPTION -->
-        <form method="POST" action="{{ url_for('request_delete') }}" onsubmit="return confirm('WARNING: Your account will be marked for permanent deletion in 7 days. If you login within 7 days, the request cancels automatically. Proceed?');" style="margin-top: 30px;">
+        <form method="POST" action="{{ url_for('request_delete') }}" onsubmit="return confirm('Account will be deleted in 7 days. Proceed?');" style="margin-top: 30px;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn" style="background: rgba(239, 68, 68, 0.1); border: 1px solid var(--danger); color: var(--danger); width: 100%;">⚠️ Request Account Deletion</button>
         </form>
     </div>
 </div>
+
+<!-- TOAST FOR SHARE -->
+<div id="toast" style="visibility: hidden; min-width: 250px; background-color: var(--success); color: white; text-align: center; border-radius: 8px; padding: 16px; position: fixed; z-index: 10000; left: 50%; bottom: 30px; transform: translateX(-50%); font-weight: bold;">✅ Profile Link Copied!</div>
+
+<script>
+function shareProfile() {
+    const profileUrl = window.location.origin + "/agent/{{ user.username }}";
+    navigator.clipboard.writeText(profileUrl).then(() => {
+        var toast = document.getElementById("toast");
+        toast.style.visibility = "visible";
+        setTimeout(function(){ toast.style.visibility = "hidden"; }, 3000);
+    });
+}
+</script>
 {% endblock %}
