@@ -1,32 +1,30 @@
 import os
 import secrets
 import time
+import urllib.parse
 from collections import defaultdict, deque
 import hmac
 from uuid import uuid4
 
 import psycopg2
-import requests
 import cloudinary
 import cloudinary.uploader
+import requests
 from dotenv import load_dotenv
 
 from flask import (
-    Flask, request, render_template, redirect, url_for, flash, session, jsonify, render_template_string
+    Flask, request, render_template, redirect, url_for, flash, session, jsonify
 )
 from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.utils import secure_filename
 
 from ai_service import get_ai_response
 from database import init_db, get_db_connection
-
 
 # =========================================================
 # BASE DIRECTORY & ENV VARIABLES
 # =========================================================
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 load_dotenv(os.path.join(BASE_DIR, "..", ".env"))
-
 
 # =========================================================
 # CLOUDINARY CONFIG (PERMANENT STORAGE)
@@ -49,7 +47,6 @@ app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024 # 50MB
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_SECURE"] = True
-
 
 # =========================================================
 # CSRF PROTECTION & SECURITY HEADERS
@@ -102,11 +99,10 @@ def add_security_headers(response):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; script-src 'self' 'unsafe-inline' https:; "
-        "style-src 'self' 'unsafe-inline' https:; img-src 'self' data: res.cloudinary.com https:; "
+        "style-src 'self' 'unsafe-inline' https:; img-src 'self' data: res.cloudinary.com https: image.pollinations.ai; "
         "media-src 'self' res.cloudinary.com https:; connect-src 'self' https:;"
     )
     return response
-
 
 # =========================================================
 # SECRETS & FILE VALIDATION
@@ -138,13 +134,11 @@ def save_uploaded_file(file, category="Photo"):
         print(f"UPLOAD REJECTED: {err_msg}")
         return None
     try:
-        # Upload directly to Cloudinary
         upload_result = cloudinary.uploader.upload(file, resource_type="auto")
         return upload_result["secure_url"]
     except Exception as e:
         print("CLOUDINARY ERROR:", repr(e))
         return None
-
 
 # =========================================================
 # RATE LIMITING & AUDIT LOGS
@@ -199,7 +193,6 @@ def sync_admin_session():
     is_admin = current_user_is_admin()
     session["is_admin"] = is_admin
     return is_admin
-
 
 # =========================================================
 # ROUTES: AUTHENTICATION
@@ -266,7 +259,6 @@ def logout():
     session.clear()
     return redirect(url_for("login"))
 
-
 # =========================================================
 # ROUTES: CORE
 # =========================================================
@@ -276,10 +268,9 @@ def dashboard():
     if "username" not in session: return redirect(url_for("login"))
     sync_admin_session()
     
-    # Naya Code: Fetching Trending Assets
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("SELECT * FROM media WHERE approved = 1 ORDER BY likes DESC LIMIT 3")
+    c.execute("SELECT * FROM media WHERE approved = 1 AND filename != 'SHAYARI_TEXT' ORDER BY likes DESC LIMIT 3")
     trending = c.fetchall()
     conn.close()
     
@@ -289,48 +280,6 @@ def dashboard():
 def games():
     if "username" not in session: return redirect(url_for("login"))
     return render_template("games.html")
-
-# =========================================================
-# ROUTES: AI IMAGE STUDIO
-# =========================================================
-@app.route("/ai-studio", methods=["GET", "POST"])
-def ai_studio():
-    if "username" not in session: return redirect(url_for("login"))
-    
-    if request.method == "POST":
-        prompt = request.form.get("prompt", "").strip()
-        if not prompt:
-            flash("Prompt cannot be empty.", "error")
-            return redirect(url_for("ai_studio"))
-        
-        # Free Text-to-Image AI API (No keys required)
-        image_url = f"https://image.pollinations.ai/prompt/{prompt}?nologo=true"
-        
-        try:
-            # AI Image ko direct URL se Cloudinary par save karna
-            upload_result = cloudinary.uploader.upload(image_url, resource_type="image")
-            secure_url = upload_result["secure_url"]
-            
-            # Database mein as a 'Photo' save karna
-            is_approved = 1 if current_user_is_admin() else 0
-            conn = get_db_connection()
-            c = conn.cursor()
-            c.execute(
-                "INSERT INTO media (filename, title, category, prompt, uploaded_by, approved) VALUES (%s, %s, %s, %s, %s, %s)",
-                (secure_url, f"AI Art: {prompt[:20]}...", "Photo", prompt, session["username"], is_approved)
-            )
-            conn.commit()
-            conn.close()
-            
-            flash("AI Image successfully generated and saved to Photo Vault!", "success")
-            return redirect(url_for("gallery", category="Photo"))
-            
-        except Exception as e:
-            print("AI GEN ERROR:", repr(e))
-            flash("AI failed to generate image. Try another prompt.", "error")
-            return redirect(url_for("ai_studio"))
-            
-    return render_template("ai_studio.html")
 
 @app.route("/profile", methods=["GET", "POST"])
 def profile():
@@ -358,16 +307,19 @@ def profile():
     conn.close()
     return render_template("profile.html", user=user, my_uploads=my_uploads, post_count=len(my_uploads))
 
-
 @app.route("/gallery/<category>", methods=["GET", "POST"])
 def gallery(category):
     if "username" not in session: return redirect(url_for("login"))
     
     if request.method == "POST":
         filename = "SHAYARI_TEXT"
-        file = request.files.get("media")
-        if file and file.filename != "":
-            filename = save_uploaded_file(file, category) or "SHAYARI_TEXT"
+        if category != 'Shayari':
+            file = request.files.get("media")
+            if file and file.filename != "":
+                filename = save_uploaded_file(file, category)
+                if not filename:
+                    flash("Upload Failed! Please check your Cloudinary API keys.", "error")
+                    return redirect(url_for("gallery", category=category))
         
         is_approved = 1 if current_user_is_admin() else 0
         conn = get_db_connection()
@@ -383,8 +335,12 @@ def gallery(category):
 
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("SELECT * FROM media WHERE category = %s AND approved = 1 ORDER BY id DESC", (category,))
+    # Filter out broken uploads from old errors
+    c.execute("SELECT * FROM media WHERE category = %s AND approved = 1 AND filename != 'SHAYARI_TEXT' ORDER BY id DESC", (category,))
+    if category == 'Shayari':
+        c.execute("SELECT * FROM media WHERE category = %s AND approved = 1 ORDER BY id DESC", (category,))
     media_files = c.fetchall()
+    
     c.execute("SELECT * FROM comments ORDER BY id ASC")
     comments_db = c.fetchall()
     conn.close()
@@ -393,6 +349,51 @@ def gallery(category):
     for comment in comments_db: comments[comment["media_id"]].append(comment)
     return render_template("gallery.html", media_files=media_files, category=category, comments=comments)
 
+# =========================================================
+# ROUTES: AI IMAGE STUDIO (FIXED)
+# =========================================================
+@app.route("/ai-studio", methods=["GET", "POST"])
+def ai_studio():
+    if "username" not in session: return redirect(url_for("login"))
+    
+    if request.method == "POST":
+        prompt = request.form.get("prompt", "").strip()
+        if not prompt:
+            flash("Prompt cannot be empty.", "error")
+            return redirect(url_for("ai_studio"))
+        
+        # Robust AI Generation Fetch
+        encoded_prompt = urllib.parse.quote(prompt)
+        image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?nologo=true"
+        
+        try:
+            # Check if Cloudinary works, else fallback to direct URL
+            r = requests.get(image_url, timeout=15)
+            if r.status_code == 200:
+                upload_result = cloudinary.uploader.upload(r.content, resource_type="image")
+                secure_url = upload_result.get("secure_url", image_url)
+            else:
+                secure_url = image_url
+                
+            is_approved = 1 if current_user_is_admin() else 0
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute(
+                "INSERT INTO media (filename, title, category, prompt, uploaded_by, approved) VALUES (%s, %s, %s, %s, %s, %s)",
+                (secure_url, f"AI Art: {prompt[:20]}...", "Photo", prompt, session["username"], is_approved)
+            )
+            conn.commit()
+            conn.close()
+            
+            flash("AI Image successfully generated!", "success")
+            return redirect(url_for("gallery", category="Photo"))
+            
+        except Exception as e:
+            print("AI GEN/CLOUDINARY ERROR:", repr(e))
+            flash("Error processing image. Check Cloudinary Keys in Render.", "error")
+            return redirect(url_for("ai_studio"))
+            
+    return render_template("ai_studio.html")
 
 # =========================================================
 # ROUTES: API & LIKES
@@ -426,35 +427,27 @@ def like(media_id):
     conn.close()
     return jsonify({"likes": likes, "liked": liked_now})
 
-
 # =========================================================
-# ROUTES: SOCIAL (COMMENTS & USER CONTROL)
+# ROUTES: SOCIAL & ADMIN
 # =========================================================
 @app.route("/add_comment/<int:media_id>", methods=["POST"])
 def add_comment(media_id):
-    if "username" not in session:
-        flash("Please login to comment.", "error")
-        return redirect(url_for("login"))
-    
+    if "username" not in session: return redirect(url_for("login"))
     text = request.form.get("comment_text", "").strip()
     if text:
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute("INSERT INTO comments (media_id, username, comment_text) VALUES (%s, %s, %s)", 
-                  (media_id, session["username"], text[:200]))
+        c.execute("INSERT INTO comments (media_id, username, comment_text) VALUES (%s, %s, %s)", (media_id, session["username"], text[:200]))
         conn.commit()
         conn.close()
         flash("Comment posted!", "success")
-        
     return redirect(request.referrer or url_for("dashboard"))
 
 @app.route("/delete_own/<int:media_id>", methods=["POST"])
 def delete_own(media_id):
     if "username" not in session: return redirect(url_for("login"))
-    
     conn = get_db_connection()
     c = conn.cursor()
-    # Check if the user actually owns this media
     c.execute("SELECT * FROM media WHERE id = %s AND uploaded_by = %s", (media_id, session["username"]))
     if c.fetchone():
         c.execute("DELETE FROM media WHERE id = %s", (media_id,))
@@ -463,13 +456,8 @@ def delete_own(media_id):
     else:
         flash("Unauthorized action.", "error")
     conn.close()
-    
     return redirect(url_for("profile"))
 
-
-# =========================================================
-# ROUTES: ADMIN & MYSTERY
-# =========================================================
 @app.route("/admin", methods=["GET", "POST"])
 def admin():
     if request.method == "POST":
@@ -488,25 +476,17 @@ def admin():
     
     conn = get_db_connection()
     c = conn.cursor()
-    
-    # Pendings fetch karna
     c.execute("SELECT * FROM media WHERE approved = 0 ORDER BY id DESC")
     pending_media = c.fetchall()
-    
-    # Analytics / Stats fetch karna
     c.execute("SELECT COUNT(*) as count FROM users")
     user_count = c.fetchone()['count']
-    
     c.execute("SELECT COUNT(*) as count FROM media WHERE approved = 1")
     media_count = c.fetchone()['count']
-    
     c.execute("SELECT SUM(likes) as total FROM media")
     likes_count = c.fetchone()['total'] or 0
-    
     conn.close()
     
     return render_template("admin.html", pending_media=pending_media, user_count=user_count, media_count=media_count, likes_count=likes_count, auth_required=False)
-
 
 @app.route("/admin/audit-logs")
 def admin_audit_logs():
@@ -516,7 +496,6 @@ def admin_audit_logs():
     c.execute("SELECT * FROM audit_logs ORDER BY id DESC LIMIT 100")
     logs = c.fetchall()
     conn.close()
-    
     return render_template("audit_logs.html", logs=logs)
 
 @app.route("/approve/<int:id>", methods=["GET", "POST"])
@@ -524,7 +503,6 @@ def approve(id):
     if not current_user_is_admin(): return redirect(url_for("admin"))
     if request.method == "GET":
         return f'<form method="post"><input type="hidden" name="csrf_token" value="{get_csrf_token()}"><button type="submit">Confirm Approve</button></form>'
-    
     conn = get_db_connection()
     c = conn.cursor()
     c.execute("UPDATE media SET approved = 1 WHERE id = %s", (id,))
@@ -534,13 +512,11 @@ def approve(id):
     flash("Approved!", "success")
     return redirect(url_for("admin"))
 
-
 @app.route("/delete/<int:id>", methods=["GET", "POST"])
 def delete(id):
     if not current_user_is_admin(): return redirect(url_for("admin"))
     if request.method == "GET":
         return f'<form method="post"><input type="hidden" name="csrf_token" value="{get_csrf_token()}"><button type="submit">Confirm Delete</button></form>'
-    
     conn = get_db_connection()
     c = conn.cursor()
     c.execute("DELETE FROM media WHERE id = %s", (id,))
@@ -550,7 +526,6 @@ def delete(id):
     flash("Deleted!", "success")
     return redirect(url_for("admin"))
 
-
 @app.route("/mystery", methods=["POST"])
 def mystery():
     if hmac.compare_digest(request.form.get("passcode", ""), MYSTERY_CODE):
@@ -558,10 +533,6 @@ def mystery():
     flash("Incorrect code.", "error")
     return redirect(url_for("dashboard"))
 
-
-# =========================================================
-# ERRORS & EXECUTION
-# =========================================================
 @app.errorhandler(404)
 def not_found_error(error): return render_template("404.html"), 404
 @app.errorhandler(500)
