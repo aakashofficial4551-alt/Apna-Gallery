@@ -8,7 +8,7 @@ from uuid import uuid4
 import datetime
 import random
 import smtplib
-import re  # NEW: For Hashtag parsing
+import re
 
 import psycopg2
 import cloudinary
@@ -44,13 +44,22 @@ app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "development-only-secret
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
 
 # =========================================================
-# HASHTAG FILTER ENGINE (PHASE 31)
+# TEXT FORMATTER & ONLINE FILTERS (PHASE 32)
 # =========================================================
-@app.template_filter('hashtag')
-def hashtag_filter(text):
+@app.template_filter('format_text')
+def format_text(text):
     if not text: return ""
-    # Converts #word into a clickable link that points to the search engine
-    return re.sub(r'#(\w+)', r'<a href="/search?q=\1" style="color: var(--accent); text-decoration: none; font-weight: bold;">#\1</a>', text)
+    # Format Hashtags
+    text = re.sub(r'#(\w+)', r'<a href="/search?q=\1" style="color: var(--accent); text-decoration: none; font-weight: bold;">#\1</a>', text)
+    # Format Mentions (@username)
+    text = re.sub(r'@(\w+)', r'<a href="/agent/\1" style="color: var(--warning); text-decoration: none; font-weight: bold;">@\1</a>', text)
+    return text
+
+@app.template_filter('is_online')
+def is_online(last_active):
+    if not last_active: return False
+    # If active in the last 5 minutes (300 seconds), mark as online
+    return (datetime.datetime.now() - last_active).total_seconds() < 300
 
 # =========================================================
 # DATABASE AUTO-HEALER
@@ -135,7 +144,7 @@ def get_csrf_token():
 @app.before_request
 def update_activity():
     if random.random() < 0.05: cleanup_database()
-    if "username" in session and request.method == "GET":
+    if "username" in session:
         try:
             conn = get_db_connection()
             c = conn.cursor()
@@ -235,7 +244,7 @@ def login():
                           (username, email, generate_password_hash(password), code))
                 conn.commit()
                 session.update({"username": username, "is_registered": True, "is_admin": False, "role": "user"})
-                flash(f"Account created! ID: {code}. Welcome to Apna Gallery!", "success")
+                flash(f"Account created! Welcome to Apna Gallery!", "success")
                 return redirect(url_for("feed"))
             except:
                 flash("Username or Email exists.", "error")
@@ -320,13 +329,14 @@ def request_delete():
     return redirect(url_for("login"))
 
 # =========================================================
-# UNIVERSAL UPLOAD ROUTE
+# UNIVERSAL UPLOAD ROUTE WITH MENTIONS
 # =========================================================
 @app.route("/upload_asset", methods=["POST"])
 def upload_asset():
     if "username" not in session: return redirect(url_for("login"))
     
     category = request.form.get("category", "Photo")
+    title = request.form.get("title", "Untitled")
     file = request.files.get("media")
     filename = "SHAYARI_TEXT"
 
@@ -340,8 +350,21 @@ def upload_asset():
     is_approved = 1 if current_user_is_admin() else 0
     conn = get_db_connection()
     c = conn.cursor()
+    
+    # 1. Insert Media
     c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved) VALUES (%s, %s, %s, %s, %s, %s)",
-              (filename, request.form.get("title", "Untitled"), category, "", session.get("username"), is_approved))
+              (filename, title, category, "", session.get("username"), is_approved))
+    
+    # 2. Check for @mentions in title
+    mentions = set(re.findall(r'@(\w+)', title))
+    for m in mentions:
+        if m != session["username"]:
+            c.execute("SELECT id FROM users WHERE username = %s", (m,))
+            if c.fetchone():
+                msg = f"📣 {session['username']} mentioned you in a post!"
+                link = f"/agent/{session['username']}"
+                c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (m, msg, link))
+                
     conn.commit()
     conn.close()
     
@@ -548,8 +571,9 @@ def inbox():
     me = session["username"]
     conn = get_db_connection()
     c = conn.cursor()
+    # FETCH LAST ACTIVE FOR ONLINE STATUS
     c.execute("""
-        SELECT u.username, u.profile_pic, u.role 
+        SELECT u.username, u.profile_pic, u.role, u.last_active
         FROM users u 
         WHERE u.username IN (SELECT receiver FROM messages WHERE sender = %s UNION SELECT sender FROM messages WHERE receiver = %s)
     """, (me, me))
@@ -566,21 +590,39 @@ def chat(username):
     me = session["username"]
     conn = get_db_connection()
     c = conn.cursor()
+    
     if request.method == "POST":
         msg = request.form.get("message", "").strip()
         if msg:
             c.execute("INSERT INTO messages (sender, receiver, message) VALUES (%s, %s, %s)", (me, username, msg))
             conn.commit()
         return redirect(url_for("chat", username=username))
+        
     c.execute("UPDATE messages SET is_read = TRUE WHERE sender = %s AND receiver = %s AND is_read = FALSE", (username, me))
     conn.commit()
+    
     c.execute("SELECT * FROM messages WHERE (sender = %s AND receiver = %s) OR (sender = %s AND receiver = %s) ORDER BY created_at ASC", (me, username, username, me))
     chat_history = c.fetchall()
-    c.execute("SELECT username, profile_pic, role FROM users WHERE username = %s", (username,))
+    c.execute("SELECT username, profile_pic, role, last_active FROM users WHERE username = %s", (username,))
     contact = c.fetchone()
     conn.close()
+    
     if not contact: return redirect(url_for("inbox"))
     return render_template("chat.html", chat_history=chat_history, contact=contact)
+
+# LIVE CHAT API ENDPOINT (For Auto-Refresh)
+@app.route("/api/chat_history/<username>")
+def api_chat_history(username):
+    if "username" not in session: return jsonify([])
+    me = session["username"]
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT sender, message, TO_CHAR(created_at, 'HH24:MI') as time FROM messages WHERE (sender = %s AND receiver = %s) OR (sender = %s AND receiver = %s) ORDER BY created_at ASC", (me, username, username, me))
+    history = c.fetchall()
+    c.execute("UPDATE messages SET is_read = TRUE WHERE sender = %s AND receiver = %s AND is_read = FALSE", (username, me))
+    conn.commit()
+    conn.close()
+    return jsonify(history)
 
 # =========================================================
 # GALLERY, SEARCH, AI STUDIO
@@ -628,7 +670,10 @@ def search():
     
     conn = get_db_connection()
     c = conn.cursor()
-    search_term = f"%{query}%"
+    
+    # Strip # or @ for pure searching in DB
+    clean_query = query.replace("#", "").replace("@", "")
+    search_term = f"%{clean_query}%"
     
     c.execute("SELECT m.*, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.approved = 1 AND m.filename != 'SHAYARI_TEXT' AND (m.title ILIKE %s OR m.prompt ILIKE %s) ORDER BY m.id DESC", (search_term, search_term))
     media_files = c.fetchall()
@@ -696,13 +741,6 @@ def ai_studio():
             return render_template("ai_studio.html", chat_reply=reply, user_prompt=prompt)
     return render_template("ai_studio.html")
 
-@app.route("/api/ai", methods=["POST"])
-def ai_endpoint():
-    if "username" not in session: return jsonify({"reply": "Login first."}), 401
-    try: reply = get_ai_response(request.get_json(silent=True).get("query", "")[:1000])
-    except: reply = "Assistant unavailable."
-    return jsonify({"reply": reply})
-
 @app.route("/like/<int:media_id>", methods=["POST"])
 def like(media_id):
     if "username" not in session: return jsonify({"error": "Login required."}), 401
@@ -738,10 +776,21 @@ def add_comment(media_id):
         c.execute("INSERT INTO comments (media_id, username, comment_text) VALUES (%s, %s, %s)", (media_id, session["username"], text[:200]))
         c.execute("SELECT uploaded_by, title, category FROM media WHERE id = %s", (media_id,))
         media_info = c.fetchone()
+        
+        # 1. Notify Owner
         if media_info and media_info['uploaded_by'] != session["username"]:
-            msg = f"💬 {session['username']} commented: '{text[:20]}...' on {media_info['title']}"
+            msg = f"💬 {session['username']} commented on {media_info['title']}"
             link = f"/gallery/{media_info['category']}"
             c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (media_info['uploaded_by'], msg, link))
+            
+        # 2. Notify @mentions
+        mentions = set(re.findall(r'@(\w+)', text))
+        for m in mentions:
+            if m != session["username"]:
+                c.execute("SELECT id FROM users WHERE username = %s", (m,))
+                if c.fetchone():
+                    msg = f"📣 {session['username']} mentioned you in a comment!"
+                    c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (m, msg, f"/gallery/{media_info['category']}"))
         conn.commit()
         conn.close()
         flash("Comment posted!", "success")
