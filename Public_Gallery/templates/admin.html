@@ -57,7 +57,7 @@
                 </div>
             </div>
 
-            <!-- NEW: REPORTED ASSETS -->
+            <!-- REPORTED ASSETS -->
             <h2 style="color: var(--danger); margin-bottom: 20px;">🚩 Reported Assets (Moderation)</h2>
             {% for r in reports %}
                 <div class="media-row" style="border-left: 4px solid var(--danger);">
@@ -137,7 +137,10 @@
                         {% for u in all_users %}
                         <tr>
                             <td style="color: var(--text-muted);">#{{ u.id }}</td>
-                            <td style="font-weight: bold; color: white;">{{ u.username or 'Unknown' }}</td>
+                            <td style="font-weight: bold; color: white;">
+                                {{ u.username or 'Unknown' }}
+                                {% if u.is_verified %}<span style="color: #38bdf8;" title="Verified">✅</span>{% endif %}
+                            </td>
                             <td style="color: var(--accent);">{{ (u.role or 'USER') | upper }}</td>
                             <td>
                                 {% if (u.status or 'ACTIVE') == 'BANNED' %}
@@ -147,7 +150,7 @@
                                 {% endif %}
                             </td>
                             <td>
-                                <div style="display: flex; gap: 10px;">
+                                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                                     {% if (u.status or 'ACTIVE') == 'ACTIVE' and (u.role or 'user') != 'admin' %}
                                     <form method="POST" action="{{ url_for('admin_user_action', user_id=u.id, action='ban') }}" onsubmit="return confirm('Ban this user?');">
                                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -162,8 +165,19 @@
                                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                         <button type="submit" class="btn" style="background: transparent; border: 1px solid var(--success); color: var(--success); padding: 4px 10px; font-size: 0.8rem;">Unban</button>
                                     </form>
+                                    {% endif %}
+                                    
+                                    <!-- NEW: VERIFY BUTTON -->
+                                    {% if not u.is_verified %}
+                                    <form method="POST" action="{{ url_for('admin_user_action', user_id=u.id, action='verify') }}">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn" style="background: transparent; border: 1px solid #38bdf8; color: #38bdf8; padding: 4px 10px; font-size: 0.8rem;">Verify ✅</button>
+                                    </form>
                                     {% else %}
-                                    <span style="color: var(--text-muted); font-size: 0.85rem; font-style: italic;">HQ Commmander</span>
+                                    <form method="POST" action="{{ url_for('admin_user_action', user_id=u.id, action='unverify') }}">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn" style="background: transparent; border: 1px solid var(--text-muted); color: var(--text-muted); padding: 4px 10px; font-size: 0.8rem;">Unverify</button>
+                                    </form>
                                     {% endif %}
                                 </div>
                             </td>
