@@ -1,90 +1,104 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <title>Admin Approvals | Secure HQ</title>
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;500;800&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Montserrat', sans-serif; background: #e0f7fa; color: #333; margin: 0; min-height: 100vh;}
-        header { padding: 20px; background: #fff; text-align: center; border-bottom: 3px solid #00b4d8; box-shadow: 0 4px 15px rgba(0,0,0,0.05);}
-        .container { max-width: 900px; margin: 40px auto; padding: 20px; }
+{% extends "base.html" %}
+
+{% block title %}Admin HQ | Apna Gallery{% endblock %}
+
+{% block head %}
+<style>
+    .admin-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        padding: 30px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        max-width: 600px;
+        margin: 0 auto;
+        text-align: center;
+    }
+    .media-item {
+        background: rgba(8, 17, 31, 0.8);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 15px;
+        margin-bottom: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+    .media-info {
+        text-align: left;
+    }
+    .media-info h4 { margin: 0 0 5px 0; color: var(--accent); }
+    .media-info p { margin: 0; font-size: 0.9rem; color: var(--text-muted); }
+    .action-btns {
+        display: flex;
+        gap: 10px;
+    }
+    .btn-approve { background: var(--success); color: #fff; }
+    .btn-approve:hover { background: #16a34a; }
+    .btn-delete { background: var(--danger); color: #fff; }
+    .btn-delete:hover { background: #dc2626; }
+    
+    .passcode-input {
+        width: 100%;
+        background: var(--bg-main);
+        border: 1px solid var(--warning);
+        color: white;
+        padding: 15px;
+        border-radius: 8px;
+        font-size: 1.2rem;
+        text-align: center;
+        letter-spacing: 5px;
+        margin-bottom: 20px;
+        outline: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+{% if auth_required %}
+    <!-- PASSCODE SECURITY WALL -->
+    <div class="admin-card">
+        <h2 style="color: var(--warning); margin-top: 0;">🛡️ Restricted Area</h2>
+        <p style="color: var(--text-muted); margin-bottom: 25px;">Enter the Commander's Passcode to activate Admin privileges for this account.</p>
         
-        .auth-box { background: #fff; padding: 40px; border-radius: 15px; border: 2px solid #00b4d8; text-align: center; max-width: 400px; margin: 50px auto; box-shadow: 0 10px 30px rgba(0,180,216,0.25);}
-        input[type="password"] { width: 100%; padding: 14px; background: #f0fcfd; color: #333; border: 2px solid #90e0ef; border-radius: 8px; margin-bottom: 20px; box-sizing: border-box; font-size: 1.1em; text-align: center;}
-        .btn { background: #0077b6; color: white; border: none; padding: 14px 20px; width: 100%; font-weight: bold; cursor: pointer; border-radius: 8px; text-transform: uppercase; font-size: 1em; letter-spacing: 1px;}
-        .btn:hover { background: #023e8a; }
+        <form method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="password" name="passcode" class="passcode-input" placeholder="PASSCODE" required autofocus>
+            <button type="submit" class="btn" style="background: var(--warning); width: 100%; font-size: 1.1rem;">AUTHORIZE</button>
+        </form>
+    </div>
+{% else %}
+    <!-- ADMIN HQ DASHBOARD -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; flex-wrap: wrap; gap: 15px;">
+        <h1 style="color: var(--warning); margin: 0;">🛡️ Admin HQ</h1>
+        <a href="{{ url_for('admin_audit_logs') }}" class="btn" style="background: #334155; color: white;">📄 View Audit Logs</a>
+    </div>
 
-        .pending-card { background: #fff; padding: 20px; border: 2px solid #00b4d8; margin-bottom: 25px; border-radius: 15px; display: flex; gap: 20px; align-items: center; box-shadow: 0 8px 20px rgba(0,0,0,0.06);}
-        .preview-box { width: 120px; height: 120px; background: #f0fcfd; border-radius: 10px; overflow: hidden; display: flex; justify-content: center; align-items: center; border: 1px solid #b2ebf2;}
-        .preview-box img, .preview-box video { width: 100%; height: 100%; object-fit: cover; }
+    <div class="admin-card" style="max-width: 100%; text-align: left;">
+        <h3 style="margin-top: 0; border-bottom: 1px solid var(--border-color); padding-bottom: 15px;">Pending Uploads Request</h3>
         
-        .details { flex: 1; }
-        .details h3 { margin: 0 0 5px 0; color: #023e8a; font-size: 1.3em;}
-        .approve-btn { background: #2a9d8f; color: white; padding: 12px 25px; border-radius: 8px; text-decoration: none; font-weight: bold; margin-right: 10px; display: inline-block; box-shadow: 0 4px 10px rgba(42,157,143,0.3);}
-        .reject-btn { background: #e76f51; color: white; padding: 12px 25px; border-radius: 8px; text-decoration: none; font-weight: bold; display: inline-block;}
-        .flash { text-align: center; padding: 12px; margin-bottom: 20px; border-radius: 8px; font-weight: bold; }
-    </style>
-</head>
-<body>
-    <header>
-        <h1 style="margin:0; color:#023e8a;">ADMIN APPROVAL <span>HQ</span></h1>
-        <a href="/dashboard" style="color:#0077b6; text-decoration:none; font-weight:bold;">⬅ Exit to Dashboard</a>
-    </header>
-
-    <div class="container">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-          {% if messages %}
-            {% for c, m in messages %}
-              <div class="flash" style="background: {% if c=='error' %}#ffcdd2; color:#c62828;{% else %}#c8e6c9; color:#2e7d32;{% endif %}">{{ m }}</div>
-            {% endfor %}
-          {% endif %}
-        {% endwith %}
-
-        {% if auth_required %}
-            <div class="auth-box">
-                <h2 style="color:#023e8a; margin-top:0;">RESTRICTED ACCESS</h2>
-                <p style="color:#666; margin-bottom:25px;">Enter your Secret Master Passcode to unlock admin control.</p>
-                <form method="POST">
-                    <input type="password" name="passcode" placeholder="Enter Admin Passcode" required autocomplete="off">
-                    <button type="submit" class="btn">UNLOCK PORTAL</button>
-                </form>
-            </div>
-        {% else %}
-            <h2 style="border-bottom: 3px solid #00b4d8; padding-bottom: 10px; color:#023e8a;">PENDING ITEMS FOR APPROVAL</h2>
-            
+        {% if pending_media %}
             {% for item in pending_media %}
-                <div class="pending-card">
-                    <div class="preview-box">
-                        {% if item.filename == 'SHAYARI_TEXT' %}
-                            <span style="font-size: 30px;">✍️</span>
-                        {% elif item.category == 'Video' %}
-                            <video src="{{ url_for('static', filename='uploads/' + item.filename) }}"></video>
-                        {% elif item.category == 'Document' %}
-                            <span style="font-size: 40px;">📄</span>
-                        {% elif item.category == 'Music' %}
-                            <span style="font-size: 40px;">🎵</span>
-                        {% else %}
-                            <img src="{{ url_for('static', filename='uploads/' + item.filename) }}">
-                        {% endif %}
-                    </div>
-                    
-                    <div class="details">
-                        <h3>{{ item.title }} <span style="background:#00b4d8; color:white; font-size:0.6em; padding:4px 8px; border-radius:4px;">{{ item.category }}</span></h3>
-                        <p style="margin: 5px 0; color: #555;">Uploaded by: <b>{{ item.uploaded_by }}</b></p>
-                        {% if item.prompt %}<p style="margin: 5px 0; color: #777; font-style:italic;">"{{ item.prompt }}"</p>{% endif %}
-                    </div>
-
-                    <div>
-                        <a href="/approve/{{ item.id }}" class="approve-btn">✔ Approve</a>
-                        <a href="/delete/{{ item.id }}" class="reject-btn">✖ Delete</a>
-                    </div>
+            <div class="media-item">
+                <div class="media-info">
+                    <h4>{{ item.title }}</h4>
+                    <p><strong>By:</strong> {{ item.uploaded_by }} | <strong>Category:</strong> {{ item.category }}</p>
+                    <p style="font-size: 0.8rem; margin-top: 5px;">File: {{ item.filename }}</p>
                 </div>
-            {% else %}
-                <div style="text-align:center; padding:60px 20px; background:#fff; border-radius:15px; color:#0077b6; border: 2px dashed #00b4d8;">
-                    <h2 style="margin:0;">No Pending Uploads!</h2>
-                    <p style="color:#666;">Users ka koi bhi upload yahan turant approval ke liye aayega.</p>
+                <div class="action-btns">
+                    <!-- Secure GET requests that open confirmation pages -->
+                    <a href="{{ url_for('approve', id=item.id) }}" class="btn btn-approve">Approve</a>
+                    <a href="{{ url_for('delete', id=item.id) }}" class="btn btn-delete">Delete</a>
                 </div>
+            </div>
             {% endfor %}
+        {% else %}
+            <p style="color: var(--success); text-align: center; padding: 30px 0; font-size: 1.1rem;">
+                ✅ All clear! No pending media to review.
+            </p>
         {% endif %}
     </div>
-</body>
-</html>
+{% endif %}
+{% endblock %}
