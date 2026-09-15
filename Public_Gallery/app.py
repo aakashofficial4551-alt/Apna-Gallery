@@ -6,6 +6,7 @@ import hmac
 from uuid import uuid4
 
 import psycopg2
+import requests
 import cloudinary
 import cloudinary.uploader
 from dotenv import load_dotenv
