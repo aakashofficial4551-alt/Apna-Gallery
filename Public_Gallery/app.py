@@ -43,7 +43,7 @@ app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "development-only-secret
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
 
 # =========================================================
-# DATABASE AUTO-HEALER & MESSAGING UPGRADE
+# DATABASE AUTO-HEALER & PHASE 24 UPGRADE
 # =========================================================
 def upgrade_db():
     conn = get_db_connection()
@@ -75,7 +75,6 @@ def upgrade_db():
             UNIQUE(follower, following)
         )
     """)
-    # NEW: MESSAGES TABLE
     c.execute("""
         CREATE TABLE IF NOT EXISTS messages (
             id SERIAL PRIMARY KEY,
@@ -84,6 +83,16 @@ def upgrade_db():
             message TEXT NOT NULL,
             is_read BOOLEAN DEFAULT FALSE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    # NEW: BOOKMARKS TABLE (PHASE 24)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS bookmarks (
+            id SERIAL PRIMARY KEY,
+            username VARCHAR(100) NOT NULL,
+            media_id INTEGER NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(username, media_id)
         )
     """)
     conn.commit()
@@ -139,7 +148,6 @@ def cleanup_database():
         c.execute("DELETE FROM users WHERE role = 'user' AND last_active < NOW() - INTERVAL '90 days'")
         c.execute("DELETE FROM stories WHERE created_at < NOW() - INTERVAL '12 hours'")
         c.execute("DELETE FROM notifications WHERE id NOT IN (SELECT id FROM notifications ORDER BY id DESC LIMIT 500)")
-        # Delete DMs older than 30 days to save DB limits
         c.execute("DELETE FROM messages WHERE created_at < NOW() - INTERVAL '30 days'")
         conn.commit()
     except: pass
@@ -226,7 +234,7 @@ def sync_admin_session():
 # =========================================================
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    if session.get("username"): return redirect(url_for("dashboard"))
+    if session.get("username"): return redirect(url_for("feed"))
     if request.method == "POST":
         action = request.form.get("action")
         username = request.form.get("username", "").strip()
@@ -242,7 +250,7 @@ def login():
             conn.commit()
             conn.close()
             session.update({"username": guest_name, "is_registered": False, "is_admin": False, "role": "user"})
-            return redirect(url_for("dashboard"))
+            return redirect(url_for("feed"))
 
         if action == "register":
             email = request.form.get("email", "").strip()
@@ -255,7 +263,7 @@ def login():
                 conn.commit()
                 session.update({"username": username, "is_registered": True, "is_admin": False, "role": "user"})
                 flash(f"Account created! ID: {code}", "success")
-                return redirect(url_for("dashboard"))
+                return redirect(url_for("feed"))
             except:
                 flash("Username or Email exists.", "error")
             finally: conn.close()
@@ -279,7 +287,7 @@ def login():
                     
                 session.update({"username": user["username"], "is_registered": True, "is_admin": (user["role"] == "admin"), "role": user["role"]})
                 conn.close()
-                return redirect(url_for("dashboard"))
+                return redirect(url_for("feed"))
             
             conn.close()
             flash("Invalid credentials.", "error")
@@ -342,13 +350,17 @@ def request_delete():
     conn.commit()
     conn.close()
     session.clear()
-    flash("Account scheduled for deletion in 7 days. Login before that to cancel.", "warning")
+    flash("Account scheduled for deletion in 7 days.", "warning")
     return redirect(url_for("login"))
 
 # =========================================================
-# CORE ROUTES (Dashboard, Profile)
+# CORE ROUTES (Dashboard, Feed, Profile)
 # =========================================================
 @app.route("/")
+def index():
+    if "username" not in session: return redirect(url_for("login"))
+    return redirect(url_for("feed"))
+
 @app.route("/dashboard")
 def dashboard():
     if "username" not in session: return redirect(url_for("login"))
@@ -361,6 +373,47 @@ def dashboard():
     stories = c.fetchall()
     conn.close()
     return render_template("dashboard.html", trending=trending, stories=stories)
+
+@app.route("/feed")
+def feed():
+    if "username" not in session: return redirect(url_for("login"))
+    conn = get_db_connection()
+    c = conn.cursor()
+    
+    # Try getting posts from followed users first
+    c.execute("""
+        SELECT m.*, u.profile_pic, u.role 
+        FROM media m 
+        JOIN users u ON m.uploaded_by = u.username 
+        JOIN followers f ON f.following = m.uploaded_by 
+        WHERE f.follower = %s AND m.approved = 1 AND m.filename != 'SHAYARI_TEXT' 
+        ORDER BY m.id DESC LIMIT 50
+    """, (session["username"],))
+    feed_posts = c.fetchall()
+    
+    # If no followers or empty feed, show global recent feed
+    if not feed_posts:
+        c.execute("""
+            SELECT m.*, u.profile_pic, u.role 
+            FROM media m 
+            JOIN users u ON m.uploaded_by = u.username 
+            WHERE m.approved = 1 AND m.filename != 'SHAYARI_TEXT' 
+            ORDER BY m.id DESC LIMIT 30
+        """)
+        feed_posts = c.fetchall()
+
+    # Get comments
+    c.execute("SELECT c.*, u.role FROM comments c JOIN users u ON c.username = u.username ORDER BY c.id ASC")
+    comments_db = c.fetchall()
+    comments = defaultdict(list)
+    for comment in comments_db: comments[comment["media_id"]].append(comment)
+    
+    # Get user's saved/bookmarked IDs
+    c.execute("SELECT media_id FROM bookmarks WHERE username = %s", (session["username"],))
+    saved_ids = [row['media_id'] for row in c.fetchall()]
+    
+    conn.close()
+    return render_template("feed.html", posts=feed_posts, comments=comments, saved_ids=saved_ids)
 
 @app.route("/notifications")
 def notifications():
@@ -402,16 +455,27 @@ def profile():
 
     c.execute("SELECT * FROM users WHERE username = %s", (session["username"],))
     user = c.fetchone()
+    
+    # User's own uploads
     c.execute("SELECT * FROM media WHERE uploaded_by = %s ORDER BY id DESC", (session["username"],))
     my_uploads = c.fetchall()
     
+    # Network Stats
     c.execute("SELECT COUNT(*) as cnt FROM followers WHERE following = %s", (session["username"],))
     followers_count = c.fetchone()['cnt']
     c.execute("SELECT COUNT(*) as cnt FROM followers WHERE follower = %s", (session["username"],))
     following_count = c.fetchone()['cnt']
     
+    # SAVED/BOOKMARKED UPLOADS
+    c.execute("""
+        SELECT m.* FROM media m 
+        JOIN bookmarks b ON m.id = b.media_id 
+        WHERE b.username = %s ORDER BY b.id DESC
+    """, (session["username"],))
+    saved_uploads = c.fetchall()
+    
     conn.close()
-    return render_template("profile.html", user=user, my_uploads=my_uploads, post_count=len(my_uploads), followers_count=followers_count, following_count=following_count)
+    return render_template("profile.html", user=user, my_uploads=my_uploads, saved_uploads=saved_uploads, post_count=len(my_uploads), followers_count=followers_count, following_count=following_count)
 
 # =========================================================
 # PUBLIC PORTFOLIO & FOLLOW SYSTEM
@@ -470,11 +534,10 @@ def follow(username):
     c.execute("SELECT COUNT(*) as cnt FROM followers WHERE following = %s", (username,))
     followers_count = c.fetchone()['cnt']
     conn.close()
-    
     return jsonify({"followers": followers_count, "following_now": following_now})
 
 # =========================================================
-# DIRECT MESSAGING (INBOX & CHAT) - PHASE 23
+# DIRECT MESSAGING (INBOX & CHAT)
 # =========================================================
 @app.route("/inbox")
 def inbox():
@@ -482,8 +545,6 @@ def inbox():
     me = session["username"]
     conn = get_db_connection()
     c = conn.cursor()
-    
-    # Get everyone I've chatted with
     c.execute("""
         SELECT u.username, u.profile_pic, u.role 
         FROM users u 
@@ -495,7 +556,6 @@ def inbox():
     """, (me, me))
     contacts = c.fetchall()
     
-    # Get unread counts per contact
     for contact in contacts:
         c.execute("SELECT COUNT(id) as cnt FROM messages WHERE sender = %s AND receiver = %s AND is_read = FALSE", (contact['username'], me))
         contact['unread'] = c.fetchone()['cnt']
@@ -507,7 +567,6 @@ def inbox():
 def chat(username):
     if "username" not in session: return redirect(url_for("login"))
     me = session["username"]
-    
     conn = get_db_connection()
     c = conn.cursor()
     
@@ -518,7 +577,6 @@ def chat(username):
             conn.commit()
         return redirect(url_for("chat", username=username))
         
-    # Mark messages from this user as read
     c.execute("UPDATE messages SET is_read = TRUE WHERE sender = %s AND receiver = %s AND is_read = FALSE", (username, me))
     conn.commit()
     
@@ -529,10 +587,7 @@ def chat(username):
     contact = c.fetchone()
     conn.close()
     
-    if not contact:
-        flash("User not found.", "error")
-        return redirect(url_for("inbox"))
-        
+    if not contact: return redirect(url_for("inbox"))
     return render_template("chat.html", chat_history=chat_history, contact=contact)
 
 # =========================================================
@@ -620,8 +675,25 @@ def leaderboard():
     return render_template("leaderboard.html", leaders=leaders)
 
 # =========================================================
-# AI STUDIO, LIKES, COMMENTS
+# AI STUDIO, LIKES, COMMENTS, BOOKMARKS (PHASE 24)
 # =========================================================
+@app.route("/bookmark/<int:media_id>", methods=["POST"])
+def bookmark(media_id):
+    if "username" not in session: return jsonify({"error": "Login required."}), 401
+    username = session["username"]
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT id FROM bookmarks WHERE username = %s AND media_id = %s", (username, media_id))
+    if c.fetchone():
+        c.execute("DELETE FROM bookmarks WHERE username = %s AND media_id = %s", (username, media_id))
+        bookmarked = False
+    else:
+        c.execute("INSERT INTO bookmarks (username, media_id) VALUES (%s, %s)", (username, media_id))
+        bookmarked = True
+    conn.commit()
+    conn.close()
+    return jsonify({"bookmarked": bookmarked})
+
 @app.route("/ai-studio", methods=["GET", "POST"])
 def ai_studio():
     if "username" not in session: return redirect(url_for("login"))
@@ -645,7 +717,7 @@ def ai_studio():
                 conn.commit()
                 conn.close()
                 flash("Image created and saved to Photo Vault!", "success")
-                return redirect(url_for("gallery", category="Photo"))
+                return redirect(url_for("gallery", Photo))
             except:
                 flash("Image generation failed.", "error")
         else:
@@ -740,7 +812,6 @@ def admin():
     
     conn = get_db_connection()
     c = conn.cursor()
-    
     c.execute("SELECT * FROM media WHERE approved = 0 ORDER BY id DESC")
     pending_media = c.fetchall()
     c.execute("SELECT COUNT(*) as count FROM users")
@@ -752,7 +823,6 @@ def admin():
     c.execute("SELECT * FROM users ORDER BY id DESC")
     all_users = c.fetchall()
     conn.close()
-    
     return render_template("admin.html", pending_media=pending_media, user_count=user_count, media_count=media_count, likes_count=likes_count, all_users=all_users, auth_required=False)
 
 @app.route("/admin/user_action/<int:user_id>/<action>", methods=["POST"])
@@ -760,7 +830,6 @@ def admin_user_action(user_id, action):
     if not current_user_is_admin(): return redirect(url_for("admin"))
     conn = get_db_connection()
     c = conn.cursor()
-    
     if action == "ban":
         c.execute("UPDATE users SET status = 'BANNED' WHERE id = %s", (user_id,))
         flash("Agent Suspended!", "success")
@@ -773,7 +842,6 @@ def admin_user_action(user_id, action):
     elif action == "make_pro":
         c.execute("UPDATE users SET role = 'pro' WHERE id = %s", (user_id,))
         flash("Granted PRO status manually!", "success")
-        
     conn.commit()
     conn.close()
     return redirect(url_for("admin"))
