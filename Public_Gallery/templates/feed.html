@@ -35,7 +35,6 @@
                             {{ post.uploaded_by }}
                             {% if post.role == 'admin' %}<span style="color: #38bdf8; font-size: 1.1rem;" title="Verified Admin">☑️</span>{% endif %}
                         </h3>
-                        <!-- NEW: TIME AGO FILTER -->
                         <span style="font-size: 0.8rem; color: var(--text-muted);">{{ post.created_at | timeago }}</span>
                     </div>
                 </a>
@@ -56,7 +55,7 @@
             <div style="padding: 20px;">
                 <h3 style="margin: 0 0 15px 0; font-size: 1.2rem; line-height: 1.4;">{{ post.title | format_text | safe }}</h3>
                 
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
                     <div style="display: flex; gap: 10px;">
                         <button class="btn" id="like-btn-{{ post.id }}" onclick="toggleLike({{ post.id }})" style="background: transparent; border: 1px solid var(--danger); color: var(--danger); padding: 8px 15px;">
                             ❤️ <span id="like-count-{{ post.id }}">{{ post.likes }}</span>
@@ -65,6 +64,13 @@
                         <button class="btn" onclick="sharePost('{{ post.title | escape }}', '{{ url_for('agent_profile', username=post.uploaded_by, _external=True) }}')" style="background: transparent; border: 1px solid var(--accent); color: var(--accent); padding: 8px 15px;">
                             📤 Share
                         </button>
+                        
+                        <!-- NEW: TIPPING BUTTON -->
+                        {% if post.uploaded_by != session.username %}
+                        <button class="btn" onclick="tipCreator({{ post.id }})" style="background: rgba(251, 191, 36, 0.1); border: 1px solid var(--warning); color: var(--warning); padding: 8px 15px;" title="Send 10 Coins to Creator">
+                            🪙 Tip
+                        </button>
+                        {% endif %}
                     </div>
 
                     <button class="btn" id="bookmark-btn-{{ post.id }}" onclick="toggleBookmark({{ post.id }})" style="background: transparent; border: 1px solid var(--warning); color: var(--warning); padding: 8px 15px; font-size: 1.1rem;">
@@ -81,7 +87,6 @@
                                         {{ c.username }}
                                         {% if c.role == 'admin' %} <span style="font-size: 0.9rem;">☑️</span> {% endif %}
                                     </strong>: {{ c.comment_text | format_text | safe }}
-                                    <!-- TIME AGO ON COMMENTS -->
                                     <span style="font-size: 0.7rem; color: var(--text-muted); float: right;">{{ c.created_at | timeago }}</span>
                                 </div>
                             {% endfor %}
@@ -129,6 +134,24 @@ async function toggleBookmark(mediaId) {
             btn.innerHTML = data.bookmarked ? '📌 Saved' : '📍 Save';
         }
     } catch (e) { console.error("Bookmark error:", e); }
+}
+
+// NEW: JS FOR TIPPING
+async function tipCreator(mediaId) {
+    if(confirm("Send 10 Apna Coins to this creator?")) {
+        try {
+            const response = await fetch(`/tip/${mediaId}`, { method: 'POST', headers: { 'X-CSRF-Token': '{{ csrf_token() }}' } });
+            const data = await response.json();
+            if (response.ok && data.success) {
+                alert(data.msg);
+                // Update live wallet balance in navbar
+                const walletElement = document.getElementById('wallet-balance');
+                if(walletElement) { walletElement.innerText = data.new_coins; }
+            } else {
+                alert(data.error || "Failed to tip. Try again.");
+            }
+        } catch (e) { console.error("Tipping error:", e); }
+    }
 }
 
 let lastTap = 0;
