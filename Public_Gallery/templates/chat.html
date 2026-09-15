@@ -38,7 +38,7 @@
 
     <!-- CHAT BOX -->
     <div id="chat-box" style="flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; background: rgba(8,17,31,0.4);">
-        <!-- JavaScript will load messages here -->
+        <!-- JavaScript loads messages -->
     </div>
 
     <form method="POST" style="background: rgba(15,23,42,0.9); padding: 15px; border-top: 1px solid var(--border-color); display: flex; gap: 10px;">
@@ -53,6 +53,14 @@
     const contactUsername = "{{ contact.username }}";
     const myUsername = "{{ session.username }}";
     
+    // UNSEND FUNCTION
+    async function unsendMessage(msgId) {
+        if(confirm("Unsend this message?")) {
+            await fetch(`/unsend_message/${msgId}`, { method: 'POST', headers: { 'X-CSRF-Token': '{{ csrf_token() }}' } });
+            fetchMessages(); // Refresh immediately
+        }
+    }
+
     async function fetchMessages() {
         try {
             const res = await fetch(`/api/chat_history/${contactUsername}`);
@@ -60,14 +68,16 @@
             
             let html = "";
             messages.forEach(msg => {
-                // FIXED BUG: Accessing object properties correctly instead of arrays!
                 const isMe = (msg.sender === myUsername);
                 
                 if(isMe) {
                     html += `
-                    <div style="align-self: flex-end; background: var(--accent); color: #000; padding: 10px 15px; border-radius: 15px 15px 0 15px; max-width: 70%; word-wrap: break-word; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
-                        <p style="margin: 0; font-size: 1rem; font-weight: 500;">${msg.message}</p>
-                        <span style="font-size: 0.7rem; color: rgba(0,0,0,0.6); display: block; text-align: right; margin-top: 5px;">${msg.time}</span>
+                    <div style="align-self: flex-end; display: flex; align-items: center; gap: 8px;">
+                        <span onclick="unsendMessage(${msg.id})" style="cursor: pointer; font-size: 0.9rem; opacity: 0.6;" title="Unsend">🗑️</span>
+                        <div style="background: var(--accent); color: #000; padding: 10px 15px; border-radius: 15px 15px 0 15px; max-width: 70%; word-wrap: break-word; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
+                            <p style="margin: 0; font-size: 1rem; font-weight: 500;">${msg.message}</p>
+                            <span style="font-size: 0.7rem; color: rgba(0,0,0,0.6); display: block; text-align: right; margin-top: 5px;">${msg.time}</span>
+                        </div>
                     </div>`;
                 } else {
                     html += `
@@ -78,23 +88,16 @@
                 }
             });
             
-            if(html === "") {
-                html = `<p style="text-align: center; color: var(--text-muted); font-size: 0.9rem; margin-top: auto; margin-bottom: auto;">Say hi to start a secure conversation! 🔒</p>`;
-            }
+            if(html === "") html = `<p style="text-align: center; color: var(--text-muted); font-size: 0.9rem; margin-top: auto; margin-bottom: auto;">Say hi to start a secure conversation! 🔒</p>`;
             
-            // Auto scroll ONLY if there are new messages
             if(chatBox.innerHTML !== html) {
                 chatBox.innerHTML = html;
                 chatBox.scrollTop = chatBox.scrollHeight;
             }
-            
         } catch(e) { console.error("Chat sync error", e); }
     }
 
-    // Fetch immediately on load
     fetchMessages();
-    
-    // Auto-refresh chat every 3 seconds
     setInterval(fetchMessages, 3000);
 </script>
 {% endblock %}
