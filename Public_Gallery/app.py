@@ -70,7 +70,7 @@ def timeago(dt):
     else: return f"{int(seconds/86400)}d ago"
 
 # =========================================================
-# DATABASE AUTO-HEALER (PHASE 40: PRIVACY ENGINE)
+# DATABASE AUTO-HEALER
 # =========================================================
 def upgrade_db():
     conn = get_db_connection()
@@ -87,7 +87,6 @@ def upgrade_db():
     try:
         c.execute("ALTER TABLE media ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
         c.execute("ALTER TABLE comments ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
-        # NEW: PRIVACY COLUMN
         c.execute("ALTER TABLE media ADD COLUMN IF NOT EXISTS visibility VARCHAR(20) DEFAULT 'public'")
         conn.commit()
     except: conn.rollback()
@@ -104,8 +103,7 @@ def upgrade_db():
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS country VARCHAR(100)",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_pic TEXT",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS theme VARCHAR(20) DEFAULT 'cyan'",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS cover_pic TEXT",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS coins INTEGER DEFAULT 50"
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS cover_pic TEXT"
     ]
     for q in queries:
         try: c.execute(q); conn.commit()
@@ -115,7 +113,6 @@ def upgrade_db():
         c.execute("UPDATE users SET role = 'user' WHERE role IS NULL")
         c.execute("UPDATE users SET status = 'ACTIVE' WHERE status IS NULL")
         c.execute("UPDATE users SET theme = 'cyan' WHERE theme IS NULL")
-        # Set old posts to public by default
         c.execute("UPDATE media SET visibility = 'public' WHERE visibility IS NULL")
         conn.commit()
     except: conn.rollback()
@@ -202,6 +199,20 @@ def save_uploaded_file(file, category="Photo"):
         print(f"Cloudinary Error: {e}")
         return None
 
+def send_otp_email(to_email, otp):
+    sender = os.environ.get("SMTP_EMAIL")
+    password = os.environ.get("SMTP_PASSWORD")
+    if not sender or not password: return True 
+    try:
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login(sender, password)
+        msg = f"Subject: Apna Gallery Verification\n\nYour OTP is: {otp}\nDo not share this with anyone."
+        server.sendmail(sender, to_email, msg)
+        server.quit()
+        return True
+    except: return False
+
 def current_user_is_admin():
     return session.get("role") == "admin"
 
@@ -279,6 +290,25 @@ def login():
             
     return render_template("login.html")
 
+@app.route("/verify_otp", methods=["GET", "POST"])
+def verify_otp():
+    if 'reset_email' not in session: return redirect(url_for("login"))
+    if request.method == "POST":
+        otp = request.form.get("otp")
+        new_pass = request.form.get("new_password")
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT * FROM users WHERE email = %s AND otp = %s", (session['reset_email'], otp))
+        if c.fetchone():
+            c.execute("UPDATE users SET password = %s, otp = NULL WHERE email = %s", (generate_password_hash(new_pass), session['reset_email']))
+            conn.commit()
+            session.pop('reset_email', None)
+            flash("Password updated successfully!", "success")
+            return redirect(url_for("login"))
+        flash("Invalid OTP.", "error")
+        conn.close()
+    return render_template("verify_otp.html")
+
 @app.route("/logout")
 def logout():
     session.clear()
@@ -321,7 +351,7 @@ def upload_asset():
     if "username" not in session: return redirect(url_for("login"))
     category = request.form.get("category", "Photo")
     title = request.form.get("title", "Untitled")
-    visibility = request.form.get("visibility", "public") # NEW: Privacy Control
+    visibility = request.form.get("visibility", "public")
     file = request.files.get("media")
     filename = "SHAYARI_TEXT"
 
@@ -365,7 +395,7 @@ def api_network(action_type, username):
     return jsonify(results)
 
 # =========================================================
-# CORE ROUTES (DUAL FEED WITH PRIVACY FILTERS)
+# CORE ROUTES (DUAL FEED)
 # =========================================================
 @app.route("/")
 def index():
@@ -380,11 +410,9 @@ def feed():
     tab = request.args.get("tab", "foryou")
     
     if tab == "global":
-        # Global Feed: Only show 'public' posts
         c.execute("SELECT m.*, u.profile_pic, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' ORDER BY m.id DESC LIMIT 50")
         feed_posts = c.fetchall()
     else:
-        # For You Feed: Show posts from people you follow (Public + Followers Only)
         c.execute("""
             SELECT m.*, u.profile_pic, u.role 
             FROM media m JOIN users u ON m.uploaded_by = u.username 
@@ -394,7 +422,6 @@ def feed():
         """, (session["username"],))
         feed_posts = c.fetchall()
         if not feed_posts:
-            # Fallback
             c.execute("SELECT m.*, u.profile_pic, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' ORDER BY m.id DESC LIMIT 10")
             feed_posts = c.fetchall()
 
@@ -414,7 +441,6 @@ def explore():
     if "username" not in session: return redirect(url_for("login"))
     conn = get_db_connection()
     c = conn.cursor()
-    # Explore only shows public assets
     c.execute("SELECT m.id, m.filename, m.title, m.category, m.likes, m.uploaded_by FROM media m WHERE m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' ORDER BY RANDOM() LIMIT 40")
     explore_posts = c.fetchall()
     conn.close()
@@ -440,9 +466,11 @@ def dashboard():
     sync_admin_session()
     conn = get_db_connection()
     c = conn.cursor()
-    # Trending only shows public
-    c.execute("SELECT * FROM media WHERE approved = 1 AND m.visibility = 'public' AND filename != 'SHAYARI_TEXT' ORDER BY likes DESC LIMIT 3")
+    
+    # 💥 BUG FIX: Fixed the SQL Error (m.visibility without alias)
+    c.execute("SELECT * FROM media WHERE approved = 1 AND visibility = 'public' AND filename != 'SHAYARI_TEXT' ORDER BY likes DESC LIMIT 3")
     trending = c.fetchall()
+    
     c.execute("SELECT s.*, u.profile_pic, u.role FROM stories s JOIN users u ON s.username = u.username WHERE s.created_at >= NOW() - INTERVAL '12 hours' ORDER BY s.id DESC")
     stories = c.fetchall()
     conn.close()
@@ -482,7 +510,6 @@ def profile():
 
     c.execute("SELECT * FROM users WHERE username = %s", (session["username"],))
     user = c.fetchone()
-    # User can see ALL their own media regardless of visibility
     c.execute("SELECT * FROM media WHERE uploaded_by = %s ORDER BY id DESC", (session["username"],))
     my_uploads = c.fetchall()
     
@@ -498,7 +525,7 @@ def profile():
     return render_template("profile.html", user=user, my_uploads=my_uploads, saved_uploads=saved_uploads, post_count=len(my_uploads), followers_count=followers_count, following_count=following_count)
 
 # =========================================================
-# PUBLIC PORTFOLIO WITH PRIVACY CHECK
+# PUBLIC PORTFOLIO & FOLLOW SYSTEM
 # =========================================================
 @app.route("/agent/<username>")
 def agent_profile(username):
@@ -515,7 +542,6 @@ def agent_profile(username):
     c.execute("SELECT id FROM followers WHERE follower = %s AND following = %s", (session["username"], username))
     is_following = bool(c.fetchone())
     
-    # PRIVACY CHECK: If following, show public + followers. Else, show only public. Private is hidden.
     if is_following:
         c.execute("SELECT m.*, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.uploaded_by = %s AND m.approved = 1 AND m.visibility IN ('public', 'followers') AND m.filename != 'SHAYARI_TEXT' ORDER BY m.id DESC", (username,))
     else:
@@ -650,6 +676,28 @@ def api_global_chat_history():
     conn.close()
     formatted = [{"id": r['id'], "sender": r['sender'], "message": r['message'], "time": r['time'], "role": r['role']} for r in history]
     return jsonify(formatted)
+
+# =========================================================
+# 💥 THE MISSING SEARCH ROUTE FIX 💥
+# =========================================================
+@app.route("/search")
+def search():
+    if "username" not in session: return redirect(url_for("login"))
+    query = request.args.get("q", "").strip()
+    if not query: return redirect(url_for("dashboard"))
+    
+    conn = get_db_connection()
+    c = conn.cursor()
+    clean_query = query.replace("#", "").replace("@", "")
+    search_term = f"%{clean_query}%"
+    
+    c.execute("SELECT m.*, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' AND (m.title ILIKE %s OR m.prompt ILIKE %s) ORDER BY m.id DESC", (search_term, search_term))
+    media_files = c.fetchall()
+    
+    c.execute("SELECT username, profile_pic, role, bio FROM users WHERE username ILIKE %s LIMIT 20", (search_term,))
+    found_users = c.fetchall()
+    conn.close()
+    return render_template("search.html", media_files=media_files, found_users=found_users, query=query)
 
 # =========================================================
 # LIKES, COMMENTS, BOOKMARKS, AI STUDIO, & REPORTS
