@@ -43,7 +43,7 @@ app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "development-only-secret
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
 
 # =========================================================
-# DATABASE AUTO-HEALER
+# DATABASE AUTO-HEALER & ECONOMY UPGRADE (PHASE 26)
 # =========================================================
 def upgrade_db():
     conn = get_db_connection()
@@ -65,7 +65,10 @@ def upgrade_db():
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) DEFAULT 'user'",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS country VARCHAR(100)",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_pic TEXT"
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_pic TEXT",
+        # NEW: ECONOMY & THEMES
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS coins INTEGER DEFAULT 50",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS theme VARCHAR(20) DEFAULT 'cyan'"
     ]
     for q in queries:
         try:
@@ -77,6 +80,8 @@ def upgrade_db():
     try:
         c.execute("UPDATE users SET role = 'user' WHERE role IS NULL")
         c.execute("UPDATE users SET status = 'ACTIVE' WHERE status IS NULL")
+        c.execute("UPDATE users SET coins = 50 WHERE coins IS NULL")
+        c.execute("UPDATE users SET theme = 'cyan' WHERE theme IS NULL")
         conn.commit()
     except: conn.rollback()
 
@@ -133,7 +138,7 @@ def update_activity():
 
 @app.context_processor
 def inject_global_vars():
-    vars_dict = {"csrf_token": get_csrf_token, "unread_notifications": 0, "unread_messages": 0}
+    vars_dict = {"csrf_token": get_csrf_token, "unread_notifications": 0, "unread_messages": 0, "my_coins": 0, "my_theme": "cyan"}
     if session.get("username"):
         try:
             conn = get_db_connection()
@@ -145,6 +150,12 @@ def inject_global_vars():
             c.execute("SELECT COUNT(id) as cnt FROM messages WHERE receiver = %s AND is_read = FALSE", (session.get("username"),))
             res2 = c.fetchone()
             if res2: vars_dict["unread_messages"] = res2['cnt']
+            
+            c.execute("SELECT coins, theme FROM users WHERE username = %s", (session.get("username"),))
+            u_data = c.fetchone()
+            if u_data:
+                vars_dict["my_coins"] = u_data["coins"]
+                vars_dict["my_theme"] = u_data["theme"]
             conn.close()
         except: pass
     return vars_dict
@@ -201,7 +212,7 @@ def login():
             code = ''.join(secrets.choice("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ") for _ in range(10))
             conn = get_db_connection()
             c = conn.cursor()
-            c.execute("INSERT INTO users (username, password, user_code, role) VALUES (%s, %s, %s, 'user')", (guest_name, "guest", code))
+            c.execute("INSERT INTO users (username, password, user_code, role, coins) VALUES (%s, %s, %s, 'user', 50)", (guest_name, "guest", code))
             conn.commit()
             conn.close()
             session.update({"username": guest_name, "is_registered": False, "is_admin": False, "role": "user"})
@@ -213,11 +224,11 @@ def login():
             try:
                 conn = get_db_connection()
                 c = conn.cursor()
-                c.execute("INSERT INTO users (username, email, password, user_code, role) VALUES (%s, %s, %s, %s, 'user')", 
+                c.execute("INSERT INTO users (username, email, password, user_code, role, coins) VALUES (%s, %s, %s, %s, 'user', 50)", 
                           (username, email, generate_password_hash(password), code))
                 conn.commit()
                 session.update({"username": username, "is_registered": True, "is_admin": False, "role": "user"})
-                flash(f"Account created! ID: {code}", "success")
+                flash(f"Account created! ID: {code}. You received 50 Apna Coins!", "success")
                 return redirect(url_for("feed"))
             except:
                 flash("Username or Email exists.", "error")
@@ -237,7 +248,7 @@ def login():
                 if user.get("deletion_requested"):
                     c.execute("UPDATE users SET deletion_requested = NULL WHERE id = %s", (user['id'],))
                     conn.commit()
-                    flash("Welcome back! Account deletion cancelled.", "success")
+                    flash("Account deletion cancelled.", "success")
                     
                 session.update({"username": user["username"], "is_registered": True, "is_admin": (user["role"] == "admin"), "role": user["role"]})
                 conn.close()
@@ -278,16 +289,11 @@ def verify_otp():
             c.execute("UPDATE users SET password = %s, otp = NULL WHERE email = %s", (generate_password_hash(new_pass), session['reset_email']))
             conn.commit()
             session.pop('reset_email', None)
-            flash("Password updated successfully! You can now login.", "success")
+            flash("Password updated successfully!", "success")
             return redirect(url_for("login"))
         flash("Invalid OTP.", "error")
         conn.close()
-    return render_template_string("""
-    <div style="max-width:400px; margin: 100px auto; background:#101b2d; padding:30px; border-radius:12px; color:white; text-align:center;">
-        <h2 style="color:#38bdf8;">Enter OTP</h2>
-        <form method="POST"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="text" name="otp" placeholder="6-Digit OTP" required style="width:100%; padding:10px; margin-bottom:15px; border-radius:6px;"><br><input type="password" name="new_password" placeholder="New Password" required style="width:100%; padding:10px; margin-bottom:15px; border-radius:6px;"><br><button type="submit" style="background:#38bdf8; color:black; padding:10px 20px; border:none; border-radius:6px; cursor:pointer;">Reset Password</button></form>
-    </div>
-    """)
+    return render_template_string("""<div style="max-width:400px; margin: 100px auto; background:#101b2d; padding:30px; border-radius:12px; color:white; text-align:center;"><h2 style="color:#38bdf8;">Enter OTP</h2><form method="POST"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="text" name="otp" placeholder="6-Digit OTP" required style="width:100%; padding:10px; margin-bottom:15px; border-radius:6px;"><br><input type="password" name="new_password" placeholder="New Password" required style="width:100%; padding:10px; margin-bottom:15px; border-radius:6px;"><br><button type="submit" style="background:#38bdf8; color:black; padding:10px 20px; border:none; border-radius:6px; cursor:pointer;">Reset Password</button></form></div>""")
 
 @app.route("/logout")
 def logout():
@@ -307,7 +313,7 @@ def request_delete():
     return redirect(url_for("login"))
 
 # =========================================================
-# CORE ROUTES (Feed, Explore, Dashboard, Studio)
+# CORE ROUTES
 # =========================================================
 @app.route("/")
 def index():
@@ -349,13 +355,7 @@ def explore():
     if "username" not in session: return redirect(url_for("login"))
     conn = get_db_connection()
     c = conn.cursor()
-    # Fetch random 40 public posts for explore grid
-    c.execute("""
-        SELECT m.id, m.filename, m.title, m.category, m.likes, m.uploaded_by 
-        FROM media m 
-        WHERE m.approved = 1 AND m.filename != 'SHAYARI_TEXT' 
-        ORDER BY RANDOM() LIMIT 40
-    """)
+    c.execute("SELECT m.id, m.filename, m.title, m.category, m.likes, m.uploaded_by FROM media m WHERE m.approved = 1 AND m.filename != 'SHAYARI_TEXT' ORDER BY RANDOM() LIMIT 40")
     explore_posts = c.fetchall()
     conn.close()
     return render_template("explore.html", posts=explore_posts)
@@ -365,16 +365,12 @@ def creator_studio():
     if "username" not in session: return redirect(url_for("login"))
     conn = get_db_connection()
     c = conn.cursor()
-    
     c.execute("SELECT COUNT(id) as total_posts, COALESCE(SUM(likes), 0) as total_likes FROM media WHERE uploaded_by = %s", (session["username"],))
     stats = c.fetchone()
-    
     c.execute("SELECT COUNT(*) as followers FROM followers WHERE following = %s", (session["username"],))
     followers = c.fetchone()['followers']
-    
     c.execute("SELECT * FROM media WHERE uploaded_by = %s ORDER BY id DESC", (session["username"],))
     my_media = c.fetchall()
-    
     conn.close()
     return render_template("creator.html", stats=stats, followers=followers, my_media=my_media)
 
@@ -415,6 +411,11 @@ def profile():
             c.execute("UPDATE users SET bio = %s, country = %s WHERE username = %s", 
                       (request.form.get("bio", ""), request.form.get("country", "India"), session["username"]))
             flash("Profile updated!", "success")
+        elif action == "theme" and session.get("role") in ["pro", "admin"]:
+            theme = request.form.get("theme", "cyan")
+            if theme in ["cyan", "gold", "rose", "matrix"]:
+                c.execute("UPDATE users SET theme = %s WHERE username = %s", (theme, session["username"]))
+                flash("PRO Theme applied successfully!", "success")
         elif action == "avatar" and "profile_pic" in request.files:
             url = save_uploaded_file(request.files["profile_pic"], "Photo")
             if url: c.execute("UPDATE users SET profile_pic = %s WHERE username = %s", (url, session["username"]))
@@ -514,7 +515,6 @@ def inbox():
         WHERE u.username IN (SELECT receiver FROM messages WHERE sender = %s UNION SELECT sender FROM messages WHERE receiver = %s)
     """, (me, me))
     contacts = c.fetchall()
-    
     for contact in contacts:
         c.execute("SELECT COUNT(id) as cnt FROM messages WHERE sender = %s AND receiver = %s AND is_read = FALSE", (contact['username'], me))
         contact['unread'] = c.fetchone()['cnt']
@@ -527,24 +527,19 @@ def chat(username):
     me = session["username"]
     conn = get_db_connection()
     c = conn.cursor()
-    
     if request.method == "POST":
         msg = request.form.get("message", "").strip()
         if msg:
             c.execute("INSERT INTO messages (sender, receiver, message) VALUES (%s, %s, %s)", (me, username, msg))
             conn.commit()
         return redirect(url_for("chat", username=username))
-        
     c.execute("UPDATE messages SET is_read = TRUE WHERE sender = %s AND receiver = %s AND is_read = FALSE", (username, me))
     conn.commit()
-    
     c.execute("SELECT * FROM messages WHERE (sender = %s AND receiver = %s) OR (sender = %s AND receiver = %s) ORDER BY created_at ASC", (me, username, username, me))
     chat_history = c.fetchall()
-    
     c.execute("SELECT username, profile_pic, role FROM users WHERE username = %s", (username,))
     contact = c.fetchone()
     conn.close()
-    
     if not contact: return redirect(url_for("inbox"))
     return render_template("chat.html", chat_history=chat_history, contact=contact)
 
@@ -633,7 +628,7 @@ def leaderboard():
     return render_template("leaderboard.html", leaders=leaders)
 
 # =========================================================
-# AI STUDIO, LIKES, COMMENTS, BOOKMARKS
+# AI STUDIO (COSTS COINS), LIKES, COMMENTS, BOOKMARKS
 # =========================================================
 @app.route("/bookmark/<int:media_id>", methods=["POST"])
 def bookmark(media_id):
@@ -662,20 +657,39 @@ def ai_studio():
         wants_image = any(word in prompt.lower() for word in trigger_words)
         
         if wants_image:
+            user_role = session.get("role", "user")
+            conn = get_db_connection()
+            c = conn.cursor()
+            
+            # PHASE 26: Coin Economy System
+            if user_role not in ["pro", "admin"]:
+                c.execute("SELECT coins FROM users WHERE username = %s", (session["username"],))
+                coins = c.fetchone()['coins']
+                if coins < 5:
+                    flash("Not enough Apna Coins (Costs 5). Upgrade to PRO for infinite coins!", "error")
+                    conn.close()
+                    return redirect(url_for("pro_upgrade"))
+                c.execute("UPDATE users SET coins = coins - 5 WHERE username = %s", (session["username"],))
+                conn.commit()
+
             encoded_prompt = urllib.parse.quote(prompt)
             image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?nologo=true"
             try:
                 r = requests.get(image_url, timeout=15)
                 secure_url = cloudinary.uploader.upload(r.content, resource_type="image")["secure_url"] if r.status_code == 200 else image_url
-                conn = get_db_connection()
-                c = conn.cursor()
                 c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved) VALUES (%s, %s, %s, %s, %s, 1)",
                           (secure_url, f"AI: {prompt[:20]}...", "Photo", prompt, session["username"]))
                 conn.commit()
                 conn.close()
-                flash("Image created and saved to Photo Vault!", "success")
+                flash("Image created! (-5 Coins)", "success")
                 return redirect(url_for("gallery", category="Photo"))
-            except: flash("Image generation failed.", "error")
+            except: 
+                # Refund coins if failed
+                if user_role not in ["pro", "admin"]:
+                    c.execute("UPDATE users SET coins = coins + 5 WHERE username = %s", (session["username"],))
+                    conn.commit()
+                conn.close()
+                flash("Image generation failed.", "error")
         else:
             try: reply = get_ai_response(prompt)
             except: reply = "I am currently offline."
