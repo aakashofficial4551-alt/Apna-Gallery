@@ -533,6 +533,45 @@ def mystery():
     flash("Incorrect code.", "error")
     return redirect(url_for("dashboard"))
 
+# =========================================================
+# ROUTES: SEARCH & LEADERBOARD (PHASE 16)
+# =========================================================
+@app.route("/search")
+def search():
+    if "username" not in session: return redirect(url_for("login"))
+    query = request.args.get("q", "").strip()
+    if not query: return redirect(url_for("dashboard"))
+    
+    conn = get_db_connection()
+    c = conn.cursor()
+    search_term = f"%{query}%"
+    # Title ya Prompt mein search karega (ILIKE means case-insensitive in Postgres)
+    c.execute("SELECT * FROM media WHERE approved = 1 AND filename != 'SHAYARI_TEXT' AND (title ILIKE %s OR prompt ILIKE %s) ORDER BY id DESC", (search_term, search_term))
+    media_files = c.fetchall()
+    
+    c.execute("SELECT * FROM comments ORDER BY id ASC")
+    comments_db = c.fetchall()
+    conn.close()
+    
+    comments = defaultdict(list)
+    for comment in comments_db: comments[comment["media_id"]].append(comment)
+    
+    return render_template("search.html", media_files=media_files, query=query, comments=comments)
+
+@app.route("/leaderboard")
+def leaderboard():
+    if "username" not in session: return redirect(url_for("login"))
+    conn = get_db_connection()
+    c = conn.cursor()
+    # Find top users based on Total Likes
+    c.execute("""
+        SELECT uploaded_by as username, COUNT(id) as total_uploads, COALESCE(SUM(likes), 0) as total_likes 
+        FROM media WHERE approved = 1 GROUP BY uploaded_by ORDER BY total_likes DESC
+    """)
+    leaders = c.fetchall()
+    conn.close()
+    return render_template("leaderboard.html", leaders=leaders)
+
 @app.errorhandler(404)
 def not_found_error(error): return render_template("404.html"), 404
 @app.errorhandler(500)
