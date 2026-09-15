@@ -411,7 +411,8 @@ def admin_audit_logs():
     c.execute("SELECT * FROM audit_logs ORDER BY id DESC LIMIT 100")
     logs = c.fetchall()
     conn.close()
-    return render_template("admin.html") # Note: In production you should make an audit.html template for this
+    
+    return render_template("audit_logs.html", logs=logs)
 
 @app.route("/approve/<int:id>", methods=["GET", "POST"])
 def approve(id):
