@@ -38,6 +38,7 @@
             <div style="height: 120px; background: #000; border-radius: 8px; margin-bottom: 10px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
                 {% if item.category == 'Photo' %}<img src="{{ item.filename }}" style="width: 100%; height: 100%; object-fit: cover;">
                 {% elif item.category == 'Video' %}<video src="{{ item.filename }}" style="width: 100%; height: 100%; object-fit: cover;"></video>
+                {% elif item.category == 'Music' %}<span style="font-size: 2.5rem;">🎵</span>
                 {% else %}<span style="font-size: 2.5rem;">📁</span>{% endif %}
             </div>
             <p style="margin: 0; font-weight: bold; font-size: 0.9rem; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ item.title }}</p>
@@ -71,65 +72,45 @@
     </a>
 </div>
 
-<!-- NEW: INSTAGRAM STYLE STORY VIEWER -->
+<!-- INSTAGRAM STYLE STORY VIEWER -->
 <div id="storyViewer" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 10000; flex-direction: column;">
-    
-    <!-- Progress Bar Area -->
     <div style="position: absolute; top: 15px; left: 15px; right: 15px; display: flex; gap: 5px;">
         <div style="flex: 1; height: 3px; background: rgba(255,255,255,0.3); border-radius: 2px; overflow: hidden;">
             <div id="storyProgress" style="height: 100%; width: 0%; background: white;"></div>
         </div>
     </div>
-
-    <!-- User Info Overlay -->
     <div style="position: absolute; top: 30px; left: 15px; display: flex; align-items: center; gap: 10px; z-index: 10001;">
         <img id="storyProfile" src="" style="width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--accent); object-fit: cover;">
         <span id="storyUser" style="color: white; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.8); font-size: 1.1rem;"></span>
     </div>
-
-    <!-- Close Button -->
     <span onclick="closeStory()" style="position: absolute; top: 25px; right: 20px; font-size: 2.5rem; color: white; cursor: pointer; text-shadow: 0 2px 4px rgba(0,0,0,0.8); z-index: 10001;">&times;</span>
-    
-    <!-- Story Image Media -->
     <img id="storyImg" src="" style="width: 100%; height: 100%; object-fit: contain;">
 </div>
 
 <script>
     let storyTimer;
-    
     function openInstaStory(imgSrc, username, profilePic) {
         document.getElementById('storyViewer').style.display = 'flex';
         document.getElementById('storyImg').src = imgSrc;
         document.getElementById('storyUser').innerText = username;
-        
         if (profilePic && profilePic !== '') {
             document.getElementById('storyProfile').src = profilePic;
             document.getElementById('storyProfile').style.display = 'block';
         } else {
-            // Default placeholder if no profile pic
             document.getElementById('storyProfile').src = 'https://placehold.co/100x100/1e293b/ffffff.png?text=' + username.charAt(0).toUpperCase();
         }
-        
-        // Progress bar animation reset & start
         const progress = document.getElementById('storyProgress');
         progress.style.transition = 'none';
         progress.style.width = '0%';
-        
         setTimeout(() => {
             progress.style.transition = 'width 5s linear';
             progress.style.width = '100%';
         }, 50);
-
-        // Auto close after 5 seconds
         storyTimer = setTimeout(closeStory, 5000);
     }
-    
     function closeStory() {
         document.getElementById('storyViewer').style.display = 'none';
         clearTimeout(storyTimer);
-        const progress = document.getElementById('storyProgress');
-        progress.style.transition = 'none';
-        progress.style.width = '0%';
     }
 </script>
 {% endblock %}
