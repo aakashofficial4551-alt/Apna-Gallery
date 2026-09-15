@@ -1,10 +1,9 @@
 {% extends "base.html" %}
-
 {% block title %}Admin HQ | Apna Gallery{% endblock %}
 
 {% block head %}
 <style>
-    .admin-container { text-align: center; margin-top: 50px; }
+    .admin-container { text-align: center; margin-top: 30px; }
     .admin-card { background: var(--bg-card); border: 1px solid var(--border-color); padding: 40px; border-radius: 16px; display: inline-block; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
     .passcode-input { padding: 12px; width: 250px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(8, 17, 31, 0.6); color: white; text-align: center; font-size: 1.2rem; margin-bottom: 20px; outline: none; }
     
@@ -42,7 +41,7 @@
                 <h1 style="color: var(--warning); margin: 0;">⚡ Commander HQ Dashboard</h1>
             </div>
 
-            <!-- Admin Analytics -->
+            <!-- Stats -->
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 40px;">
                 <div style="background: rgba(8, 17, 31, 0.5); border: 1px solid var(--border-color); padding: 20px; border-radius: 12px; text-align: center;">
                     <h3 style="margin: 0; color: var(--text-muted); font-size: 1rem;">Total Agents</h3>
@@ -58,8 +57,40 @@
                 </div>
             </div>
 
+            <!-- NEW: REPORTED ASSETS -->
+            <h2 style="color: var(--danger); margin-bottom: 20px;">🚩 Reported Assets (Moderation)</h2>
+            {% for r in reports %}
+                <div class="media-row" style="border-left: 4px solid var(--danger);">
+                    <div class="media-info">
+                        <div class="media-preview">
+                            {% if r.category == 'Photo' %}<img src="{{ r.filename }}">
+                            {% elif r.category == 'Video' %}<video src="{{ r.filename }}"></video>
+                            {% else %}<span style="font-size: 2rem;">📄</span>{% endif %}
+                        </div>
+                        <div>
+                            <h3 style="margin: 0 0 5px 0; color: var(--text-main);">{{ r.title }}</h3>
+                            <p style="margin: 0; font-size: 0.85rem; color: var(--text-muted);">
+                                Reported by <strong>{{ r.reported_by }}</strong> on {{ r.created_at.strftime('%Y-%m-%d') }}
+                            </p>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <form method="POST" action="{{ url_for('dismiss_report', report_id=r.report_id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn" style="background: rgba(34, 197, 94, 0.2); border: 1px solid var(--success); color: var(--success);">Dismiss</button>
+                        </form>
+                        <form method="POST" action="{{ url_for('delete', id=r.media_id) }}" onsubmit="return confirm('Permanently delete this asset?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn" style="background: rgba(239, 68, 68, 0.2); border: 1px solid var(--danger); color: var(--danger);">Delete Asset</button>
+                        </form>
+                    </div>
+                </div>
+            {% else %}
+                <p style="color: var(--text-muted); font-style: italic; background: rgba(8, 17, 31, 0.3); padding: 20px; border-radius: 10px;">No pending reports. Platform is clean. ✅</p>
+            {% endfor %}
+
             <!-- Pending Asset Approvals -->
-            <h2 style="color: var(--accent); margin-bottom: 20px;">⏳ Pending Asset Approvals</h2>
+            <h2 style="color: var(--accent); margin-bottom: 20px; margin-top: 40px;">⏳ Pending Approvals</h2>
             {% for item in pending_media %}
                 <div class="media-row">
                     <div class="media-info">
@@ -90,7 +121,6 @@
                 <p style="color: var(--text-muted); font-style: italic; background: rgba(8, 17, 31, 0.3); padding: 20px; border-radius: 10px;">No pending assets. HQ is clear.</p>
             {% endfor %}
             
-            <!-- GOD MODE (USER MANAGEMENT) -->
             <h2 style="color: var(--warning); margin-top: 50px; margin-bottom: 20px;">🛡️ God Mode: Agent Management</h2>
             <div style="overflow-x: auto;">
                 <table class="users-table">
@@ -108,11 +138,7 @@
                         <tr>
                             <td style="color: var(--text-muted);">#{{ u.id }}</td>
                             <td style="font-weight: bold; color: white;">{{ u.username or 'Unknown' }}</td>
-                            
-                            <!-- SAFE RENDER: Uses 'USER' if role is missing -->
                             <td style="color: var(--accent);">{{ (u.role or 'USER') | upper }}</td>
-                            
-                            <!-- SAFE RENDER: Uses 'ACTIVE' if status is missing -->
                             <td>
                                 {% if (u.status or 'ACTIVE') == 'BANNED' %}
                                     <span class="badge-banned">BANNED</span>
