@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Explore | Apna Gallery{% endblock %}
+
+{% block content %}
+<div style="text-align: center; margin-bottom: 30px;">
+    <h1 style="color: var(--accent); margin: 0;">🌍 Discover Assets</h1>
+    <p style="color: var(--text-muted);">Trending and random public uploads from the global network.</p>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px;">
+    {% for post in posts %}
+    <a href="{{ url_for('agent_profile', username=post.uploaded_by) }}" style="display: block; position: relative; height: 250px; border-radius: 12px; overflow: hidden; background: #000; text-decoration: none; border: 1px solid var(--border-color); transition: transform 0.3s;" onmouseover="this.style.transform='scale(1.05)'; this.children[1].style.opacity='1';" onmouseout="this.style.transform='scale(1)'; this.children[1].style.opacity='0';">
+        
+        <!-- Media -->
+        {% if post.category == 'Photo' %}
+            <img src="{{ post.filename }}" style="width: 100%; height: 100%; object-fit: cover; opacity: 0.8;">
+        {% elif post.category == 'Video' %}
+            <video src="{{ post.filename }}" style="width: 100%; height: 100%; object-fit: cover; opacity: 0.8;"></video>
+        {% else %}
+            <div style="width: 100%; height: 100%; display: grid; place-items: center; font-size: 3rem;">📁</div>
+        {% endif %}
+        
+        <!-- Hover Overlay -->
+        <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); opacity: 0; transition: 0.3s; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white;">
+            <p style="font-weight: bold; margin: 0 0 10px 0; font-size: 1.1rem;">{{ post.title }}</p>
+            <p style="margin: 0; color: var(--danger); font-weight: bold;">❤️ {{ post.likes }}</p>
+            <p style="margin: 5px 0 0 0; font-size: 0.85rem; color: var(--accent);">By {{ post.uploaded_by }}</p>
+        </div>
+    </a>
+    {% else %}
+    <div style="grid-column: 1/-1; text-align: center; padding: 50px; color: var(--text-muted);">
+        <span style="font-size: 4rem;">🏜️</span>
+        <h2>The grid is empty.</h2>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
