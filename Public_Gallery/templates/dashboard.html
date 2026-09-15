@@ -72,19 +72,27 @@
     </a>
 </div>
 
-<!-- INSTAGRAM STYLE STORY VIEWER -->
+<!-- INSTAGRAM STYLE STORY VIEWER WITH DIRECT MESSAGE REPLY -->
 <div id="storyViewer" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 10000; flex-direction: column;">
     <div style="position: absolute; top: 15px; left: 15px; right: 15px; display: flex; gap: 5px;">
         <div style="flex: 1; height: 3px; background: rgba(255,255,255,0.3); border-radius: 2px; overflow: hidden;">
             <div id="storyProgress" style="height: 100%; width: 0%; background: white;"></div>
         </div>
     </div>
+    
     <div style="position: absolute; top: 30px; left: 15px; display: flex; align-items: center; gap: 10px; z-index: 10001;">
         <img id="storyProfile" src="" style="width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--accent); object-fit: cover;">
         <span id="storyUser" style="color: white; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.8); font-size: 1.1rem;"></span>
     </div>
     <span onclick="closeStory()" style="position: absolute; top: 25px; right: 20px; font-size: 2.5rem; color: white; cursor: pointer; text-shadow: 0 2px 4px rgba(0,0,0,0.8); z-index: 10001;">&times;</span>
+    
     <img id="storyImg" src="" style="width: 100%; height: 100%; object-fit: contain;">
+
+    <!-- NEW: STORY REPLY BOX -->
+    <div style="position: absolute; bottom: 20px; left: 20px; right: 20px; display: flex; gap: 10px; z-index: 10001;">
+        <input type="text" id="storyReplyInput" placeholder="Reply to story..." autocomplete="off" style="flex: 1; padding: 12px 20px; border-radius: 25px; border: 1px solid rgba(255,255,255,0.3); background: rgba(0,0,0,0.5); color: white; outline: none; backdrop-filter: blur(5px);">
+        <button onclick="sendStoryReply()" style="background: var(--accent); color: #000; border: none; width: 45px; height: 45px; border-radius: 50%; font-size: 1.2rem; cursor: pointer; display: grid; place-items: center;">➤</button>
+    </div>
 </div>
 
 <script>
@@ -99,6 +107,9 @@
         } else {
             document.getElementById('storyProfile').src = 'https://placehold.co/100x100/1e293b/ffffff.png?text=' + username.charAt(0).toUpperCase();
         }
+        
+        document.getElementById('storyReplyInput').value = ''; // Reset input
+        
         const progress = document.getElementById('storyProgress');
         progress.style.transition = 'none';
         progress.style.width = '0%';
@@ -108,9 +119,30 @@
         }, 50);
         storyTimer = setTimeout(closeStory, 5000);
     }
+    
     function closeStory() {
         document.getElementById('storyViewer').style.display = 'none';
         clearTimeout(storyTimer);
+    }
+
+    // NEW: SEND DM FROM STORY API CALL
+    async function sendStoryReply() {
+        const msg = document.getElementById('storyReplyInput').value.trim();
+        const user = document.getElementById('storyUser').innerText;
+        if(!msg) return;
+        
+        const formData = new FormData();
+        formData.append('message', msg);
+        
+        try {
+            await fetch(`/reply_story/${user}`, {
+                method: 'POST',
+                headers: { 'X-CSRF-Token': '{{ csrf_token() }}' },
+                body: formData
+            });
+            alert(`Reply sent to ${user}'s Inbox! 📩`);
+            closeStory();
+        } catch(e) { console.error(e); }
     }
 </script>
 {% endblock %}
