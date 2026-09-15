@@ -385,6 +385,46 @@ def like(media_id):
 
 
 # =========================================================
+# ROUTES: SOCIAL (COMMENTS & USER CONTROL)
+# =========================================================
+@app.route("/add_comment/<int:media_id>", methods=["POST"])
+def add_comment(media_id):
+    if "username" not in session:
+        flash("Please login to comment.", "error")
+        return redirect(url_for("login"))
+    
+    text = request.form.get("comment_text", "").strip()
+    if text:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("INSERT INTO comments (media_id, username, comment_text) VALUES (%s, %s, %s)", 
+                  (media_id, session["username"], text[:200]))
+        conn.commit()
+        conn.close()
+        flash("Comment posted!", "success")
+        
+    return redirect(request.referrer or url_for("dashboard"))
+
+@app.route("/delete_own/<int:media_id>", methods=["POST"])
+def delete_own(media_id):
+    if "username" not in session: return redirect(url_for("login"))
+    
+    conn = get_db_connection()
+    c = conn.cursor()
+    # Check if the user actually owns this media
+    c.execute("SELECT * FROM media WHERE id = %s AND uploaded_by = %s", (media_id, session["username"]))
+    if c.fetchone():
+        c.execute("DELETE FROM media WHERE id = %s", (media_id,))
+        conn.commit()
+        flash("Asset permanently deleted.", "success")
+    else:
+        flash("Unauthorized action.", "error")
+    conn.close()
+    
+    return redirect(url_for("profile"))
+
+
+# =========================================================
 # ROUTES: ADMIN & MYSTERY
 # =========================================================
 @app.route("/admin", methods=["GET", "POST"])
