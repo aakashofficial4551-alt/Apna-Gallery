@@ -115,20 +115,20 @@
     {% for item in media_files %}
     <div class="media-card">
         
-        <!-- File Viewer -->
+        <!-- File Viewer (Fixed for Cloudinary URL) -->
         <div class="media-content">
             {% if category == 'Shayari' %}
                 <div style="padding: 20px; text-align: center; color: white; font-style: italic; background: linear-gradient(135deg, #1e293b, #0f172a); width: 100%; height: 100%; display: grid; place-items: center; overflow-y: auto;">
                     "{{ item.prompt }}"
                 </div>
             {% elif category == 'Photo' %}
-                <img src="{{ url_for('static', filename='uploads/' + item.filename) }}" alt="{{ item.title }}">
+                <img src="{{ item.filename }}" alt="{{ item.title }}">
             {% elif category == 'Video' %}
-                <video src="{{ url_for('static', filename='uploads/' + item.filename) }}" controls></video>
+                <video src="{{ item.filename }}" controls></video>
             {% elif category == 'Music' %}
-                <audio src="{{ url_for('static', filename='uploads/' + item.filename) }}" controls></audio>
+                <audio src="{{ item.filename }}" controls></audio>
             {% elif category == 'Document' %}
-                <a href="{{ url_for('static', filename='uploads/' + item.filename) }}" target="_blank" style="text-decoration: none; color: inherit; display: flex; flex-direction: column; align-items: center;">
+                <a href="{{ item.filename }}" target="_blank" style="text-decoration: none; color: inherit; display: flex; flex-direction: column; align-items: center;">
                     <span class="doc-icon">📄</span>
                     <span style="margin-top: 10px; color: var(--accent);">View Document</span>
                 </a>
@@ -152,7 +152,7 @@
                 <span style="font-size: 0.85rem; color: var(--text-muted);">ID: #{{ item.id }}</span>
             </div>
             
-            <!-- Comments (Static Design for now) -->
+            <!-- Comments Section -->
             <div class="comments-section">
                 <div class="comments-list">
                     {% if comments and comments[item.id] %}
@@ -165,6 +165,13 @@
                         <div style="color: var(--text-muted); font-style: italic;">No comments yet.</div>
                     {% endif %}
                 </div>
+                
+                <!-- Comments Form (Live Working) -->
+                <form class="comment-form" method="POST" action="{{ url_for('add_comment', media_id=item.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="text" name="comment_text" placeholder="Write a comment..." required>
+                    <button type="submit">Post</button>
+                </form>
             </div>
         </div>
         
