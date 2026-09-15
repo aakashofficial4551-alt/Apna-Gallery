@@ -70,9 +70,9 @@ def timeago(dt):
     else: return f"{int(seconds/86400)}d ago"
 
 # =========================================================
-# BULLETPROOF DATABASE AUTO-HEALER 🛡️
+# THE 100% BULLETPROOF DATABASE AUTO-HEALER
 # =========================================================
-def safe_execute(c, conn, query):
+def safe_alter(c, conn, query):
     try:
         c.execute(query)
         conn.commit()
@@ -82,46 +82,55 @@ def safe_execute(c, conn, query):
 def upgrade_db():
     conn = get_db_connection()
     c = conn.cursor()
-    safe_execute(c, conn, "CREATE TABLE IF NOT EXISTS stories (id SERIAL PRIMARY KEY, username VARCHAR(100) NOT NULL, filename TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
-    safe_execute(c, conn, "CREATE TABLE IF NOT EXISTS notifications (id SERIAL PRIMARY KEY, username VARCHAR(100) NOT NULL, message TEXT NOT NULL, link TEXT, is_read BOOLEAN DEFAULT FALSE, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
-    safe_execute(c, conn, "CREATE TABLE IF NOT EXISTS followers (id SERIAL PRIMARY KEY, follower VARCHAR(100) NOT NULL, following VARCHAR(100) NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE(follower, following))")
-    safe_execute(c, conn, "CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, sender VARCHAR(100) NOT NULL, receiver VARCHAR(100) NOT NULL, message TEXT NOT NULL, is_read BOOLEAN DEFAULT FALSE, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
-    safe_execute(c, conn, "CREATE TABLE IF NOT EXISTS bookmarks (id SERIAL PRIMARY KEY, username VARCHAR(100) NOT NULL, media_id INTEGER NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE(username, media_id))")
-    safe_execute(c, conn, "CREATE TABLE IF NOT EXISTS global_chat (id SERIAL PRIMARY KEY, sender VARCHAR(100) NOT NULL, message TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
-    safe_execute(c, conn, "CREATE TABLE IF NOT EXISTS reports (id SERIAL PRIMARY KEY, media_id INTEGER NOT NULL, reported_by VARCHAR(100) NOT NULL, reason TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE(media_id, reported_by))")
-    safe_execute(c, conn, "CREATE TABLE IF NOT EXISTS comment_likes (id SERIAL PRIMARY KEY, comment_id INTEGER NOT NULL, username VARCHAR(100) NOT NULL, UNIQUE(comment_id, username))")
+    c.execute("CREATE TABLE IF NOT EXISTS stories (id SERIAL PRIMARY KEY, username VARCHAR(100) NOT NULL, filename TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
+    c.execute("CREATE TABLE IF NOT EXISTS notifications (id SERIAL PRIMARY KEY, username VARCHAR(100) NOT NULL, message TEXT NOT NULL, link TEXT, is_read BOOLEAN DEFAULT FALSE, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
+    c.execute("CREATE TABLE IF NOT EXISTS followers (id SERIAL PRIMARY KEY, follower VARCHAR(100) NOT NULL, following VARCHAR(100) NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE(follower, following))")
+    c.execute("CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, sender VARCHAR(100) NOT NULL, receiver VARCHAR(100) NOT NULL, message TEXT NOT NULL, is_read BOOLEAN DEFAULT FALSE, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
+    c.execute("CREATE TABLE IF NOT EXISTS bookmarks (id SERIAL PRIMARY KEY, username VARCHAR(100) NOT NULL, media_id INTEGER NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE(username, media_id))")
+    c.execute("CREATE TABLE IF NOT EXISTS global_chat (id SERIAL PRIMARY KEY, sender VARCHAR(100) NOT NULL, message TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
+    c.execute("CREATE TABLE IF NOT EXISTS reports (id SERIAL PRIMARY KEY, media_id INTEGER NOT NULL, reported_by VARCHAR(100) NOT NULL, reason TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE(media_id, reported_by))")
+    c.execute("CREATE TABLE IF NOT EXISTS comment_likes (id SERIAL PRIMARY KEY, comment_id INTEGER NOT NULL, username VARCHAR(100) NOT NULL, UNIQUE(comment_id, username))")
+    conn.commit()
 
-    # Safe Column Alterations
-    alter_queries = [
-        "ALTER TABLE media ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
-        "ALTER TABLE comments ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
-        "ALTER TABLE media ADD COLUMN IF NOT EXISTS visibility VARCHAR(20) DEFAULT 'public'",
-        "ALTER TABLE media ADD COLUMN IF NOT EXISTS views INTEGER DEFAULT 0",
-        "ALTER TABLE media ADD COLUMN IF NOT EXISTS is_pinned BOOLEAN DEFAULT FALSE",
-        "ALTER TABLE comments ADD COLUMN IF NOT EXISTS likes INTEGER DEFAULT 0",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(120) UNIQUE",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS user_code VARCHAR(10) UNIQUE",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS deletion_requested TIMESTAMP",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS otp VARCHAR(6)",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'ACTIVE'",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) DEFAULT 'user'",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS country VARCHAR(100)",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_pic TEXT",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS theme VARCHAR(20) DEFAULT 'cyan'",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS cover_pic TEXT"
-    ]
-    for q in alter_queries: safe_execute(c, conn, q)
-            
-    # Default values population
-    safe_execute(c, conn, "UPDATE users SET role = 'user' WHERE role IS NULL")
-    safe_execute(c, conn, "UPDATE users SET status = 'ACTIVE' WHERE status IS NULL")
-    safe_execute(c, conn, "UPDATE users SET theme = 'cyan' WHERE theme IS NULL")
-    safe_execute(c, conn, "UPDATE media SET visibility = 'public' WHERE visibility IS NULL")
-    safe_execute(c, conn, "UPDATE media SET views = 0 WHERE views IS NULL")
-    safe_execute(c, conn, "UPDATE media SET is_pinned = FALSE WHERE is_pinned IS NULL")
-    safe_execute(c, conn, "UPDATE comments SET likes = 0 WHERE likes IS NULL")
+    # 💥 THE FIX: Convert title to TEXT so unlimited AI captions can fit! 💥
+    safe_alter(c, conn, "ALTER TABLE media ALTER COLUMN title TYPE TEXT")
+    
+    # Executing Alters Safely
+    safe_alter(c, conn, "ALTER TABLE media ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+    safe_alter(c, conn, "ALTER TABLE comments ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+    safe_alter(c, conn, "ALTER TABLE media ADD COLUMN IF NOT EXISTS visibility VARCHAR(20) DEFAULT 'public'")
+    safe_alter(c, conn, "ALTER TABLE media ADD COLUMN IF NOT EXISTS views INTEGER DEFAULT 0")
+    safe_alter(c, conn, "ALTER TABLE media ADD COLUMN IF NOT EXISTS is_pinned BOOLEAN DEFAULT FALSE")
+    safe_alter(c, conn, "ALTER TABLE comments ADD COLUMN IF NOT EXISTS likes INTEGER DEFAULT 0")
+    
+    safe_alter(c, conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(120) UNIQUE")
+    safe_alter(c, conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS user_code VARCHAR(10) UNIQUE")
+    safe_alter(c, conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+    safe_alter(c, conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS deletion_requested TIMESTAMP")
+    safe_alter(c, conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS otp VARCHAR(6)")
+    safe_alter(c, conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'ACTIVE'")
+    safe_alter(c, conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) DEFAULT 'user'")
+    safe_alter(c, conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT")
+    safe_alter(c, conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS country VARCHAR(100)")
+    safe_alter(c, conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_pic TEXT")
+    safe_alter(c, conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS theme VARCHAR(20) DEFAULT 'cyan'")
+    safe_alter(c, conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS cover_pic TEXT")
+    
+    # NEW: PHASE 52 & 53 (Link in Bio & Verified Badges)
+    safe_alter(c, conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS website TEXT")
+    safe_alter(c, conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE")
+
+    try:
+        c.execute("UPDATE users SET role = 'user' WHERE role IS NULL")
+        c.execute("UPDATE users SET status = 'ACTIVE' WHERE status IS NULL")
+        c.execute("UPDATE users SET theme = 'cyan' WHERE theme IS NULL")
+        c.execute("UPDATE users SET is_verified = FALSE WHERE is_verified IS NULL")
+        c.execute("UPDATE media SET visibility = 'public' WHERE visibility IS NULL")
+        c.execute("UPDATE media SET views = 0 WHERE views IS NULL")
+        c.execute("UPDATE media SET is_pinned = FALSE WHERE is_pinned IS NULL")
+        c.execute("UPDATE comments SET likes = 0 WHERE likes IS NULL")
+        conn.commit()
+    except: conn.rollback()
 
     try:
         c.execute("SELECT id FROM users WHERE user_code IS NULL")
@@ -130,6 +139,7 @@ def upgrade_db():
             c.execute("UPDATE users SET user_code = %s WHERE id = %s", (code, row['id']))
         conn.commit()
     except: conn.rollback()
+        
     conn.close()
 
 upgrade_db()
@@ -176,7 +186,7 @@ def inject_global_vars():
         encoded_name = urllib.parse.quote(str(username))
         return f"https://api.dicebear.com/7.x/avataaars/svg?seed={encoded_name}&backgroundColor=1e293b"
 
-    vars_dict = {"csrf_token": get_csrf_token, "unread_notifications": 0, "unread_messages": 0, "my_theme": "cyan", "get_avatar": get_avatar}
+    vars_dict = {"csrf_token": get_csrf_token, "unread_notifications": 0, "unread_messages": 0, "my_theme": "cyan", "get_avatar": get_avatar, "my_website": ""}
     if session.get("username"):
         try:
             conn = get_db_connection()
@@ -189,12 +199,14 @@ def inject_global_vars():
             res2 = c.fetchone()
             if res2: vars_dict["unread_messages"] = res2['cnt']
             
-            c.execute("SELECT theme, bio, profile_pic FROM users WHERE username = %s", (session.get("username"),))
+            c.execute("SELECT theme, bio, profile_pic, website, is_verified FROM users WHERE username = %s", (session.get("username"),))
             u_data = c.fetchone()
             if u_data:
                 vars_dict["my_theme"] = u_data["theme"]
                 vars_dict["my_bio"] = u_data["bio"]
                 vars_dict["my_profile_pic"] = u_data["profile_pic"]
+                vars_dict["my_website"] = u_data.get("website", "")
+                vars_dict["my_is_verified"] = u_data.get("is_verified", False)
             conn.close()
         except: pass
     return vars_dict
@@ -320,8 +332,9 @@ def settings():
     c = conn.cursor()
     
     if action == "update_profile":
-        c.execute("UPDATE users SET bio = %s, theme = %s WHERE username = %s", 
-                  (request.form.get("bio", ""), request.form.get("theme", "cyan"), session["username"]))
+        # 💥 Added Website to settings update 💥
+        c.execute("UPDATE users SET bio = %s, theme = %s, website = %s WHERE username = %s", 
+                  (request.form.get("bio", ""), request.form.get("theme", "cyan"), request.form.get("website", ""), session["username"]))
         flash("Profile Settings Updated!", "success")
         
     elif action == "change_password":
@@ -342,7 +355,7 @@ def settings():
     return redirect(request.referrer or url_for("dashboard"))
 
 # =========================================================
-# CRASH-PROOF UPLOAD ROUTE (BUG FIXED 100%)
+# CRASH-PROOF UPLOAD ROUTE (PHASE 50 FIX)
 # =========================================================
 @app.route("/upload_asset", methods=["POST"])
 def upload_asset():
@@ -366,9 +379,7 @@ def upload_asset():
         conn = get_db_connection()
         c = conn.cursor()
         
-        # FIX: Removed `views` and `is_pinned` from the initial insert query to rely purely on database defaults. 
-        # This completely avoids the column missing crash if migrations are delayed.
-        c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved, visibility) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+        c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved, visibility, views, is_pinned) VALUES (%s, %s, %s, %s, %s, %s, %s, 0, FALSE)",
                   (filename, title, category, "", session.get("username"), is_approved, visibility))
         
         mentions = set(re.findall(r'@(\w+)', title))
@@ -383,35 +394,18 @@ def upload_asset():
         flash(f"Asset published as {visibility.upper()}!" if is_approved else "Asset sent to Admin for approval.", "success")
         
     except Exception as e:
-        # We will now print exactly WHAT failed to the user!
-        flash(f"Database Security Alert: {str(e)}", "error")
+        # Prints EXACT error to the flash message if it ever fails again!
+        conn.rollback()
+        print(f"UPLOAD CRASH: {e}")
+        flash(f"Server Alert: {str(e)[:150]}", "error")
         
-    return redirect(request.referrer or url_for("feed"))
-
-# 💥 PHASE 53: REPOST ENGINE 💥
-@app.route("/repost/<int:media_id>", methods=["POST"])
-def repost(media_id):
-    if "username" not in session: return jsonify({"error": "Login required"}), 401
-    
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("SELECT * FROM media WHERE id = %s", (media_id,))
-    original = c.fetchone()
-    
-    if original:
-        new_title = f"🔄 Reposted from @{original['uploaded_by']}: {original['title']}"
-        c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved, visibility) VALUES (%s, %s, %s, %s, %s, 1, 'public')",
-                  (original['filename'], new_title[:200], original['category'], "", session["username"]))
-        c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (original['uploaded_by'], f"🔄 {session['username']} reposted your asset!", f"/agent/{session['username']}"))
-        conn.commit()
-        flash("Successfully Reposted to your timeline!", "success")
-    conn.close()
     return redirect(request.referrer or url_for("feed"))
 
 @app.route("/edit_post/<int:media_id>", methods=["POST"])
 def edit_post(media_id):
     if "username" not in session: return redirect(url_for("login"))
     new_title = request.form.get("title", "").strip()
+    
     if new_title:
         conn = get_db_connection()
         c = conn.cursor()
@@ -437,10 +431,8 @@ def pin_post(media_id):
 def add_view(media_id):
     conn = get_db_connection()
     c = conn.cursor()
-    try:
-        c.execute("UPDATE media SET views = views + 1 WHERE id = %s", (media_id,))
-        conn.commit()
-    except: pass # Ignore if views column isn't ready
+    c.execute("UPDATE media SET views = views + 1 WHERE id = %s", (media_id,))
+    conn.commit()
     conn.close()
     return jsonify({"success": True})
 
@@ -460,11 +452,11 @@ def feed():
     tab = request.args.get("tab", "foryou")
     
     if tab == "global":
-        c.execute("SELECT m.*, u.profile_pic, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' ORDER BY m.id DESC LIMIT 50")
+        c.execute("SELECT m.*, u.profile_pic, u.role, u.is_verified FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' ORDER BY m.id DESC LIMIT 50")
         feed_posts = c.fetchall()
     else:
         c.execute("""
-            SELECT m.*, u.profile_pic, u.role 
+            SELECT m.*, u.profile_pic, u.role, u.is_verified 
             FROM media m JOIN users u ON m.uploaded_by = u.username 
             JOIN followers f ON f.following = m.uploaded_by 
             WHERE f.follower = %s AND m.approved = 1 AND m.visibility IN ('public', 'followers') AND m.filename != 'SHAYARI_TEXT' 
@@ -472,10 +464,10 @@ def feed():
         """, (session["username"],))
         feed_posts = c.fetchall()
         if not feed_posts:
-            c.execute("SELECT m.*, u.profile_pic, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' ORDER BY m.id DESC LIMIT 10")
+            c.execute("SELECT m.*, u.profile_pic, u.role, u.is_verified FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' ORDER BY m.id DESC LIMIT 10")
             feed_posts = c.fetchall()
 
-    c.execute("SELECT c.*, u.role FROM comments c JOIN users u ON c.username = u.username ORDER BY c.id ASC")
+    c.execute("SELECT c.*, u.role, u.is_verified FROM comments c JOIN users u ON c.username = u.username ORDER BY c.id ASC")
     comments_db = c.fetchall()
     comments = defaultdict(list)
     for comment in comments_db: comments[comment["media_id"]].append(comment)
@@ -486,34 +478,12 @@ def feed():
     
     return render_template("feed.html", posts=feed_posts, comments=comments, saved_ids=saved_ids, current_tab=tab)
 
-# 💥 PHASE 52: SINGLE POST DEEP LINK 💥
-@app.route("/post/<int:media_id>")
-def view_post(media_id):
-    if "username" not in session: return redirect(url_for("login"))
-    conn = get_db_connection()
-    c = conn.cursor()
-    
-    c.execute("SELECT m.*, u.profile_pic, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.id = %s", (media_id,))
-    post = c.fetchone()
-    if not post:
-        flash("Post not found.", "error")
-        return redirect(url_for("feed"))
-        
-    c.execute("SELECT c.*, u.role FROM comments c JOIN users u ON c.username = u.username WHERE c.media_id = %s ORDER BY c.id ASC", (media_id,))
-    post_comments = c.fetchall()
-    comments = {media_id: post_comments}
-    
-    c.execute("SELECT media_id FROM bookmarks WHERE username = %s", (session["username"],))
-    saved_ids = [row['media_id'] for row in c.fetchall()]
-    conn.close()
-    return render_template("post.html", post=post, comments=comments, saved_ids=saved_ids)
-
 @app.route("/reels")
 def reels():
     if "username" not in session: return redirect(url_for("login"))
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("SELECT m.*, u.profile_pic, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.approved = 1 AND m.visibility = 'public' AND m.category = 'Video' ORDER BY RANDOM() LIMIT 20")
+    c.execute("SELECT m.*, u.profile_pic, u.role, u.is_verified FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.approved = 1 AND m.visibility = 'public' AND m.category = 'Video' ORDER BY RANDOM() LIMIT 20")
     videos = c.fetchall()
     conn.close()
     return render_template("reels.html", videos=videos)
@@ -524,12 +494,9 @@ def explore():
     conn = get_db_connection()
     c = conn.cursor()
     
-    try:
-        c.execute("SELECT m.id, m.filename, m.title, m.category, m.likes, m.views, m.uploaded_by FROM media m WHERE m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' ORDER BY RANDOM() LIMIT 40")
-    except:
-        c.execute("SELECT m.id, m.filename, m.title, m.category, m.likes, 0 as views, m.uploaded_by FROM media m WHERE m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' ORDER BY RANDOM() LIMIT 40")
-        
+    c.execute("SELECT m.id, m.filename, m.title, m.category, m.likes, m.views, m.uploaded_by FROM media m WHERE m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' ORDER BY RANDOM() LIMIT 40")
     explore_posts = c.fetchall()
+    
     c.execute("SELECT title FROM media WHERE approved = 1 AND visibility = 'public'")
     all_titles = c.fetchall()
     conn.close()
@@ -541,6 +508,7 @@ def explore():
             for t in tags: tag_counts[t.lower()] += 1
             
     trending_tags = [tag for tag, count in sorted(tag_counts.items(), key=lambda x: x[1], reverse=True)[:6]]
+    
     return render_template("explore.html", posts=explore_posts, trending_tags=trending_tags)
 
 @app.route("/dashboard")
@@ -550,15 +518,20 @@ def dashboard():
     try:
         conn = get_db_connection()
         c = conn.cursor()
-        
-        try:
-            c.execute("SELECT id, title, filename, category, likes, views FROM media WHERE approved = 1 AND visibility = 'public' AND filename != 'SHAYARI_TEXT' ORDER BY likes DESC LIMIT 3")
-        except:
-            c.rollback()
-            c.execute("SELECT id, title, filename, category, likes, 0 as views FROM media WHERE approved = 1 AND visibility = 'public' AND filename != 'SHAYARI_TEXT' ORDER BY likes DESC LIMIT 3")
-            
+        c.execute("""
+            SELECT id, title, filename, category, likes, views 
+            FROM media 
+            WHERE approved = 1 AND visibility = 'public' AND filename != 'SHAYARI_TEXT' 
+            ORDER BY likes DESC LIMIT 3
+        """)
         trending = c.fetchall()
-        c.execute("SELECT s.id, s.username, s.filename, s.created_at, u.profile_pic, u.role FROM stories s JOIN users u ON s.username = u.username WHERE s.created_at >= NOW() - INTERVAL '12 hours' ORDER BY s.id DESC")
+        c.execute("""
+            SELECT s.id, s.username, s.filename, s.created_at, u.profile_pic, u.role, u.is_verified 
+            FROM stories s 
+            JOIN users u ON s.username = u.username 
+            WHERE s.created_at >= NOW() - INTERVAL '12 hours' 
+            ORDER BY s.id DESC
+        """)
         stories = c.fetchall()
         conn.close()
         return render_template("dashboard.html", trending=trending, stories=stories)
@@ -610,13 +583,7 @@ def profile():
 
     c.execute("SELECT * FROM users WHERE username = %s", (session["username"],))
     user = c.fetchone()
-    
-    try:
-        c.execute("SELECT * FROM media WHERE uploaded_by = %s ORDER BY is_pinned DESC, id DESC", (session["username"],))
-    except:
-        c.rollback()
-        c.execute("SELECT * FROM media WHERE uploaded_by = %s ORDER BY id DESC", (session["username"],))
-        
+    c.execute("SELECT * FROM media WHERE uploaded_by = %s ORDER BY is_pinned DESC, id DESC", (session["username"],))
     my_uploads = c.fetchall()
     
     c.execute("SELECT COUNT(*) as cnt FROM followers WHERE following = %s", (session["username"],))
@@ -631,7 +598,7 @@ def profile():
     return render_template("profile.html", user=user, my_uploads=my_uploads, saved_uploads=saved_uploads, post_count=len(my_uploads), followers_count=followers_count, following_count=following_count)
 
 # =========================================================
-# OTHERS (Follow, Inbox, Admin etc.)
+# PUBLIC PORTFOLIO & FOLLOW SYSTEM
 # =========================================================
 @app.route("/agent/<username>")
 def agent_profile(username):
@@ -648,17 +615,10 @@ def agent_profile(username):
     c.execute("SELECT id FROM followers WHERE follower = %s AND following = %s", (session["username"], username))
     is_following = bool(c.fetchone())
     
-    try:
-        if is_following:
-            c.execute("SELECT m.*, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.uploaded_by = %s AND m.approved = 1 AND m.visibility IN ('public', 'followers') AND m.filename != 'SHAYARI_TEXT' ORDER BY m.is_pinned DESC, m.id DESC", (username,))
-        else:
-            c.execute("SELECT m.*, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.uploaded_by = %s AND m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' ORDER BY m.is_pinned DESC, m.id DESC", (username,))
-    except:
-        c.rollback()
-        if is_following:
-            c.execute("SELECT m.*, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.uploaded_by = %s AND m.approved = 1 AND m.visibility IN ('public', 'followers') AND m.filename != 'SHAYARI_TEXT' ORDER BY m.id DESC", (username,))
-        else:
-            c.execute("SELECT m.*, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.uploaded_by = %s AND m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' ORDER BY m.id DESC", (username,))
+    if is_following:
+        c.execute("SELECT m.*, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.uploaded_by = %s AND m.approved = 1 AND m.visibility IN ('public', 'followers') AND m.filename != 'SHAYARI_TEXT' ORDER BY m.is_pinned DESC, m.id DESC", (username,))
+    else:
+        c.execute("SELECT m.*, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.uploaded_by = %s AND m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' ORDER BY m.is_pinned DESC, m.id DESC", (username,))
         
     agent_uploads = c.fetchall()
     
@@ -704,13 +664,16 @@ def api_network(action_type, username):
     conn = get_db_connection()
     c = conn.cursor()
     if action_type == "followers":
-        c.execute("SELECT u.username, u.profile_pic, u.role FROM users u JOIN followers f ON u.username = f.follower WHERE f.following = %s", (username,))
+        c.execute("SELECT u.username, u.profile_pic, u.role, u.is_verified FROM users u JOIN followers f ON u.username = f.follower WHERE f.following = %s", (username,))
     else:
-        c.execute("SELECT u.username, u.profile_pic, u.role FROM users u JOIN followers f ON u.username = f.following WHERE f.follower = %s", (username,))
+        c.execute("SELECT u.username, u.profile_pic, u.role, u.is_verified FROM users u JOIN followers f ON u.username = f.following WHERE f.follower = %s", (username,))
     results = c.fetchall()
     conn.close()
     return jsonify(results)
 
+# =========================================================
+# DIRECT MESSAGING & STORY DM
+# =========================================================
 @app.route("/inbox")
 def inbox():
     if "username" not in session: return redirect(url_for("login"))
@@ -718,7 +681,7 @@ def inbox():
     conn = get_db_connection()
     c = conn.cursor()
     c.execute("""
-        SELECT u.username, u.profile_pic, u.role, u.last_active
+        SELECT u.username, u.profile_pic, u.role, u.last_active, u.is_verified
         FROM users u 
         WHERE u.username IN (SELECT receiver FROM messages WHERE sender = %s UNION SELECT sender FROM messages WHERE receiver = %s)
     """, (me, me))
@@ -745,7 +708,7 @@ def chat(username):
     conn.commit()
     c.execute("SELECT * FROM messages WHERE (sender = %s AND receiver = %s) OR (sender = %s AND receiver = %s) ORDER BY created_at ASC", (me, username, username, me))
     chat_history = c.fetchall()
-    c.execute("SELECT username, profile_pic, role, last_active FROM users WHERE username = %s", (username,))
+    c.execute("SELECT username, profile_pic, role, last_active, is_verified FROM users WHERE username = %s", (username,))
     contact = c.fetchone()
     conn.close()
     if not contact: return redirect(url_for("inbox"))
@@ -807,12 +770,15 @@ def api_global_chat_history():
     if "username" not in session: return jsonify([])
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("SELECT gc.id, gc.sender, gc.message, TO_CHAR(gc.created_at, 'HH24:MI') as time, u.role FROM global_chat gc JOIN users u ON gc.sender = u.username ORDER BY gc.created_at ASC")
+    c.execute("SELECT gc.id, gc.sender, gc.message, TO_CHAR(gc.created_at, 'HH24:MI') as time, u.role, u.is_verified FROM global_chat gc JOIN users u ON gc.sender = u.username ORDER BY gc.created_at ASC")
     history = c.fetchall()
     conn.close()
-    formatted = [{"id": r['id'], "sender": r['sender'], "message": r['message'], "time": r['time'], "role": r['role']} for r in history]
+    formatted = [{"id": r['id'], "sender": r['sender'], "message": r['message'], "time": r['time'], "role": r['role'], "is_verified": r['is_verified']} for r in history]
     return jsonify(formatted)
 
+# =========================================================
+# LIKES, COMMENTS, SEARCH, & GALLERY
+# =========================================================
 @app.route("/search")
 def search():
     if "username" not in session: return redirect(url_for("login"))
@@ -822,9 +788,9 @@ def search():
     c = conn.cursor()
     clean_query = query.replace("#", "").replace("@", "")
     search_term = f"%{clean_query}%"
-    c.execute("SELECT m.*, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' AND (m.title ILIKE %s OR m.prompt ILIKE %s) ORDER BY m.id DESC", (search_term, search_term))
+    c.execute("SELECT m.*, u.profile_pic, u.role, u.is_verified FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' AND (m.title ILIKE %s OR m.prompt ILIKE %s) ORDER BY m.id DESC", (search_term, search_term))
     media_files = c.fetchall()
-    c.execute("SELECT username, profile_pic, role, bio FROM users WHERE username ILIKE %s LIMIT 20", (search_term,))
+    c.execute("SELECT username, profile_pic, role, bio, is_verified FROM users WHERE username ILIKE %s LIMIT 20", (search_term,))
     found_users = c.fetchall()
     conn.close()
     return render_template("search.html", media_files=media_files, found_users=found_users, query=query)
@@ -835,27 +801,30 @@ def gallery(category):
     conn = get_db_connection()
     c = conn.cursor()
     if request.method == "POST":
-        filename = "SHAYARI_TEXT"
-        if category != 'Shayari':
-            file = request.files.get("media")
-            if file and file.filename != "":
-                filename = save_uploaded_file(file, category)
-                if not filename:
-                    flash("Upload Failed! Check API keys.", "error")
-                    return redirect(url_for("gallery", category=category))
-        
-        is_approved = 1 if current_user_is_admin() else 0
-        visibility = request.form.get("visibility", "public")
-        c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved, visibility) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-                  (filename, request.form.get("title", "Untitled"), category, "", session.get("username"), is_approved, visibility))
-        conn.commit()
-        flash("File live!" if is_approved else "Sent to Admin for approval.", "success")
+        try:
+            filename = "SHAYARI_TEXT"
+            if category != 'Shayari':
+                file = request.files.get("media")
+                if file and file.filename != "":
+                    filename = save_uploaded_file(file, category)
+                    if not filename:
+                        flash("Upload Failed! Check API keys.", "error")
+                        return redirect(url_for("gallery", category=category))
+            
+            is_approved = 1 if current_user_is_admin() else 0
+            visibility = request.form.get("visibility", "public")
+            c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved, visibility, views, is_pinned) VALUES (%s, %s, %s, %s, %s, %s, %s, 0, FALSE)",
+                      (filename, request.form.get("title", "Untitled"), category, "", session.get("username"), is_approved, visibility))
+            conn.commit()
+            flash("File live!" if is_approved else "Sent to Admin for approval.", "success")
+        except Exception as e:
+            flash(f"Upload System Fault: {str(e)[:100]}", "error")
         return redirect(url_for("gallery", category=category))
 
-    c.execute("SELECT m.*, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.category = %s AND m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' ORDER BY m.id DESC", (category,))
-    if category == 'Shayari': c.execute("SELECT m.*, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.category = %s AND m.approved = 1 AND m.visibility = 'public' ORDER BY m.id DESC", (category,))
+    c.execute("SELECT m.*, u.profile_pic, u.role, u.is_verified FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.category = %s AND m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' ORDER BY m.id DESC", (category,))
+    if category == 'Shayari': c.execute("SELECT m.*, u.role, u.is_verified FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.category = %s AND m.approved = 1 AND m.visibility = 'public' ORDER BY m.id DESC", (category,))
     media_files = c.fetchall()
-    c.execute("SELECT c.*, u.role FROM comments c JOIN users u ON c.username = u.username ORDER BY c.id ASC")
+    c.execute("SELECT c.*, u.role, u.is_verified FROM comments c JOIN users u ON c.username = u.username ORDER BY c.id ASC")
     comments_db = c.fetchall()
     conn.close()
     comments = defaultdict(list)
@@ -906,7 +875,7 @@ def ai_studio():
                 secure_url = cloudinary.uploader.upload(r.content, resource_type="image")["secure_url"] if r.status_code == 200 else image_url
                 conn = get_db_connection()
                 c = conn.cursor()
-                c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved, visibility) VALUES (%s, %s, %s, %s, %s, 1, 'public')",
+                c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved, visibility, views, is_pinned) VALUES (%s, %s, %s, %s, %s, 1, 'public', 0, FALSE)",
                           (secure_url, f"AI: {prompt[:20]}...", "Photo", prompt, session["username"]))
                 conn.commit()
                 conn.close()
@@ -949,22 +918,17 @@ def like_comment(comment_id):
     c = conn.cursor()
     c.execute("INSERT INTO comment_likes (comment_id, username) VALUES (%s, %s) ON CONFLICT (comment_id, username) DO NOTHING", (comment_id, username))
     if c.rowcount == 1:
-        try:
-            c.execute("UPDATE comments SET likes = COALESCE(likes, 0) + 1 WHERE id = %s", (comment_id,))
-            c.execute("SELECT username, media_id FROM comments WHERE id = %s", (comment_id,))
-            comment_info = c.fetchone()
-            if comment_info and comment_info['username'] != username:
-                c.execute("SELECT category FROM media WHERE id = %s", (comment_info['media_id'],))
-                media_cat = c.fetchone()
-                cat = media_cat['category'] if media_cat else 'Photo'
-                c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (comment_info['username'], f"❤️ {username} liked your comment!", f"/gallery/{cat}"))
-            conn.commit()
-        except: pass
-    
-    try:
-        c.execute("SELECT likes FROM comments WHERE id = %s", (comment_id,))
-        likes = c.fetchone()["likes"]
-    except: likes = 0
+        c.execute("UPDATE comments SET likes = COALESCE(likes, 0) + 1 WHERE id = %s", (comment_id,))
+        c.execute("SELECT username, media_id FROM comments WHERE id = %s", (comment_id,))
+        comment_info = c.fetchone()
+        if comment_info and comment_info['username'] != username:
+            c.execute("SELECT category FROM media WHERE id = %s", (comment_info['media_id'],))
+            media_cat = c.fetchone()
+            cat = media_cat['category'] if media_cat else 'Photo'
+            c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (comment_info['username'], f"❤️ {username} liked your comment!", f"/gallery/{cat}"))
+        conn.commit()
+    c.execute("SELECT likes FROM comments WHERE id = %s", (comment_id,))
+    likes = c.fetchone()["likes"]
     conn.close()
     return jsonify({"likes": likes or 0})
 
@@ -1018,7 +982,7 @@ def report_asset(media_id):
     finally: conn.close()
 
 # =========================================================
-# ADMIN CONTROLS
+# ADMIN CONTROLS (PHASE 53: ADDED VERIFY BUTTON)
 # =========================================================
 @app.route("/admin", methods=["GET", "POST"])
 def admin():
@@ -1069,6 +1033,13 @@ def admin_user_action(user_id, action):
     elif action == "make_admin":
         c.execute("UPDATE users SET role = 'admin' WHERE id = %s", (user_id,))
         flash("Promoted to Admin HQ!", "success")
+    elif action == "verify":
+        c.execute("UPDATE users SET is_verified = TRUE WHERE id = %s", (user_id,))
+        flash("Agent Verified ✅!", "success")
+    elif action == "unverify":
+        c.execute("UPDATE users SET is_verified = FALSE WHERE id = %s", (user_id,))
+        flash("Verification Removed.", "success")
+        
     conn.commit()
     conn.close()
     return redirect(url_for("admin"))
@@ -1122,13 +1093,6 @@ def dismiss_report(report_id):
     conn.close()
     flash("Report dismissed.", "success")
     return redirect(url_for("admin"))
-
-@app.route("/mystery", methods=["POST"])
-def mystery():
-    if hmac.compare_digest(request.form.get("passcode", ""), os.environ.get("MYSTERY_CODE", "SOCHO")): 
-        return render_template("mystery.html")
-    flash("Incorrect code.", "error")
-    return redirect(url_for("dashboard"))
 
 @app.errorhandler(404)
 def not_found_error(error): return render_template("404.html"), 404
