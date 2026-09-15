@@ -70,7 +70,7 @@ def timeago(dt):
     else: return f"{int(seconds/86400)}d ago"
 
 # =========================================================
-# DATABASE AUTO-HEALER (PHASE 42: VIEWS & PINS)
+# DATABASE AUTO-HEALER
 # =========================================================
 def upgrade_db():
     conn = get_db_connection()
@@ -88,8 +88,6 @@ def upgrade_db():
         c.execute("ALTER TABLE media ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
         c.execute("ALTER TABLE comments ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
         c.execute("ALTER TABLE media ADD COLUMN IF NOT EXISTS visibility VARCHAR(20) DEFAULT 'public'")
-        
-        # NEW: Views & Pinned Columns
         c.execute("ALTER TABLE media ADD COLUMN IF NOT EXISTS views INTEGER DEFAULT 0")
         c.execute("ALTER TABLE media ADD COLUMN IF NOT EXISTS is_pinned BOOLEAN DEFAULT FALSE")
         conn.commit()
@@ -392,12 +390,8 @@ def pin_post(media_id):
     if "username" not in session: return redirect(url_for("login"))
     conn = get_db_connection()
     c = conn.cursor()
-    
-    # Unpin all previous posts for this user
     c.execute("UPDATE media SET is_pinned = FALSE WHERE uploaded_by = %s", (session["username"],))
-    # Pin the chosen post
     c.execute("UPDATE media SET is_pinned = TRUE WHERE id = %s AND uploaded_by = %s", (media_id, session["username"]))
-    
     conn.commit()
     conn.close()
     flash("Post Pinned to top of your profile!", "success")
@@ -405,7 +399,6 @@ def pin_post(media_id):
 
 @app.route("/api/view/<int:media_id>", methods=["POST"])
 def add_view(media_id):
-    # This is called via JS when lightbox is opened
     conn = get_db_connection()
     c = conn.cursor()
     c.execute("UPDATE media SET views = views + 1 WHERE id = %s", (media_id,))
@@ -414,7 +407,7 @@ def add_view(media_id):
     return jsonify({"success": True})
 
 # =========================================================
-# CORE ROUTES (DUAL FEED)
+# CORE ROUTES
 # =========================================================
 @app.route("/")
 def index():
@@ -465,18 +458,40 @@ def explore():
     conn.close()
     return render_template("explore.html", posts=explore_posts)
 
+# 💥 BULLETPROOF DASHBOARD FIX 💥
 @app.route("/dashboard")
 def dashboard():
     if "username" not in session: return redirect(url_for("login"))
     sync_admin_session()
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("SELECT * FROM media WHERE approved = 1 AND visibility = 'public' AND filename != 'SHAYARI_TEXT' ORDER BY likes DESC LIMIT 3")
-    trending = c.fetchall()
-    c.execute("SELECT s.*, u.profile_pic, u.role FROM stories s JOIN users u ON s.username = u.username WHERE s.created_at >= NOW() - INTERVAL '12 hours' ORDER BY s.id DESC")
-    stories = c.fetchall()
-    conn.close()
-    return render_template("dashboard.html", trending=trending, stories=stories)
+    
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 100% Safe SQL - Fetching only needed columns explicitly
+        c.execute("""
+            SELECT id, title, filename, category, likes, views 
+            FROM media 
+            WHERE approved = 1 AND visibility = 'public' AND filename != 'SHAYARI_TEXT' 
+            ORDER BY likes DESC LIMIT 3
+        """)
+        trending = c.fetchall()
+        
+        c.execute("""
+            SELECT s.id, s.username, s.filename, s.created_at, u.profile_pic, u.role 
+            FROM stories s 
+            JOIN users u ON s.username = u.username 
+            WHERE s.created_at >= NOW() - INTERVAL '12 hours' 
+            ORDER BY s.id DESC
+        """)
+        stories = c.fetchall()
+        
+        conn.close()
+        return render_template("dashboard.html", trending=trending, stories=stories)
+        
+    except Exception as e:
+        # If it ever crashes again, it will print the exact reason instead of a 500 blank page!
+        return f"<div style='color:#f43f5e; padding:50px; text-align:center; font-family:sans-serif;'><h1>Dashboard Engine Error</h1><p>{str(e)}</p><a href='/feed' style='color:#38bdf8;'>Go back to Feed</a></div>"
 
 @app.route("/notifications")
 def notifications():
@@ -512,8 +527,6 @@ def profile():
 
     c.execute("SELECT * FROM users WHERE username = %s", (session["username"],))
     user = c.fetchone()
-    
-    # PROFILE SORT: Pinned posts show first!
     c.execute("SELECT * FROM media WHERE uploaded_by = %s ORDER BY is_pinned DESC, id DESC", (session["username"],))
     my_uploads = c.fetchall()
     
@@ -557,8 +570,8 @@ def agent_profile(username):
     followers_count = c.fetchone()['cnt']
     c.execute("SELECT COUNT(*) as cnt FROM followers WHERE follower = %s", (username,))
     following_count = c.fetchone()['cnt']
-    
     conn.close()
+    
     return render_template("agent.html", agent=agent, uploads=agent_uploads, post_count=len(agent_uploads), followers_count=followers_count, following_count=following_count, is_following=is_following)
 
 @app.route("/follow/<username>", methods=["POST"])
@@ -588,19 +601,6 @@ def follow(username):
     followers_count = c.fetchone()['cnt']
     conn.close()
     return jsonify({"followers": followers_count, "following_now": following_now})
-
-@app.route("/api/network/<action_type>/<username>")
-def api_network(action_type, username):
-    if "username" not in session: return jsonify([])
-    conn = get_db_connection()
-    c = conn.cursor()
-    if action_type == "followers":
-        c.execute("SELECT u.username, u.profile_pic, u.role FROM users u JOIN followers f ON u.username = f.follower WHERE f.following = %s", (username,))
-    else:
-        c.execute("SELECT u.username, u.profile_pic, u.role FROM users u JOIN followers f ON u.username = f.following WHERE f.follower = %s", (username,))
-    results = c.fetchall()
-    conn.close()
-    return jsonify(results)
 
 # =========================================================
 # DIRECT MESSAGING & GLOBAL CHAT
@@ -766,6 +766,44 @@ def bookmark(media_id):
     conn.close()
     return jsonify({"bookmarked": bookmarked})
 
+@app.route("/ai-studio", methods=["GET", "POST"])
+def ai_studio():
+    if "username" not in session: return redirect(url_for("login"))
+    if request.method == "POST":
+        prompt = request.form.get("prompt", "").strip()
+        if not prompt: return redirect(url_for("ai_studio"))
+        trigger_words = ["create", "generate", "draw", "make an image"]
+        wants_image = any(word in prompt.lower() for word in trigger_words)
+        
+        if wants_image:
+            encoded_prompt = urllib.parse.quote(prompt)
+            image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?nologo=true"
+            try:
+                r = requests.get(image_url, timeout=15)
+                secure_url = cloudinary.uploader.upload(r.content, resource_type="image")["secure_url"] if r.status_code == 200 else image_url
+                conn = get_db_connection()
+                c = conn.cursor()
+                c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved, visibility) VALUES (%s, %s, %s, %s, %s, 1, 'public')",
+                          (secure_url, f"AI: {prompt[:20]}...", "Photo", prompt, session["username"]))
+                conn.commit()
+                conn.close()
+                flash("Image created successfully! (100% Free)", "success")
+                return redirect(url_for("gallery", category="Photo"))
+            except: 
+                flash("Image generation failed.", "error")
+        else:
+            try: reply = get_ai_response(prompt)
+            except: reply = "I am currently offline."
+            return render_template("ai_studio.html", chat_reply=reply, user_prompt=prompt)
+    return render_template("ai_studio.html")
+
+@app.route("/api/ai", methods=["POST"])
+def ai_endpoint():
+    if "username" not in session: return jsonify({"reply": "Login first."}), 401
+    try: reply = get_ai_response(request.get_json(silent=True).get("query", "")[:1000])
+    except: reply = "Assistant unavailable."
+    return jsonify({"reply": reply})
+
 @app.route("/like/<int:media_id>", methods=["POST"])
 def like(media_id):
     if "username" not in session: return jsonify({"error": "Login required."}), 401
@@ -813,6 +851,17 @@ def add_comment(media_id):
         conn.close()
         flash("Comment posted!", "success")
     return redirect(request.referrer or url_for("dashboard"))
+
+@app.route("/delete_own/<int:media_id>", methods=["POST"])
+def delete_own(media_id):
+    if "username" not in session: return redirect(url_for("login"))
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("DELETE FROM media WHERE id = %s AND uploaded_by = %s", (media_id, session["username"]))
+    conn.commit()
+    conn.close()
+    flash("Asset permanently deleted.", "success")
+    return redirect(request.referrer or url_for("profile"))
 
 @app.route("/report/<int:media_id>", methods=["POST"])
 def report_asset(media_id):
@@ -934,6 +983,13 @@ def dismiss_report(report_id):
     conn.close()
     flash("Report dismissed.", "success")
     return redirect(url_for("admin"))
+
+@app.route("/mystery", methods=["POST"])
+def mystery():
+    if hmac.compare_digest(request.form.get("passcode", ""), os.environ.get("MYSTERY_CODE", "SOCHO")): 
+        return render_template("mystery.html")
+    flash("Incorrect code.", "error")
+    return redirect(url_for("dashboard"))
 
 @app.errorhandler(404)
 def not_found_error(error): return render_template("404.html"), 404
