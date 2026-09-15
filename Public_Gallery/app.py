@@ -43,7 +43,7 @@ app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "development-only-secret
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
 
 # =========================================================
-# DATABASE AUTO-HEALER
+# DATABASE AUTO-HEALER & NOTIFICATIONS UPGRADE
 # =========================================================
 def upgrade_db():
     conn = get_db_connection()
@@ -53,6 +53,17 @@ def upgrade_db():
             id SERIAL PRIMARY KEY,
             username VARCHAR(100) NOT NULL,
             filename TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    # NEW: NOTIFICATIONS TABLE
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS notifications (
+            id SERIAL PRIMARY KEY,
+            username VARCHAR(100) NOT NULL,
+            message TEXT NOT NULL,
+            link TEXT,
+            is_read BOOLEAN DEFAULT FALSE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
@@ -108,12 +119,14 @@ def cleanup_database():
         c.execute("DELETE FROM users WHERE username LIKE 'Guest-%%' AND last_active < NOW() - INTERVAL '30 days'")
         c.execute("DELETE FROM users WHERE role = 'user' AND last_active < NOW() - INTERVAL '90 days'")
         c.execute("DELETE FROM stories WHERE created_at < NOW() - INTERVAL '12 hours'")
+        # Keep only last 50 notifications per user
+        c.execute("DELETE FROM notifications WHERE id NOT IN (SELECT id FROM notifications ORDER BY id DESC LIMIT 500)")
         conn.commit()
     except: pass
     finally: conn.close()
 
 # =========================================================
-# SECURITY & HELPERS
+# SECURITY & GLOBAL CONTEXT
 # =========================================================
 def get_csrf_token():
     token = session.get("csrf_token")
@@ -135,7 +148,18 @@ def update_activity():
         except: pass
 
 @app.context_processor
-def inject_security_helpers(): return {"csrf_token": get_csrf_token}
+def inject_global_vars():
+    vars_dict = {"csrf_token": get_csrf_token, "unread_notifications": 0}
+    if session.get("username"):
+        try:
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute("SELECT COUNT(id) as cnt FROM notifications WHERE username = %s AND is_read = FALSE", (session.get("username"),))
+            res = c.fetchone()
+            if res: vars_dict["unread_notifications"] = res['cnt']
+            conn.close()
+        except: pass
+    return vars_dict
 
 def save_uploaded_file(file, category="Photo"):
     if not file or not file.filename: return None
@@ -297,7 +321,7 @@ def request_delete():
     return redirect(url_for("login"))
 
 # =========================================================
-# CORE ROUTES (Dashboard, Profile)
+# CORE ROUTES (Dashboard, Profile, Notifications)
 # =========================================================
 @app.route("/")
 @app.route("/dashboard")
@@ -312,6 +336,19 @@ def dashboard():
     stories = c.fetchall()
     conn.close()
     return render_template("dashboard.html", trending=trending, stories=stories)
+
+@app.route("/notifications")
+def notifications():
+    if "username" not in session: return redirect(url_for("login"))
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT * FROM notifications WHERE username = %s ORDER BY id DESC LIMIT 50", (session["username"],))
+    notifs = c.fetchall()
+    # Mark as read
+    c.execute("UPDATE notifications SET is_read = TRUE WHERE username = %s AND is_read = FALSE", (session["username"],))
+    conn.commit()
+    conn.close()
+    return render_template("notifications.html", notifications=notifs)
 
 @app.route("/games")
 def games():
@@ -346,9 +383,6 @@ def profile():
     conn.close()
     return render_template("profile.html", user=user, my_uploads=my_uploads, post_count=len(my_uploads))
 
-# =========================================================
-# PUBLIC PORTFOLIO (NEW - PHASE 20)
-# =========================================================
 @app.route("/agent/<username>")
 def agent_profile(username):
     if "username" not in session: return redirect(url_for("login"))
@@ -356,20 +390,17 @@ def agent_profile(username):
     c = conn.cursor()
     c.execute("SELECT * FROM users WHERE username = %s", (username,))
     agent = c.fetchone()
-    
     if not agent:
         flash("Agent not found.", "error")
         conn.close()
         return redirect(url_for("dashboard"))
-        
     c.execute("SELECT * FROM media WHERE uploaded_by = %s AND approved = 1 AND filename != 'SHAYARI_TEXT' ORDER BY id DESC", (username,))
     agent_uploads = c.fetchall()
     conn.close()
-    
     return render_template("agent.html", agent=agent, uploads=agent_uploads, post_count=len(agent_uploads))
 
 # =========================================================
-# SAAS PRO TIER & GALLERY
+# ROUTES: GALLERY & PRO
 # =========================================================
 @app.route("/pro", methods=["GET", "POST"])
 def pro_upgrade():
@@ -388,7 +419,6 @@ def pro_upgrade():
 @app.route("/gallery/<category>", methods=["GET", "POST"])
 def gallery(category):
     if "username" not in session: return redirect(url_for("login"))
-    
     conn = get_db_connection()
     c = conn.cursor()
     
@@ -503,11 +533,20 @@ def like(media_id):
     conn = get_db_connection()
     c = conn.cursor()
     c.execute("INSERT INTO likes (media_id, username) VALUES (%s, %s) ON CONFLICT (media_id, username) DO NOTHING", (media_id, username))
+    
     if c.rowcount == 1:
         c.execute("UPDATE media SET likes = likes + 1 WHERE id = %s", (media_id,))
+        # NOTIFICATION LOGIC
+        c.execute("SELECT uploaded_by, title, category FROM media WHERE id = %s", (media_id,))
+        media_info = c.fetchone()
+        if media_info and media_info['uploaded_by'] != username:
+            msg = f"❤️ {username} liked your asset: {media_info['title']}"
+            link = f"/gallery/{media_info['category']}"
+            c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (media_info['uploaded_by'], msg, link))
         conn.commit()
         liked_now = True
     else: liked_now = False
+    
     c.execute("SELECT likes FROM media WHERE id = %s", (media_id,))
     likes = c.fetchone()["likes"]
     conn.close()
@@ -521,6 +560,13 @@ def add_comment(media_id):
         conn = get_db_connection()
         c = conn.cursor()
         c.execute("INSERT INTO comments (media_id, username, comment_text) VALUES (%s, %s, %s)", (media_id, session["username"], text[:200]))
+        # NOTIFICATION LOGIC
+        c.execute("SELECT uploaded_by, title, category FROM media WHERE id = %s", (media_id,))
+        media_info = c.fetchone()
+        if media_info and media_info['uploaded_by'] != session["username"]:
+            msg = f"💬 {session['username']} commented: '{text[:20]}...' on {media_info['title']}"
+            link = f"/gallery/{media_info['category']}"
+            c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (media_info['uploaded_by'], msg, link))
         conn.commit()
         conn.close()
         flash("Comment posted!", "success")
@@ -616,6 +662,13 @@ def approve(id):
     conn = get_db_connection()
     c = conn.cursor()
     c.execute("UPDATE media SET approved = 1 WHERE id = %s", (id,))
+    # NOTIFICATION LOGIC
+    c.execute("SELECT uploaded_by, title, category FROM media WHERE id = %s", (id,))
+    media_info = c.fetchone()
+    if media_info:
+        msg = f"✅ Approved! Your asset '{media_info['title']}' is now live."
+        link = f"/gallery/{media_info['category']}"
+        c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (media_info['uploaded_by'], msg, link))
     conn.commit()
     conn.close()
     flash("Approved!", "success")
