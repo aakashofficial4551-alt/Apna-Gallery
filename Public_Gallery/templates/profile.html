@@ -27,17 +27,22 @@
     </form>
 
     <div style="flex: 1;">
-        <!-- VERIFIED BLUE TICK LOGIC -->
         <h1 style="color: var(--accent); margin: 0 0 10px 0; display: flex; align-items: center; gap: 8px;">
             {{ user.username }}
             {% if user.role in ['pro', 'admin'] %}
                 <span style="color: #38bdf8; font-size: 1.5rem;" title="Verified PRO Agent">☑️</span>
             {% endif %}
         </h1>
-        <p style="color: var(--text-muted); margin: 0 0 5px 0;">{{ user.bio }}</p>
+        <p style="color: var(--text-muted); margin: 0 0 15px 0;">{{ user.bio }}</p>
+        
+        <!-- NETWORK STATS -->
+        <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+            <span style="background: rgba(8,17,31,0.6); padding: 5px 10px; border-radius: 6px; font-size: 0.9rem; color: var(--success);">👥 {{ followers_count }} Followers</span>
+            <span style="background: rgba(8,17,31,0.6); padding: 5px 10px; border-radius: 6px; font-size: 0.9rem; color: var(--accent);">🫂 {{ following_count }} Following</span>
+        </div>
         
         <!-- STORY UPLOAD -->
-        <form id="storyForm" method="POST" enctype="multipart/form-data" style="margin-top: 15px;">
+        <form id="storyForm" method="POST" enctype="multipart/form-data">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="action" value="story">
             <label class="btn" style="background: var(--warning); color: #000; cursor: pointer;">
@@ -83,7 +88,6 @@
     </div>
 </div>
 
-<!-- TOAST FOR SHARE -->
 <div id="toast" style="visibility: hidden; min-width: 250px; background-color: var(--success); color: white; text-align: center; border-radius: 8px; padding: 16px; position: fixed; z-index: 10000; left: 50%; bottom: 30px; transform: translateX(-50%); font-weight: bold;">✅ Profile Link Copied!</div>
 
 <script>
