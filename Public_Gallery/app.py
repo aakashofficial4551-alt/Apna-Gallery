@@ -405,10 +405,24 @@ def admin():
     
     conn = get_db_connection()
     c = conn.cursor()
+    
+    # Pendings fetch karna
     c.execute("SELECT * FROM media WHERE approved = 0 ORDER BY id DESC")
     pending_media = c.fetchall()
+    
+    # Analytics / Stats fetch karna
+    c.execute("SELECT COUNT(*) as count FROM users")
+    user_count = c.fetchone()['count']
+    
+    c.execute("SELECT COUNT(*) as count FROM media WHERE approved = 1")
+    media_count = c.fetchone()['count']
+    
+    c.execute("SELECT SUM(likes) as total FROM media")
+    likes_count = c.fetchone()['total'] or 0
+    
     conn.close()
-    return render_template("admin.html", pending_media=pending_media, auth_required=False)
+    
+    return render_template("admin.html", pending_media=pending_media, user_count=user_count, media_count=media_count, likes_count=likes_count, auth_required=False)
 
 
 @app.route("/admin/audit-logs")
