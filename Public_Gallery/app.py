@@ -70,7 +70,7 @@ def timeago(dt):
     else: return f"{int(seconds/86400)}d ago"
 
 # =========================================================
-# DATABASE AUTO-HEALER (PHASE 39: REPORTS)
+# DATABASE AUTO-HEALER (PHASE 40: PRIVACY ENGINE)
 # =========================================================
 def upgrade_db():
     conn = get_db_connection()
@@ -81,14 +81,14 @@ def upgrade_db():
     c.execute("CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, sender VARCHAR(100) NOT NULL, receiver VARCHAR(100) NOT NULL, message TEXT NOT NULL, is_read BOOLEAN DEFAULT FALSE, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
     c.execute("CREATE TABLE IF NOT EXISTS bookmarks (id SERIAL PRIMARY KEY, username VARCHAR(100) NOT NULL, media_id INTEGER NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE(username, media_id))")
     c.execute("CREATE TABLE IF NOT EXISTS global_chat (id SERIAL PRIMARY KEY, sender VARCHAR(100) NOT NULL, message TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
-    
-    # NEW: REPORTS TABLE
     c.execute("CREATE TABLE IF NOT EXISTS reports (id SERIAL PRIMARY KEY, media_id INTEGER NOT NULL, reported_by VARCHAR(100) NOT NULL, reason TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE(media_id, reported_by))")
     conn.commit()
 
     try:
         c.execute("ALTER TABLE media ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
         c.execute("ALTER TABLE comments ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+        # NEW: PRIVACY COLUMN
+        c.execute("ALTER TABLE media ADD COLUMN IF NOT EXISTS visibility VARCHAR(20) DEFAULT 'public'")
         conn.commit()
     except: conn.rollback()
 
@@ -115,6 +115,8 @@ def upgrade_db():
         c.execute("UPDATE users SET role = 'user' WHERE role IS NULL")
         c.execute("UPDATE users SET status = 'ACTIVE' WHERE status IS NULL")
         c.execute("UPDATE users SET theme = 'cyan' WHERE theme IS NULL")
+        # Set old posts to public by default
+        c.execute("UPDATE media SET visibility = 'public' WHERE visibility IS NULL")
         conn.commit()
     except: conn.rollback()
 
@@ -200,20 +202,6 @@ def save_uploaded_file(file, category="Photo"):
         print(f"Cloudinary Error: {e}")
         return None
 
-def send_otp_email(to_email, otp):
-    sender = os.environ.get("SMTP_EMAIL")
-    password = os.environ.get("SMTP_PASSWORD")
-    if not sender or not password: return True 
-    try:
-        server = smtplib.SMTP('smtp.gmail.com', 587)
-        server.starttls()
-        server.login(sender, password)
-        msg = f"Subject: Apna Gallery Verification\n\nYour OTP is: {otp}\nDo not share this with anyone."
-        server.sendmail(sender, to_email, msg)
-        server.quit()
-        return True
-    except: return False
-
 def current_user_is_admin():
     return session.get("role") == "admin"
 
@@ -261,7 +249,7 @@ def login():
                           (username, email, generate_password_hash(password), code))
                 conn.commit()
                 session.update({"username": username, "is_registered": True, "is_admin": False, "role": "user"})
-                flash(f"Account created! Welcome to Apna Gallery!", "success")
+                flash("Account created! Welcome to Apna Gallery!", "success")
                 return redirect(url_for("feed"))
             except:
                 flash("Username or Email exists.", "error")
@@ -288,52 +276,14 @@ def login():
                 return redirect(url_for("feed"))
             conn.close()
             flash("Invalid credentials.", "error")
-
-        elif action == "forgot":
-            email = request.form.get("email", "").strip()
-            conn = get_db_connection()
-            c = conn.cursor()
-            c.execute("SELECT * FROM users WHERE email = %s", (email,))
-            user = c.fetchone()
-            if user:
-                otp = ''.join(secrets.choice("0123456789") for _ in range(6))
-                c.execute("UPDATE users SET otp = %s WHERE email = %s", (otp, email))
-                conn.commit()
-                send_otp_email(email, otp)
-                session['reset_email'] = email
-                flash("OTP sent to email.", "success")
-                return redirect(url_for("verify_otp"))
-            else:
-                flash("Email not found.", "error")
-            conn.close()
-
+            
     return render_template("login.html")
-
-@app.route("/verify_otp", methods=["GET", "POST"])
-def verify_otp():
-    if 'reset_email' not in session: return redirect(url_for("login"))
-    if request.method == "POST":
-        otp = request.form.get("otp")
-        new_pass = request.form.get("new_password")
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute("SELECT * FROM users WHERE email = %s AND otp = %s", (session['reset_email'], otp))
-        if c.fetchone():
-            c.execute("UPDATE users SET password = %s, otp = NULL WHERE email = %s", (generate_password_hash(new_pass), session['reset_email']))
-            conn.commit()
-            session.pop('reset_email', None)
-            flash("Password updated successfully!", "success")
-            return redirect(url_for("login"))
-        flash("Invalid OTP.", "error")
-        conn.close()
-    return render_template("verify_otp.html")
 
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect(url_for("login"))
 
-# NEW: UNIVERSAL SETTINGS HUB
 @app.route("/settings", methods=["POST"])
 def settings():
     if "username" not in session: return redirect(url_for("login"))
@@ -364,13 +314,14 @@ def settings():
     return redirect(request.referrer or url_for("dashboard"))
 
 # =========================================================
-# UNIVERSAL UPLOAD ROUTE WITH MENTIONS
+# UNIVERSAL UPLOAD ROUTE WITH PRIVACY CONTROL
 # =========================================================
 @app.route("/upload_asset", methods=["POST"])
 def upload_asset():
     if "username" not in session: return redirect(url_for("login"))
     category = request.form.get("category", "Photo")
     title = request.form.get("title", "Untitled")
+    visibility = request.form.get("visibility", "public") # NEW: Privacy Control
     file = request.files.get("media")
     filename = "SHAYARI_TEXT"
 
@@ -385,21 +336,19 @@ def upload_asset():
     conn = get_db_connection()
     c = conn.cursor()
     
-    c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved) VALUES (%s, %s, %s, %s, %s, %s)",
-              (filename, title, category, "", session.get("username"), is_approved))
+    c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved, visibility) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+              (filename, title, category, "", session.get("username"), is_approved, visibility))
     
     mentions = set(re.findall(r'@(\w+)', title))
     for m in mentions:
         if m != session["username"]:
             c.execute("SELECT id FROM users WHERE username = %s", (m,))
             if c.fetchone():
-                msg = f"📣 {session['username']} mentioned you in a post!"
-                link = f"/agent/{session['username']}"
-                c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (m, msg, link))
+                c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (m, f"📣 {session['username']} mentioned you in a post!", f"/agent/{session['username']}"))
                 
     conn.commit()
     conn.close()
-    flash("Asset published successfully!" if is_approved else "Asset sent to Admin for approval.", "success")
+    flash(f"Asset published as {visibility.upper()}!" if is_approved else "Asset sent to Admin for approval.", "success")
     return redirect(request.referrer or url_for("feed"))
 
 @app.route("/api/network/<action_type>/<username>")
@@ -416,7 +365,7 @@ def api_network(action_type, username):
     return jsonify(results)
 
 # =========================================================
-# CORE ROUTES (DUAL FEED)
+# CORE ROUTES (DUAL FEED WITH PRIVACY FILTERS)
 # =========================================================
 @app.route("/")
 def index():
@@ -431,19 +380,22 @@ def feed():
     tab = request.args.get("tab", "foryou")
     
     if tab == "global":
-        c.execute("SELECT m.*, u.profile_pic, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.approved = 1 AND m.filename != 'SHAYARI_TEXT' ORDER BY m.id DESC LIMIT 50")
+        # Global Feed: Only show 'public' posts
+        c.execute("SELECT m.*, u.profile_pic, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' ORDER BY m.id DESC LIMIT 50")
         feed_posts = c.fetchall()
     else:
+        # For You Feed: Show posts from people you follow (Public + Followers Only)
         c.execute("""
             SELECT m.*, u.profile_pic, u.role 
             FROM media m JOIN users u ON m.uploaded_by = u.username 
             JOIN followers f ON f.following = m.uploaded_by 
-            WHERE f.follower = %s AND m.approved = 1 AND m.filename != 'SHAYARI_TEXT' 
+            WHERE f.follower = %s AND m.approved = 1 AND m.visibility IN ('public', 'followers') AND m.filename != 'SHAYARI_TEXT' 
             ORDER BY m.id DESC LIMIT 50
         """, (session["username"],))
         feed_posts = c.fetchall()
         if not feed_posts:
-            c.execute("SELECT m.*, u.profile_pic, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.approved = 1 AND m.filename != 'SHAYARI_TEXT' ORDER BY m.id DESC LIMIT 10")
+            # Fallback
+            c.execute("SELECT m.*, u.profile_pic, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' ORDER BY m.id DESC LIMIT 10")
             feed_posts = c.fetchall()
 
     c.execute("SELECT c.*, u.role FROM comments c JOIN users u ON c.username = u.username ORDER BY c.id ASC")
@@ -462,7 +414,8 @@ def explore():
     if "username" not in session: return redirect(url_for("login"))
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("SELECT m.id, m.filename, m.title, m.category, m.likes, m.uploaded_by FROM media m WHERE m.approved = 1 AND m.filename != 'SHAYARI_TEXT' ORDER BY RANDOM() LIMIT 40")
+    # Explore only shows public assets
+    c.execute("SELECT m.id, m.filename, m.title, m.category, m.likes, m.uploaded_by FROM media m WHERE m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' ORDER BY RANDOM() LIMIT 40")
     explore_posts = c.fetchall()
     conn.close()
     return render_template("explore.html", posts=explore_posts)
@@ -487,7 +440,8 @@ def dashboard():
     sync_admin_session()
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("SELECT * FROM media WHERE approved = 1 AND filename != 'SHAYARI_TEXT' ORDER BY likes DESC LIMIT 3")
+    # Trending only shows public
+    c.execute("SELECT * FROM media WHERE approved = 1 AND m.visibility = 'public' AND filename != 'SHAYARI_TEXT' ORDER BY likes DESC LIMIT 3")
     trending = c.fetchall()
     c.execute("SELECT s.*, u.profile_pic, u.role FROM stories s JOIN users u ON s.username = u.username WHERE s.created_at >= NOW() - INTERVAL '12 hours' ORDER BY s.id DESC")
     stories = c.fetchall()
@@ -528,6 +482,7 @@ def profile():
 
     c.execute("SELECT * FROM users WHERE username = %s", (session["username"],))
     user = c.fetchone()
+    # User can see ALL their own media regardless of visibility
     c.execute("SELECT * FROM media WHERE uploaded_by = %s ORDER BY id DESC", (session["username"],))
     my_uploads = c.fetchall()
     
@@ -543,7 +498,7 @@ def profile():
     return render_template("profile.html", user=user, my_uploads=my_uploads, saved_uploads=saved_uploads, post_count=len(my_uploads), followers_count=followers_count, following_count=following_count)
 
 # =========================================================
-# PUBLIC PORTFOLIO & FOLLOW SYSTEM
+# PUBLIC PORTFOLIO WITH PRIVACY CHECK
 # =========================================================
 @app.route("/agent/<username>")
 def agent_profile(username):
@@ -557,16 +512,21 @@ def agent_profile(username):
         conn.close()
         return redirect(url_for("feed"))
         
-    c.execute("SELECT m.*, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.uploaded_by = %s AND m.approved = 1 AND m.filename != 'SHAYARI_TEXT' ORDER BY m.id DESC", (username,))
+    c.execute("SELECT id FROM followers WHERE follower = %s AND following = %s", (session["username"], username))
+    is_following = bool(c.fetchone())
+    
+    # PRIVACY CHECK: If following, show public + followers. Else, show only public. Private is hidden.
+    if is_following:
+        c.execute("SELECT m.*, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.uploaded_by = %s AND m.approved = 1 AND m.visibility IN ('public', 'followers') AND m.filename != 'SHAYARI_TEXT' ORDER BY m.id DESC", (username,))
+    else:
+        c.execute("SELECT m.*, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.uploaded_by = %s AND m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' ORDER BY m.id DESC", (username,))
+        
     agent_uploads = c.fetchall()
     
     c.execute("SELECT COUNT(*) as cnt FROM followers WHERE following = %s", (username,))
     followers_count = c.fetchone()['cnt']
     c.execute("SELECT COUNT(*) as cnt FROM followers WHERE follower = %s", (username,))
     following_count = c.fetchone()['cnt']
-    
-    c.execute("SELECT id FROM followers WHERE follower = %s AND following = %s", (session["username"], username))
-    is_following = bool(c.fetchone())
     conn.close()
     
     return render_template("agent.html", agent=agent, uploads=agent_uploads, post_count=len(agent_uploads), followers_count=followers_count, following_count=following_count, is_following=is_following)
@@ -590,9 +550,7 @@ def follow(username):
         following_now = False
     else:
         c.execute("INSERT INTO followers (follower, following) VALUES (%s, %s)", (current_user, username))
-        msg = f"👤 {current_user} started following you!"
-        link = f"/agent/{current_user}"
-        c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (username, msg, link))
+        c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (username, f"👤 {current_user} started following you!", f"/agent/{current_user}"))
         following_now = True
         
     conn.commit()
@@ -712,14 +670,15 @@ def gallery(category):
                     return redirect(url_for("gallery", category=category))
         
         is_approved = 1 if current_user_is_admin() else 0
-        c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved) VALUES (%s, %s, %s, %s, %s, %s)",
-                  (filename, request.form.get("title", "Untitled"), category, "", session.get("username"), is_approved))
+        visibility = request.form.get("visibility", "public")
+        c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved, visibility) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                  (filename, request.form.get("title", "Untitled"), category, "", session.get("username"), is_approved, visibility))
         conn.commit()
         flash("File live!" if is_approved else "Sent to Admin for approval.", "success")
         return redirect(url_for("gallery", category=category))
 
-    c.execute("SELECT m.*, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.category = %s AND m.approved = 1 AND m.filename != 'SHAYARI_TEXT' ORDER BY m.id DESC", (category,))
-    if category == 'Shayari': c.execute("SELECT m.*, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.category = %s AND m.approved = 1 ORDER BY m.id DESC", (category,))
+    c.execute("SELECT m.*, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.category = %s AND m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' ORDER BY m.id DESC", (category,))
+    if category == 'Shayari': c.execute("SELECT m.*, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.category = %s AND m.approved = 1 AND m.visibility = 'public' ORDER BY m.id DESC", (category,))
     media_files = c.fetchall()
     c.execute("SELECT c.*, u.role FROM comments c JOIN users u ON c.username = u.username ORDER BY c.id ASC")
     comments_db = c.fetchall()
@@ -727,32 +686,6 @@ def gallery(category):
     comments = defaultdict(list)
     for comment in comments_db: comments[comment["media_id"]].append(comment)
     return render_template("gallery.html", media_files=media_files, category=category, comments=comments)
-
-@app.route("/search")
-def search():
-    if "username" not in session: return redirect(url_for("login"))
-    query = request.args.get("q", "").strip()
-    if not query: return redirect(url_for("dashboard"))
-    conn = get_db_connection()
-    c = conn.cursor()
-    clean_query = query.replace("#", "").replace("@", "")
-    search_term = f"%{clean_query}%"
-    c.execute("SELECT m.*, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.approved = 1 AND m.filename != 'SHAYARI_TEXT' AND (m.title ILIKE %s OR m.prompt ILIKE %s) ORDER BY m.id DESC", (search_term, search_term))
-    media_files = c.fetchall()
-    c.execute("SELECT username, profile_pic, role, bio FROM users WHERE username ILIKE %s LIMIT 20", (search_term,))
-    found_users = c.fetchall()
-    conn.close()
-    return render_template("search.html", media_files=media_files, found_users=found_users, query=query)
-
-@app.route("/leaderboard")
-def leaderboard():
-    if "username" not in session: return redirect(url_for("login"))
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("SELECT m.uploaded_by as username, COUNT(m.id) as total_uploads, COALESCE(SUM(m.likes), 0) as total_likes, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.approved = 1 GROUP BY m.uploaded_by, u.role ORDER BY total_likes DESC")
-    leaders = c.fetchall()
-    conn.close()
-    return render_template("leaderboard.html", leaders=leaders)
 
 @app.route("/bookmark/<int:media_id>", methods=["POST"])
 def bookmark(media_id):
@@ -788,7 +721,7 @@ def ai_studio():
                 secure_url = cloudinary.uploader.upload(r.content, resource_type="image")["secure_url"] if r.status_code == 200 else image_url
                 conn = get_db_connection()
                 c = conn.cursor()
-                c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved) VALUES (%s, %s, %s, %s, %s, 1)",
+                c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved, visibility) VALUES (%s, %s, %s, %s, %s, 1, 'public')",
                           (secure_url, f"AI: {prompt[:20]}...", "Photo", prompt, session["username"]))
                 conn.commit()
                 conn.close()
@@ -822,9 +755,7 @@ def like(media_id):
         c.execute("SELECT uploaded_by, title, category FROM media WHERE id = %s", (media_id,))
         media_info = c.fetchone()
         if media_info and media_info['uploaded_by'] != username:
-            msg = f"❤️ {username} liked your asset: {media_info['title']}"
-            link = f"/gallery/{media_info['category']}"
-            c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (media_info['uploaded_by'], msg, link))
+            c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (media_info['uploaded_by'], f"❤️ {username} liked your asset: {media_info['title']}", f"/gallery/{media_info['category']}"))
         conn.commit()
         liked_now = True
     else: liked_now = False
@@ -846,17 +777,14 @@ def add_comment(media_id):
         media_info = c.fetchone()
         
         if media_info and media_info['uploaded_by'] != session["username"]:
-            msg = f"💬 {session['username']} commented on {media_info['title']}"
-            link = f"/gallery/{media_info['category']}"
-            c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (media_info['uploaded_by'], msg, link))
+            c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (media_info['uploaded_by'], f"💬 {session['username']} commented on {media_info['title']}", f"/gallery/{media_info['category']}"))
             
         mentions = set(re.findall(r'@(\w+)', text))
         for m in mentions:
             if m != session["username"]:
                 c.execute("SELECT id FROM users WHERE username = %s", (m,))
                 if c.fetchone():
-                    msg = f"📣 {session['username']} mentioned you in a comment!"
-                    c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (m, msg, f"/gallery/{media_info['category']}"))
+                    c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (m, f"📣 {session['username']} mentioned you in a comment!", f"/gallery/{media_info['category']}"))
         conn.commit()
         conn.close()
         flash("Comment posted!", "success")
@@ -873,7 +801,6 @@ def delete_own(media_id):
     flash("Asset permanently deleted.", "success")
     return redirect(request.referrer or url_for("profile"))
 
-# NEW: REPORT ASSET
 @app.route("/report/<int:media_id>", methods=["POST"])
 def report_asset(media_id):
     if "username" not in session: return jsonify({"error": "Login required"}), 401
@@ -888,7 +815,7 @@ def report_asset(media_id):
     finally: conn.close()
 
 # =========================================================
-# ADMIN CONTROLS (WITH REPORTS)
+# ADMIN CONTROLS
 # =========================================================
 @app.route("/admin", methods=["GET", "POST"])
 def admin():
@@ -921,7 +848,6 @@ def admin():
     c.execute("SELECT * FROM users ORDER BY id DESC")
     all_users = c.fetchall()
     
-    # FETCH REPORTS
     c.execute("SELECT r.id as report_id, r.media_id, r.reported_by, r.reason, r.created_at, m.title, m.filename, m.category, m.uploaded_by FROM reports r JOIN media m ON r.media_id = m.id ORDER BY r.id DESC")
     reports = c.fetchall()
     
@@ -967,9 +893,7 @@ def approve(id):
     c.execute("SELECT uploaded_by, title, category FROM media WHERE id = %s", (id,))
     media_info = c.fetchone()
     if media_info:
-        msg = f"✅ Approved! Your asset '{media_info['title']}' is now live."
-        link = f"/gallery/{media_info['category']}"
-        c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (media_info['uploaded_by'], msg, link))
+        c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (media_info['uploaded_by'], f"✅ Approved! '{media_info['title']}' is now live.", f"/gallery/{media_info['category']}"))
     conn.commit()
     conn.close()
     flash("Approved!", "success")
@@ -980,7 +904,6 @@ def delete(id):
     if not current_user_is_admin(): return redirect(url_for("admin"))
     conn = get_db_connection()
     c = conn.cursor()
-    # Also delete reports related to this media
     c.execute("DELETE FROM reports WHERE media_id = %s", (id,))
     c.execute("DELETE FROM media WHERE id = %s", (id,))
     conn.commit()
