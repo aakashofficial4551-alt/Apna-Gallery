@@ -63,20 +63,18 @@
                     <a href="{{ url_for('pro_upgrade') }}" class="btn pro-btn" style="padding: 8px 15px; margin-right: 10px;">💎 PRO</a>
                 {% endif %}
                 
-                <!-- NEW: FEED ROUTE -->
-                <a href="{{ url_for('feed') }}" style="color: var(--accent);">📰 Feed</a>
+                <a href="{{ url_for('feed') }}">📰 Feed</a>
+                <a href="{{ url_for('explore') }}" style="color: var(--accent);">🌍 Explore</a>
                 
-                <a href="{{ url_for('inbox') }}" style="font-size: 1.3rem; margin-right: 5px;">
-                    ✉️
-                    {% if unread_messages > 0 %}<span class="notif-badge">{{ unread_messages }}</span>{% endif %}
+                <a href="{{ url_for('inbox') }}" style="font-size: 1.3rem;">
+                    ✉️ {% if unread_messages > 0 %}<span class="notif-badge">{{ unread_messages }}</span>{% endif %}
                 </a>
-                
                 <a href="{{ url_for('notifications') }}" style="font-size: 1.3rem; margin-right: 10px;">
-                    🔔
-                    {% if unread_notifications > 0 %}<span class="notif-badge">{{ unread_notifications }}</span>{% endif %}
+                    🔔 {% if unread_notifications > 0 %}<span class="notif-badge">{{ unread_notifications }}</span>{% endif %}
                 </a>
                 
                 <a href="{{ url_for('dashboard') }}">Dashboard</a>
+                <a href="{{ url_for('creator_studio') }}" style="color: var(--warning);">📈 Studio</a>
                 <a href="{{ url_for('profile') }}">Profile</a>
                 
                 {% if session.get('role') == 'admin' %}
@@ -104,12 +102,5 @@
         {% block content %}{% endblock %}
     </div>
 
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register("{{ url_for('static', filename='service-worker.js') }}");
-            });
-        }
-    </script>
 </body>
 </html>
