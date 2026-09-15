@@ -4,9 +4,20 @@
 {% block content %}
 <div style="max-width: 800px; margin: 0 auto;">
     
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; border-bottom: 1px solid var(--border-color); padding-bottom: 15px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; border-bottom: 1px solid var(--border-color); padding-bottom: 15px; flex-wrap: wrap; gap: 15px;">
         <h1 style="color: var(--accent); margin: 0;">🔔 Activity Center</h1>
-        <a href="{{ url_for('dashboard') }}" class="btn" style="background: #334155; color: white;">&larr; HQ</a>
+        
+        <div style="display: flex; gap: 10px;">
+            <!-- NEW: CLEAR ALL NOTIFICATIONS -->
+            {% if notifications and notifications|length > 0 %}
+            <form method="POST" action="{{ url_for('clear_notifications') }}" onsubmit="return confirm('Clear all notifications?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn" style="background: rgba(239, 68, 68, 0.2); border: 1px solid var(--danger); color: var(--danger);">🧹 Clear All</button>
+            </form>
+            {% endif %}
+            
+            <a href="{{ url_for('dashboard') }}" class="btn" style="background: #334155; color: white;">&larr; HQ</a>
+        </div>
     </div>
 
     <div style="display: flex; flex-direction: column; gap: 15px;">
@@ -14,11 +25,9 @@
         <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-left: 4px solid {% if n.is_read %}var(--border-color){% else %}var(--accent){% endif %}; border-radius: 12px; padding: 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 5px 15px rgba(0,0,0,0.2); transition: 0.3s;">
             
             <div>
-                <!-- Format text filter will make sure if any # or @ is in notification, it becomes colorful -->
                 <p style="margin: 0; font-size: 1.1rem; color: {% if n.is_read %}var(--text-muted){% else %}var(--text-main){% endif %};">
                     {{ n.message | format_text | safe }}
                 </p>
-                <!-- NEW TIME AGO FILTER -->
                 <p style="margin: 5px 0 0 0; font-size: 0.85rem; color: var(--text-muted); font-weight: bold;">
                     🕒 {{ n.created_at | timeago }}
                 </p>
