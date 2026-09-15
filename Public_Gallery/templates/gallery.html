@@ -29,6 +29,8 @@
     .action-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-top: 1px solid var(--border-color); padding-top: 15px; }
     .btn-like { background: transparent; border: 1px solid var(--danger); color: var(--danger); padding: 6px 12px; border-radius: 6px; cursor: pointer; transition: 0.2s; font-weight: bold; }
     .btn-like:hover, .btn-like.liked { background: var(--danger); color: white; }
+    .btn-share { background: transparent; border: 1px solid var(--accent); color: var(--accent); padding: 6px 12px; border-radius: 6px; cursor: pointer; transition: 0.2s; font-weight: bold; }
+    .btn-share:hover { background: var(--accent); color: #000; }
     
     .comments-section { background: rgba(8, 17, 31, 0.4); border-radius: 8px; padding: 10px; flex: 1; }
     .comments-list { max-height: 120px; overflow-y: auto; margin-bottom: 10px; font-size: 0.85rem; }
@@ -43,6 +45,12 @@
     #lightbox-img { max-width: 90%; max-height: 75vh; border-radius: 12px; box-shadow: 0 0 30px rgba(56, 189, 248, 0.3); }
     .close-btn { position: absolute; top: 20px; right: 40px; font-size: 3rem; color: white; cursor: pointer; transition: 0.2s; }
     .close-btn:hover { color: var(--danger); }
+
+    /* Toast Notification */
+    #toast { visibility: hidden; min-width: 250px; background-color: var(--success); color: white; text-align: center; border-radius: 8px; padding: 16px; position: fixed; z-index: 10000; left: 50%; bottom: 30px; transform: translateX(-50%); font-weight: bold; font-size: 1rem; box-shadow: 0 5px 15px rgba(0,0,0,0.4); }
+    #toast.show { visibility: visible; animation: fadein 0.5s, fadeout 0.5s 2.5s; }
+    @keyframes fadein { from { bottom: 0; opacity: 0; } to { bottom: 30px; opacity: 1; } }
+    @keyframes fadeout { from { bottom: 30px; opacity: 1; } to { bottom: 0; opacity: 0; } }
 </style>
 {% endblock %}
 
@@ -74,12 +82,12 @@
             {% if category == 'Shayari' %}
                 <div style="padding: 20px; text-align: center; color: white; font-style: italic; background: linear-gradient(135deg, #1e293b, #0f172a); width: 100%; height: 100%; display: grid; place-items: center; overflow-y: auto;">"{{ item.prompt }}"</div>
             {% elif category == 'Photo' %}
-                <!-- Added onclick for Lightbox -->
-                <img src="{{ item.filename }}" alt="{{ item.title }}" onclick="openLightbox('{{ item.filename }}')">
+                <!-- ADDED LAZY LOADING -->
+                <img src="{{ item.filename }}" alt="{{ item.title }}" loading="lazy" onclick="openLightbox('{{ item.filename }}')">
             {% elif category == 'Video' %}
-                <video src="{{ item.filename }}" controls></video>
+                <video src="{{ item.filename }}" controls preload="metadata"></video>
             {% elif category == 'Music' %}
-                <audio src="{{ item.filename }}" controls></audio>
+                <audio src="{{ item.filename }}" controls preload="metadata"></audio>
             {% elif category == 'Document' %}
                 <a href="{{ item.filename }}" target="_blank" style="text-decoration: none; color: inherit; display: flex; flex-direction: column; align-items: center;"><span class="doc-icon">📄</span><span style="margin-top: 10px; color: var(--accent);">View Document</span></a>
             {% endif %}
@@ -92,9 +100,15 @@
                 <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 15px; font-style: italic;">"{{ item.prompt }}"</p>
             {% endif %}
             
+            <!-- ADDED SHARE BUTTON HERE -->
             <div class="action-bar">
                 <button class="btn-like" id="like-btn-{{ item.id }}" onclick="toggleLike({{ item.id }})">❤️ <span id="like-count-{{ item.id }}">{{ item.likes }}</span></button>
-                <span style="font-size: 0.85rem; color: var(--text-muted);">ID: #{{ item.id }}</span>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <span style="font-size: 0.85rem; color: var(--text-muted);">#{{ item.id }}</span>
+                    {% if category in ['Photo', 'Video'] %}
+                    <button class="btn-share" onclick="shareAsset('{{ item.filename }}')">🔗 Share</button>
+                    {% endif %}
+                </div>
             </div>
             
             <div class="comments-section">
@@ -120,14 +134,17 @@
     {% endfor %}
 </div>
 
-<!-- NEW: Lightbox Modal HTML -->
+<!-- Lightbox Modal -->
 <div id="lightbox">
     <span class="close-btn" onclick="closeLightbox()">&times;</span>
     <img id="lightbox-img" src="" alt="Zoomed Image">
     <a id="lightbox-download" href="" target="_blank" download class="btn" style="margin-top: 25px; font-size: 1.1rem; background: var(--success); color: white;">
-        ⬇️ Download Original Quality
+        ⬇️ Download Original
     </a>
 </div>
+
+<!-- Toast Notification -->
+<div id="toast">✅ Link Copied! Ready to share.</div>
 
 <script>
 // Like Script
@@ -152,9 +169,19 @@ function openLightbox(imageSrc) {
 function closeLightbox() {
     document.getElementById('lightbox').style.display = 'none';
 }
-// Close on outside click
 document.getElementById('lightbox').addEventListener('click', function(e) {
     if (e.target === this) { closeLightbox(); }
 });
+
+// Share Feature (Copy to Clipboard)
+function shareAsset(url) {
+    navigator.clipboard.writeText(url).then(() => {
+        var toast = document.getElementById("toast");
+        toast.className = "show";
+        setTimeout(function(){ toast.className = toast.className.replace("show", ""); }, 3000);
+    }).catch(err => {
+        console.error('Failed to copy: ', err);
+    });
+}
 </script>
 {% endblock %}
