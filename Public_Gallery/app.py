@@ -43,7 +43,7 @@ app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "development-only-secret
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
 
 # =========================================================
-# DATABASE AUTO-HEALER & NETWORK UPGRADE
+# DATABASE AUTO-HEALER & MESSAGING UPGRADE
 # =========================================================
 def upgrade_db():
     conn = get_db_connection()
@@ -66,7 +66,6 @@ def upgrade_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    # NEW: FOLLOWERS TABLE
     c.execute("""
         CREATE TABLE IF NOT EXISTS followers (
             id SERIAL PRIMARY KEY,
@@ -74,6 +73,17 @@ def upgrade_db():
             following VARCHAR(100) NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(follower, following)
+        )
+    """)
+    # NEW: MESSAGES TABLE
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS messages (
+            id SERIAL PRIMARY KEY,
+            sender VARCHAR(100) NOT NULL,
+            receiver VARCHAR(100) NOT NULL,
+            message TEXT NOT NULL,
+            is_read BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
     conn.commit()
@@ -129,6 +139,8 @@ def cleanup_database():
         c.execute("DELETE FROM users WHERE role = 'user' AND last_active < NOW() - INTERVAL '90 days'")
         c.execute("DELETE FROM stories WHERE created_at < NOW() - INTERVAL '12 hours'")
         c.execute("DELETE FROM notifications WHERE id NOT IN (SELECT id FROM notifications ORDER BY id DESC LIMIT 500)")
+        # Delete DMs older than 30 days to save DB limits
+        c.execute("DELETE FROM messages WHERE created_at < NOW() - INTERVAL '30 days'")
         conn.commit()
     except: pass
     finally: conn.close()
@@ -157,14 +169,19 @@ def update_activity():
 
 @app.context_processor
 def inject_global_vars():
-    vars_dict = {"csrf_token": get_csrf_token, "unread_notifications": 0}
+    vars_dict = {"csrf_token": get_csrf_token, "unread_notifications": 0, "unread_messages": 0}
     if session.get("username"):
         try:
             conn = get_db_connection()
             c = conn.cursor()
             c.execute("SELECT COUNT(id) as cnt FROM notifications WHERE username = %s AND is_read = FALSE", (session.get("username"),))
-            res = c.fetchone()
-            if res: vars_dict["unread_notifications"] = res['cnt']
+            res1 = c.fetchone()
+            if res1: vars_dict["unread_notifications"] = res1['cnt']
+            
+            c.execute("SELECT COUNT(id) as cnt FROM messages WHERE receiver = %s AND is_read = FALSE", (session.get("username"),))
+            res2 = c.fetchone()
+            if res2: vars_dict["unread_messages"] = res2['cnt']
+            
             conn.close()
         except: pass
     return vars_dict
@@ -329,7 +346,7 @@ def request_delete():
     return redirect(url_for("login"))
 
 # =========================================================
-# CORE ROUTES (Dashboard, Profile, Notifications)
+# CORE ROUTES (Dashboard, Profile)
 # =========================================================
 @app.route("/")
 @app.route("/dashboard")
@@ -388,7 +405,6 @@ def profile():
     c.execute("SELECT * FROM media WHERE uploaded_by = %s ORDER BY id DESC", (session["username"],))
     my_uploads = c.fetchall()
     
-    # NETWORK COUNTS
     c.execute("SELECT COUNT(*) as cnt FROM followers WHERE following = %s", (session["username"],))
     followers_count = c.fetchone()['cnt']
     c.execute("SELECT COUNT(*) as cnt FROM followers WHERE follower = %s", (session["username"],))
@@ -456,6 +472,68 @@ def follow(username):
     conn.close()
     
     return jsonify({"followers": followers_count, "following_now": following_now})
+
+# =========================================================
+# DIRECT MESSAGING (INBOX & CHAT) - PHASE 23
+# =========================================================
+@app.route("/inbox")
+def inbox():
+    if "username" not in session: return redirect(url_for("login"))
+    me = session["username"]
+    conn = get_db_connection()
+    c = conn.cursor()
+    
+    # Get everyone I've chatted with
+    c.execute("""
+        SELECT u.username, u.profile_pic, u.role 
+        FROM users u 
+        WHERE u.username IN (
+            SELECT receiver FROM messages WHERE sender = %s
+            UNION 
+            SELECT sender FROM messages WHERE receiver = %s
+        )
+    """, (me, me))
+    contacts = c.fetchall()
+    
+    # Get unread counts per contact
+    for contact in contacts:
+        c.execute("SELECT COUNT(id) as cnt FROM messages WHERE sender = %s AND receiver = %s AND is_read = FALSE", (contact['username'], me))
+        contact['unread'] = c.fetchone()['cnt']
+        
+    conn.close()
+    return render_template("inbox.html", contacts=contacts)
+
+@app.route("/chat/<username>", methods=["GET", "POST"])
+def chat(username):
+    if "username" not in session: return redirect(url_for("login"))
+    me = session["username"]
+    
+    conn = get_db_connection()
+    c = conn.cursor()
+    
+    if request.method == "POST":
+        msg = request.form.get("message", "").strip()
+        if msg:
+            c.execute("INSERT INTO messages (sender, receiver, message) VALUES (%s, %s, %s)", (me, username, msg))
+            conn.commit()
+        return redirect(url_for("chat", username=username))
+        
+    # Mark messages from this user as read
+    c.execute("UPDATE messages SET is_read = TRUE WHERE sender = %s AND receiver = %s AND is_read = FALSE", (username, me))
+    conn.commit()
+    
+    c.execute("SELECT * FROM messages WHERE (sender = %s AND receiver = %s) OR (sender = %s AND receiver = %s) ORDER BY created_at ASC", (me, username, username, me))
+    chat_history = c.fetchall()
+    
+    c.execute("SELECT username, profile_pic, role FROM users WHERE username = %s", (username,))
+    contact = c.fetchone()
+    conn.close()
+    
+    if not contact:
+        flash("User not found.", "error")
+        return redirect(url_for("inbox"))
+        
+    return render_template("chat.html", chat_history=chat_history, contact=contact)
 
 # =========================================================
 # ROUTES: GALLERY & PRO
