@@ -43,13 +43,13 @@ app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "development-only-secret
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
 
 # =========================================================
-# DATABASE AUTO-UPGRADER
+# DATABASE AUTO-UPGRADER & AUTO-HEAL (FIXED)
 # =========================================================
 def upgrade_db():
     conn = get_db_connection()
     c = conn.cursor()
     
-    # Create Stories Table
+    # 1. Create Stories Table
     c.execute("""
         CREATE TABLE IF NOT EXISTS stories (
             id SERIAL PRIMARY KEY,
@@ -60,13 +60,18 @@ def upgrade_db():
     """)
     conn.commit()
 
-    # Add new columns to users if missing
+    # 2. Safely add ALL possible missing columns to avoid 500 Errors
     queries = [
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(120) UNIQUE",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS user_code VARCHAR(10) UNIQUE",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS deletion_requested TIMESTAMP",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS otp VARCHAR(6)"
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS otp VARCHAR(6)",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'ACTIVE'",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) DEFAULT 'user'",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS country VARCHAR(100)",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_pic TEXT"
     ]
     for q in queries:
         try:
@@ -75,7 +80,7 @@ def upgrade_db():
         except:
             conn.rollback()
             
-    # Generate 10-Digit codes for existing users
+    # 3. Generate 10-Digit codes for existing users
     try:
         c.execute("SELECT id FROM users WHERE user_code IS NULL")
         for row in c.fetchall():
@@ -529,7 +534,7 @@ def delete_own(media_id):
     return redirect(url_for("profile"))
 
 # =========================================================
-# ROUTES: ADMIN GOD MODE & MYSTERY
+# ROUTES: ADMIN GOD MODE & MYSTERY (FIXED)
 # =========================================================
 @app.route("/admin", methods=["GET", "POST"])
 def admin():
@@ -560,7 +565,8 @@ def admin():
     c.execute("SELECT SUM(likes) as total FROM media")
     likes_count = c.fetchone()['total'] or 0
     
-    c.execute("SELECT id, username, role, status, country FROM users ORDER BY id DESC")
+    # FIXED: Using SELECT * to avoid crash if any column is slightly misnamed in DB
+    c.execute("SELECT * FROM users ORDER BY id DESC")
     all_users = c.fetchall()
     conn.close()
     
