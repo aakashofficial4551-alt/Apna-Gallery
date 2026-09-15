@@ -26,18 +26,24 @@
             <th>Rank</th>
             <th>Agent Name</th>
             <th>Assets Uploaded</th>
-            <th>Total Engagement (Likes)</th>
+            <th>Total Engagement</th>
         </tr>
     </thead>
     <tbody>
         {% for leader in leaders %}
         <tr>
-            <td class="
-                {% if loop.index == 1 %}rank-1{% elif loop.index == 2 %}rank-2{% elif loop.index == 3 %}rank-3{% else %}style='color: white;'{% endif %}
-            ">
+            <td class="{% if loop.index == 1 %}rank-1{% elif loop.index == 2 %}rank-2{% elif loop.index == 3 %}rank-3{% else %}style='color: white;'{% endif %}">
                 #{{ loop.index }}
             </td>
-            <td style="font-weight: bold; color: white; font-size: 1.1rem;">{{ leader.username }}</td>
+            <td style="font-weight: bold; font-size: 1.1rem;">
+                <!-- Link to public agent profile -->
+                <a href="{{ url_for('agent_profile', username=leader.username) }}" style="color: white; text-decoration: none; display: flex; align-items: center; gap: 5px;">
+                    {{ leader.username }}
+                    {% if leader.role in ['pro', 'admin'] %}
+                        <span style="color: #38bdf8;" title="Verified PRO">☑️</span>
+                    {% endif %}
+                </a>
+            </td>
             <td style="color: var(--text-muted);">{{ leader.total_uploads }}</td>
             <td style="color: var(--danger); font-weight: bold;">❤️ {{ leader.total_likes }}</td>
         </tr>
