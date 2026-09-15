@@ -1,96 +1,13 @@
 {% extends "base.html" %}
 
-{% block title %}HQ Dashboard | Apna Gallery{% endblock %}
-
-{% block head %}
-<style>
-    .vault-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 20px;
-        margin-top: 30px;
-    }
-    .vault-card {
-        background: var(--bg-card);
-        border: 1px solid var(--border-color);
-        border-radius: 16px;
-        padding: 30px 20px;
-        text-align: center;
-        text-decoration: none;
-        color: white;
-        transition: all 0.3s ease;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-    }
-    .vault-card:hover {
-        transform: translateY(-5px);
-        border-color: var(--accent);
-        box-shadow: 0 10px 20px rgba(56, 189, 248, 0.15);
-    }
-    .vault-icon {
-        font-size: 3rem;
-        margin-bottom: 15px;
-        display: block;
-    }
-    
-    /* Feature Section */
-    .dashboard-features {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 25px;
-        margin-top: 40px;
-    }
-    @media (max-width: 768px) {
-        .dashboard-features { grid-template-columns: 1fr; }
-    }
-
-    .feature-card {
-        background: var(--bg-card);
-        border: 1px solid var(--border-color);
-        border-radius: 16px;
-        padding: 25px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-    }
-    .feature-card h3 {
-        color: var(--text-main);
-        margin-top: 0;
-        margin-bottom: 20px;
-        font-size: 1.3rem;
-        border-bottom: 1px solid var(--border-color);
-        padding-bottom: 15px;
-    }
-
-    /* AI Chat */
-    .chat-box {
-        background: var(--bg-main);
-        border: 1px solid var(--border-color);
-        border-radius: 10px;
-        height: 200px;
-        overflow-y: auto;
-        padding: 15px;
-        margin-bottom: 15px;
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-    }
-    .chat-msg { padding: 10px 14px; border-radius: 10px; font-size: 0.9rem; max-width: 85%; line-height: 1.4; }
-    .chat-user { background: var(--accent); color: var(--bg-main); align-self: flex-end; border-bottom-right-radius: 2px; font-weight: 600; }
-    .chat-bot { background: #1e293b; color: white; align-self: flex-start; border-bottom-left-radius: 2px; }
-    
-    .chat-input { display: flex; gap: 10px; }
-    .chat-input input {
-        flex: 1; background: var(--bg-main); border: 1px solid var(--border-color); color: white; padding: 12px; border-radius: 8px; outline: none;
-    }
-    .chat-input input:focus { border-color: var(--accent); }
-
-    /* Forms & Inputs */
-    .input-box {
-        width: 100%; background: var(--bg-main); border: 1px solid var(--border-color); color: white; padding: 12px; border-radius: 8px; outline: none; box-sizing: border-box; text-align: center; letter-spacing: 2px; font-weight: bold; margin-bottom: 15px;
-    }
-    .input-box:focus { border-color: var(--warning); }
-</style>
-{% endblock %}
+{% block title %}Dashboard | Apna Gallery{% endblock %}
 
 {% block content %}
+<div style="margin-bottom: 30px;">
+    <h1 style="color: var(--accent); margin: 0;">Welcome back, {{ session.username }}! 🚀</h1>
+    <p style="color: var(--text-muted); margin-top: 5px;">Access your secure vaults and agent tools below.</p>
+</div>
+
 <!-- INSTAGRAM STYLE LIVE STORIES -->
 {% if stories %}
 <div style="margin-bottom: 30px;">
@@ -98,7 +15,6 @@
     <div style="display: flex; gap: 20px; overflow-x: auto; padding-bottom: 15px;">
         {% for s in stories %}
         <div style="min-width: 80px; text-align: center;">
-            <!-- Story Ring -->
             <div style="width: 75px; height: 75px; border-radius: 50%; border: 3px solid var(--accent); padding: 3px; margin: 0 auto 8px auto; cursor: pointer; transition: transform 0.2s;" onclick="openLightbox('{{ s.filename }}')" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
                 {% if s.profile_pic %}
                     <img src="{{ s.profile_pic }}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">
@@ -111,27 +27,12 @@
         {% endfor %}
     </div>
 </div>
+{% endif %}
 
-<!-- Lightbox Modal (For viewing stories) -->
-<div id="lightbox" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 9999; justify-content: center; align-items: center; flex-direction: column; backdrop-filter: blur(5px);">
-    <span onclick="document.getElementById('lightbox').style.display='none'" style="position: absolute; top: 20px; right: 40px; font-size: 3rem; color: white; cursor: pointer;">&times;</span>
-    <img id="lightbox-img" src="" style="max-width: 90%; max-height: 80vh; border-radius: 12px; box-shadow: 0 0 30px rgba(56, 189, 248, 0.3);">
-</div>
-
-<script>
-    function openLightbox(imageSrc) {
-        document.getElementById('lightbox').style.display = 'flex';
-        document.getElementById('lightbox-img').src = imageSrc;
-    }
-</script>
-{% endif %}Welcome to HQ, {{ session.username }}</h1>
-    <p style="color: var(--text-muted); font-size: 1.1rem;">Select a secure vault or access advanced modules.</p>
-</div>
-
-<!-- NEW: Trending Assets Section -->
+<!-- TRENDING ASSETS -->
 {% if trending and trending|length > 0 %}
-<div style="margin-top: 20px; margin-bottom: 40px;">
-    <h3 style="color: var(--warning); margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">🔥 Trending Assets</h3>
+<div style="margin-bottom: 40px;">
+    <h3 style="color: #f43f5e; margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">🔥 Trending Now</h3>
     <div style="display: flex; gap: 15px; overflow-x: auto; padding-bottom: 15px;">
         {% for item in trending %}
         <div style="min-width: 200px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.3);">
@@ -145,106 +46,46 @@
                 {% endif %}
             </div>
             <p style="margin: 0; font-weight: bold; font-size: 0.9rem; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ item.title }}</p>
-            <p style="margin: 5px 0 0 0; font-size: 0.8rem; color: var(--accent);">❤️ {{ item.likes }} Likes</p>
+            <p style="margin: 5px 0 0 0; font-size: 0.8rem; color: var(--danger);">❤️ {{ item.likes }} Likes</p>
         </div>
         {% endfor %}
     </div>
 </div>
 {% endif %}
-<!-- End Trending -->
 
-<!-- Vault Grid -->
-<div class="vault-grid">
-    <a href="{{ url_for('gallery', category='Photo') }}" class="vault-card"><span class="vault-icon">📸</span><h3>Photo Vault</h3></a>
-    <a href="{{ url_for('gallery', category='Video') }}" class="vault-card"><span class="vault-icon">🎥</span><h3>Video Vault</h3></a>
-    <a href="{{ url_for('gallery', category='Music') }}" class="vault-card"><span class="vault-icon">🎵</span><h3>Music Vault</h3></a>
-    <a href="{{ url_for('gallery', category='Document') }}" class="vault-card"><span class="vault-icon">📄</span><h3>Doc Vault</h3></a>
-    <a href="{{ url_for('gallery', category='Shayari') }}" class="vault-card"><span class="vault-icon">✍️</span><h3>Shayari</h3></a>
-    <a href="{{ url_for('ai_studio') }}" class="vault-card" style="border-color: #a855f7;">
-        <span class="vault-icon">🎨</span>
-        <h3 style="color: #a855f7;">AI Studio</h3>
+<!-- MAIN VAULT GRID -->
+<h3 style="color: var(--accent); margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">🛡️ Secure Vaults</h3>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
+    <a href="{{ url_for('gallery', category='Photo') }}" class="btn" style="background: var(--bg-card); border: 1px solid var(--border-color); padding: 30px; border-radius: 16px; font-size: 1.2rem; text-align: center; display: block; text-decoration: none;">
+        <span style="font-size: 3rem; display: block; margin-bottom: 10px;">📸</span> Photo Vault
+    </a>
+    <a href="{{ url_for('gallery', category='Video') }}" class="btn" style="background: var(--bg-card); border: 1px solid var(--border-color); padding: 30px; border-radius: 16px; font-size: 1.2rem; text-align: center; display: block; text-decoration: none;">
+        <span style="font-size: 3rem; display: block; margin-bottom: 10px;">🎥</span> Video Vault
+    </a>
+    <a href="{{ url_for('gallery', category='Music') }}" class="btn" style="background: var(--bg-card); border: 1px solid var(--border-color); padding: 30px; border-radius: 16px; font-size: 1.2rem; text-align: center; display: block; text-decoration: none;">
+        <span style="font-size: 3rem; display: block; margin-bottom: 10px;">🎵</span> Music Vault
+    </a>
+    <a href="{{ url_for('gallery', category='Document') }}" class="btn" style="background: var(--bg-card); border: 1px solid var(--border-color); padding: 30px; border-radius: 16px; font-size: 1.2rem; text-align: center; display: block; text-decoration: none;">
+        <span style="font-size: 3rem; display: block; margin-bottom: 10px;">📁</span> Doc Vault
+    </a>
+    <a href="{{ url_for('gallery', category='Shayari') }}" class="btn" style="background: var(--bg-card); border: 1px solid var(--border-color); padding: 30px; border-radius: 16px; font-size: 1.2rem; text-align: center; display: block; text-decoration: none;">
+        <span style="font-size: 3rem; display: block; margin-bottom: 10px;">✍️</span> Shayari Vault
+    </a>
+    <a href="{{ url_for('ai_studio') }}" class="btn" style="background: var(--bg-card); border: 1px solid #a855f7; padding: 30px; border-radius: 16px; font-size: 1.2rem; text-align: center; display: block; text-decoration: none;">
+        <span style="font-size: 3rem; display: block; margin-bottom: 10px;">🎨</span> AI Studio
     </a>
 </div>
 
-<!-- Features Area -->
-<div class="dashboard-features">
-    
-    <!-- AI Assistant -->
-    <div class="feature-card">
-        <h3 style="color: var(--accent);">🤖 SOCHO AI Assistant</h3>
-        <div class="chat-box" id="chatBox">
-            <div class="chat-msg chat-bot">Hello Agent! How can I assist you today?</div>
-        </div>
-        <div class="chat-input">
-            <input type="text" id="aiInput" placeholder="Type your message..." onkeypress="if(event.key === 'Enter') sendAIMessage()">
-            <button class="btn" onclick="sendAIMessage()">Send</button>
-        </div>
-    </div>
-
-    <!-- Admin & Mystery Section -->
-    <div class="feature-card">
-        <h3 style="color: var(--warning);">🕵️‍♂️ The Mystery Box</h3>
-        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 15px;">Enter the classified passcode to unlock hidden sectors.</p>
-        
-        <form action="{{ url_for('mystery') }}" method="POST">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="password" name="passcode" class="input-box" placeholder="ENTER CODE" required>
-            <button type="submit" class="btn" style="background: var(--warning); width: 100%;">Unlock Mystery</button>
-        </form>
-
-        <h3 style="margin-top: 35px; border-top: 1px solid var(--border-color); padding-top: 20px;">🛡️ Authorization Status</h3>
-        
-        {% if session.get('is_admin') %}
-            <p style="color: var(--success); font-weight: bold; font-size: 1.1rem; margin-bottom: 10px;">🟢 ACTIVE - Administrator</p>
-            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 15px;">You have elevated privileges. Manage assets carefully.</p>
-            <a href="{{ url_for('admin') }}" class="btn" style="background: var(--success); width: 100%; box-sizing: border-box; text-align: center;">Access Admin HQ</a>
-        {% else %}
-            <p style="color: var(--danger); font-weight: bold; font-size: 1.1rem;">🔴 INACTIVE</p>
-            <p style="color: var(--text-muted); font-size: 0.9rem;">Standard user clearance only.</p>
-        {% endif %}
-    </div>
-    
+<!-- Lightbox Modal for Stories -->
+<div id="lightbox" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 9999; justify-content: center; align-items: center; flex-direction: column; backdrop-filter: blur(5px);">
+    <span onclick="document.getElementById('lightbox').style.display='none'" style="position: absolute; top: 20px; right: 40px; font-size: 3rem; color: white; cursor: pointer;">&times;</span>
+    <img id="lightbox-img" src="" style="max-width: 90%; max-height: 80vh; border-radius: 12px; box-shadow: 0 0 30px rgba(56, 189, 248, 0.3);">
 </div>
 
-<!-- AI Chat Script -->
 <script>
-    async function sendAIMessage() {
-        const input = document.getElementById('aiInput');
-        const chatBox = document.getElementById('chatBox');
-        const query = input.value.trim();
-        
-        if (!query) return;
-        
-        // Add User message
-        chatBox.innerHTML += `<div class="chat-msg chat-user">${query}</div>`;
-        input.value = '';
-        chatBox.scrollTop = chatBox.scrollHeight;
-        
-        // Add Loading
-        const loadId = 'load-' + Date.now();
-        chatBox.innerHTML += `<div id="${loadId}" class="chat-msg chat-bot">...</div>`;
-        chatBox.scrollTop = chatBox.scrollHeight;
-        
-        try {
-            const response = await fetch("{{ url_for('ai_endpoint') }}", {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': '{{ csrf_token() }}' },
-                body: JSON.stringify({ query: query })
-            });
-            
-            const data = await response.json();
-            document.getElementById(loadId).remove();
-            
-            if (data.reply) {
-                chatBox.innerHTML += `<div class="chat-msg chat-bot">${data.reply}</div>`;
-            } else {
-                chatBox.innerHTML += `<div class="chat-msg chat-bot" style="color: var(--danger);">Error processing request.</div>`;
-            }
-        } catch (e) {
-            if(document.getElementById(loadId)) document.getElementById(loadId).remove();
-            chatBox.innerHTML += `<div class="chat-msg chat-bot" style="color: var(--danger);">Connection failed.</div>`;
-        }
-        chatBox.scrollTop = chatBox.scrollHeight;
+    function openLightbox(imageSrc) {
+        document.getElementById('lightbox').style.display = 'flex';
+        document.getElementById('lightbox-img').src = imageSrc;
     }
 </script>
 {% endblock %}
