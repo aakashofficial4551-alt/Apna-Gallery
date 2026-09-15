@@ -11,12 +11,11 @@
             <a href="{{ url_for('agent_profile', username=contact.username) }}" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit;">
                 <div style="position: relative;">
                     {% if contact.profile_pic %}
-                        <img src="{{ contact.profile_pic }}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
+                        <img src="{{ contact.profile_pic }}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid var(--accent);">
                     {% else %}
-                        <div style="width: 40px; height: 40px; border-radius: 50%; background: #1e293b; display: grid; place-items: center;">👤</div>
+                        <div style="width: 40px; height: 40px; border-radius: 50%; background: #1e293b; display: grid; place-items: center; border: 2px solid var(--accent);">👤</div>
                     {% endif %}
                     
-                    <!-- ONLINE INDICATOR -->
                     {% if contact.last_active | is_online %}
                         <div style="position: absolute; bottom: 0; right: 0; width: 10px; height: 10px; background: #22c55e; border-radius: 50%; border: 2px solid var(--bg-card);"></div>
                     {% endif %}
@@ -37,9 +36,9 @@
         </div>
     </div>
 
-    <!-- CHAT BOX (Auto-updating) -->
+    <!-- CHAT BOX -->
     <div id="chat-box" style="flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; background: rgba(8,17,31,0.4);">
-        <!-- Messages will be loaded here via JS to allow smooth real-time feeling -->
+        <!-- JavaScript will load messages here -->
     </div>
 
     <form method="POST" style="background: rgba(15,23,42,0.9); padding: 15px; border-top: 1px solid var(--border-color); display: flex; gap: 10px;">
@@ -54,7 +53,6 @@
     const contactUsername = "{{ contact.username }}";
     const myUsername = "{{ session.username }}";
     
-    // Auto-polling function for real-time chat feel
     async function fetchMessages() {
         try {
             const res = await fetch(`/api/chat_history/${contactUsername}`);
@@ -62,18 +60,20 @@
             
             let html = "";
             messages.forEach(msg => {
-                const isMe = (msg[0] === myUsername);
+                // FIXED BUG: Accessing object properties correctly instead of arrays!
+                const isMe = (msg.sender === myUsername);
+                
                 if(isMe) {
                     html += `
                     <div style="align-self: flex-end; background: var(--accent); color: #000; padding: 10px 15px; border-radius: 15px 15px 0 15px; max-width: 70%; word-wrap: break-word; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
-                        <p style="margin: 0; font-size: 1rem; font-weight: 500;">${msg[1]}</p>
-                        <span style="font-size: 0.7rem; color: rgba(0,0,0,0.6); display: block; text-align: right; margin-top: 5px;">${msg[2]}</span>
+                        <p style="margin: 0; font-size: 1rem; font-weight: 500;">${msg.message}</p>
+                        <span style="font-size: 0.7rem; color: rgba(0,0,0,0.6); display: block; text-align: right; margin-top: 5px;">${msg.time}</span>
                     </div>`;
                 } else {
                     html += `
                     <div style="align-self: flex-start; background: #334155; color: white; padding: 10px 15px; border-radius: 15px 15px 15px 0; max-width: 70%; word-wrap: break-word; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
-                        <p style="margin: 0; font-size: 1rem;">${msg[1]}</p>
-                        <span style="font-size: 0.7rem; color: var(--text-muted); display: block; text-align: right; margin-top: 5px;">${msg[2]}</span>
+                        <p style="margin: 0; font-size: 1rem;">${msg.message}</p>
+                        <span style="font-size: 0.7rem; color: var(--text-muted); display: block; text-align: right; margin-top: 5px;">${msg.time}</span>
                     </div>`;
                 }
             });
@@ -82,7 +82,7 @@
                 html = `<p style="text-align: center; color: var(--text-muted); font-size: 0.9rem; margin-top: auto; margin-bottom: auto;">Say hi to start a secure conversation! 🔒</p>`;
             }
             
-            // Only update DOM and scroll if new message arrived to prevent flickering
+            // Auto scroll ONLY if there are new messages
             if(chatBox.innerHTML !== html) {
                 chatBox.innerHTML = html;
                 chatBox.scrollTop = chatBox.scrollHeight;
@@ -94,7 +94,7 @@
     // Fetch immediately on load
     fetchMessages();
     
-    // Auto-refresh chat every 3 seconds! (Live Chat Feel)
+    // Auto-refresh chat every 3 seconds
     setInterval(fetchMessages, 3000);
 </script>
 {% endblock %}
