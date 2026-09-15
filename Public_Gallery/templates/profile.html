@@ -1,674 +1,114 @@
 {% extends "base.html" %}
 
-{% block title %}Agent {{ session.username }} | Profile{% endblock %}
+{% block title %}Agent Profile | Apna Gallery{% endblock %}
+
+{% block head %}
+<style>
+    .profile-header {
+        display: flex; gap: 30px; align-items: center; flex-wrap: wrap;
+        background: var(--bg-card); padding: 30px; border-radius: 20px;
+        border: 1px solid var(--border-color); margin-bottom: 30px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+    .profile-pic {
+        width: 130px; height: 130px; border-radius: 50%;
+        background: #1e293b; border: 4px solid var(--accent);
+        object-fit: cover; box-shadow: 0 0 20px rgba(56, 189, 248, 0.2);
+    }
+    .profile-info h1 { margin: 0 0 10px 0; color: var(--accent); font-size: 2.2rem; }
+    .profile-info p { margin: 6px 0; color: var(--text-muted); font-size: 1.05rem; }
+    .badge { background: var(--warning); color: #000; padding: 4px 10px; border-radius: 6px; font-size: 0.8rem; font-weight: bold; vertical-align: middle; margin-left: 10px;}
+    
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 25px; }
+    @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } }
+    
+    .edit-card { background: var(--bg-card); padding: 30px; border-radius: 16px; border: 1px solid var(--border-color); }
+    .edit-card h3 { color: var(--text-main); margin-top: 0; border-bottom: 1px solid var(--border-color); padding-bottom: 15px; margin-bottom: 20px;}
+    .form-group { margin-bottom: 20px; }
+    .form-group label { display: block; margin-bottom: 8px; color: var(--text-muted); font-weight: 600; font-size: 0.95rem; }
+    .form-group input, .form-group textarea {
+        width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color);
+        background: rgba(8, 17, 31, 0.6); color: white; box-sizing: border-box; outline: none;
+    }
+    .form-group input:focus, .form-group textarea:focus { border-color: var(--accent); }
+    
+    .gallery-grid {
+        display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; margin-top: 25px;
+    }
+    .media-box {
+        background: var(--bg-card); border: 1px solid var(--border-color);
+        border-radius: 12px; padding: 15px; text-align: center;
+    }
+    .media-box img, .media-box video { width: 100%; height: 160px; object-fit: cover; border-radius: 8px; margin-bottom: 10px; }
+</style>
+{% endblock %}
 
 {% block content %}
-<style>
-    /* =========================================================
-       PREMIUM PROFILE DESIGN SYSTEM (Sky Blue Identity)
-       Scoped exclusively to avoid base.html conflicts
-       ========================================================= */
-    :root {
-        --prof-bg: #f0fcfd;
-        --prof-surface: #ffffff;
-        --prof-surface-glass: rgba(255, 255, 255, 0.85);
-        --prof-text-main: #023e8a;
-        --prof-text-muted: #555555;
-        --prof-accent: #00b4d8;
-        --prof-accent-dark: #0077b6;
-        --prof-border: #b2ebf2;
-        --prof-danger: #e76f51;
-        --prof-shadow-sm: 0 4px 12px rgba(0, 180, 216, 0.08);
-        --prof-shadow-md: 0 12px 24px rgba(0, 180, 216, 0.12);
-        --prof-shadow-lg: 0 24px 48px rgba(0, 119, 182, 0.15);
-        --prof-radius-sm: 12px;
-        --prof-radius-md: 20px;
-        --prof-radius-full: 9999px;
-        --prof-transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-    }
-
-    .profile-wrapper {
-        font-family: 'Montserrat', sans-serif;
-        background: var(--prof-bg);
-        min-height: 100vh;
-        padding-bottom: 80px;
-        color: var(--prof-text-main);
-    }
-
-    /* --- Hero Section --- */
-    .profile-hero {
-        height: 280px;
-        background: linear-gradient(135deg, var(--prof-accent), var(--prof-accent-dark));
-        position: relative;
-        overflow: hidden;
-    }
-    .profile-hero::after {
-        content: '';
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        height: 40%;
-        background: linear-gradient(to top, var(--prof-bg), transparent);
-    }
-
-    .profile-container {
-        max-width: 1000px;
-        margin: 0 auto;
-        padding: 0 24px;
-        position: relative;
-        z-index: 10;
-        margin-top: -100px;
-    }
-
-    /* --- Header / Identity --- */
-    .profile-header-top {
-        display: flex;
-        align-items: flex-end;
-        gap: 32px;
-        margin-bottom: 24px;
-        flex-wrap: wrap;
-    }
-
-    .avatar-wrapper {
-        position: relative;
-        flex-shrink: 0;
-    }
-    .profile-avatar {
-        width: 180px;
-        height: 180px;
-        border-radius: var(--prof-radius-full);
-        object-fit: cover;
-        border: 6px solid var(--prof-bg);
-        background: var(--prof-surface);
-        box-shadow: var(--prof-shadow-md);
-        transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    }
-    .avatar-wrapper:hover .profile-avatar {
-        transform: scale(1.03) translateY(-4px);
-        box-shadow: var(--prof-shadow-lg);
-    }
-
-    .profile-stats-actions {
-        flex-grow: 1;
-        display: flex;
-        flex-direction: column;
-        gap: 20px;
-        padding-bottom: 12px;
-    }
-
-    .stats-row {
-        display: flex;
-        gap: 32px;
-    }
-    .stat-box {
-        display: flex;
-        flex-direction: column;
-        align-items: flex-start;
-    }
-    .stat-val {
-        font-size: 1.5rem;
-        font-weight: 800;
-        color: var(--prof-text-main);
-        line-height: 1.2;
-    }
-    .stat-label {
-        font-size: 0.85rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        color: var(--prof-text-muted);
-        letter-spacing: 0.05em;
-    }
-
-    .actions-row {
-        display: flex;
-        gap: 12px;
-    }
-    .prof-btn {
-        background: var(--prof-surface);
-        color: var(--prof-text-main);
-        border: 2px solid var(--prof-border);
-        padding: 10px 20px;
-        border-radius: var(--prof-radius-sm);
-        font-weight: 700;
-        font-size: 0.9rem;
-        cursor: pointer;
-        transition: var(--prof-transition);
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        text-decoration: none;
-    }
-    .prof-btn:hover {
-        background: var(--prof-accent);
-        color: #fff;
-        border-color: var(--prof-accent);
-        transform: translateY(-2px);
-        box-shadow: var(--prof-shadow-sm);
-    }
-    .prof-btn.primary {
-        background: var(--prof-accent-dark);
-        color: #fff;
-        border-color: var(--prof-accent-dark);
-    }
-    .prof-btn.primary:hover {
-        background: var(--prof-accent);
-        border-color: var(--prof-accent);
-    }
-    .prof-btn:focus-visible {
-        outline: 3px solid var(--prof-accent);
-        outline-offset: 2px;
-    }
-
-    /* --- Info Section --- */
-    .profile-info {
-        margin-bottom: 40px;
-        background: var(--prof-surface);
-        padding: 32px;
-        border-radius: var(--prof-radius-md);
-        box-shadow: var(--prof-shadow-sm);
-        border: 1px solid var(--prof-border);
-    }
-    .profile-username {
-        font-size: 2.2rem;
-        font-weight: 800;
-        margin-bottom: 8px;
-        color: var(--prof-text-main);
-        display: flex;
-        align-items: center;
-        gap: 12px;
-    }
-    .profile-country {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        font-size: 0.9rem;
-        font-weight: 600;
-        color: var(--prof-accent-dark);
-        background: #e0f7fa;
-        padding: 6px 12px;
-        border-radius: var(--prof-radius-full);
-        margin-bottom: 16px;
-    }
-    .profile-bio {
-        font-size: 1rem;
-        line-height: 1.7;
-        color: var(--prof-text-muted);
-        max-width: 800px;
-        white-space: pre-line;
-    }
-
-    /* --- Stories Carousel --- */
-    .stories-section {
-        margin-bottom: 40px;
-    }
-    .section-title {
-        font-size: 1.2rem;
-        font-weight: 800;
-        margin-bottom: 16px;
-        color: var(--prof-text-main);
-        padding-left: 8px;
-    }
-    .stories-scroll {
-        display: flex;
-        gap: 20px;
-        overflow-x: auto;
-        padding: 10px 8px 20px 8px;
-        scroll-snap-type: x mandatory;
-        scrollbar-width: thin;
-        scrollbar-color: var(--prof-accent) transparent;
-    }
-    .stories-scroll::-webkit-scrollbar { height: 6px; }
-    .stories-scroll::-webkit-scrollbar-track { background: transparent; }
-    .stories-scroll::-webkit-scrollbar-thumb { background: var(--prof-accent); border-radius: 10px; }
-
-    .story-item {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 8px;
-        scroll-snap-align: start;
-        cursor: pointer;
-        flex-shrink: 0;
-    }
-    .story-ring {
-        width: 84px;
-        height: 84px;
-        border-radius: 50%;
-        background: linear-gradient(45deg, var(--prof-accent-dark), var(--prof-accent), #80deea);
-        padding: 3px;
-        transition: var(--prof-transition);
-        box-shadow: var(--prof-shadow-sm);
-    }
-    .story-item:hover .story-ring {
-        transform: scale(1.05);
-        box-shadow: var(--prof-shadow-md);
-    }
-    .story-inner {
-        width: 100%;
-        height: 100%;
-        border-radius: 50%;
-        border: 3px solid var(--prof-surface);
-        background: var(--prof-surface);
-        overflow: hidden;
-    }
-    .story-img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-    }
-    .story-add-btn {
-        width: 84px;
-        height: 84px;
-        border-radius: 50%;
-        border: 2px dashed var(--prof-accent);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: var(--prof-surface);
-        color: var(--prof-accent);
-        font-size: 2rem;
-        transition: var(--prof-transition);
-        cursor: pointer;
-    }
-    .story-add-btn:hover {
-        background: var(--prof-accent);
-        color: #fff;
-        transform: scale(1.05);
-    }
-
-    /* --- Media Grid (Fallback if my_uploads is passed) --- */
-    .media-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-        gap: 24px;
-    }
-    .media-card {
-        aspect-ratio: 1;
-        border-radius: var(--prof-radius-md);
-        overflow: hidden;
-        position: relative;
-        box-shadow: var(--prof-shadow-sm);
-        cursor: pointer;
-        background: var(--prof-surface);
-        border: 1px solid var(--prof-border);
-    }
-    .media-card img, .media-card video {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        transition: transform 0.6s cubic-bezier(0.25, 1, 0.5, 1);
-    }
-    .media-card:hover img {
-        transform: scale(1.08);
-    }
-    .media-overlay {
-        position: absolute;
-        inset: 0;
-        background: linear-gradient(to top, rgba(2, 62, 138, 0.8), transparent);
-        opacity: 0;
-        transition: var(--prof-transition);
-        display: flex;
-        flex-direction: column;
-        justify-content: flex-end;
-        padding: 20px;
-        color: #fff;
-    }
-    .media-card:hover .media-overlay {
-        opacity: 1;
-    }
-    
-    .empty-state {
-        grid-column: 1/-1;
-        text-align: center;
-        padding: 60px 20px;
-        background: var(--prof-surface);
-        border-radius: var(--prof-radius-md);
-        border: 2px dashed var(--prof-border);
-        color: var(--prof-text-muted);
-    }
-
-    /* --- Modals --- */
-    .modal-overlay {
-        position: fixed;
-        inset: 0;
-        background: rgba(2, 62, 138, 0.6);
-        backdrop-filter: blur(6px);
-        z-index: 10000;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        opacity: 0;
-        visibility: hidden;
-        transition: var(--prof-transition);
-        padding: 20px;
-    }
-    .modal-overlay.active {
-        opacity: 1;
-        visibility: visible;
-    }
-    .modal-box {
-        background: var(--prof-surface);
-        width: 100%;
-        max-width: 500px;
-        border-radius: var(--prof-radius-md);
-        padding: 32px;
-        box-shadow: var(--prof-shadow-lg);
-        border: 2px solid var(--prof-accent);
-        transform: translateY(20px) scale(0.95);
-        transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    }
-    .modal-overlay.active .modal-box {
-        transform: translateY(0) scale(1);
-    }
-    .modal-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 24px;
-    }
-    .modal-header h3 {
-        margin: 0;
-        font-size: 1.4rem;
-        color: var(--prof-text-main);
-    }
-    .close-btn {
-        background: none;
-        border: none;
-        font-size: 1.8rem;
-        color: var(--prof-text-muted);
-        cursor: pointer;
-        transition: var(--prof-transition);
-    }
-    .close-btn:hover { color: var(--prof-danger); }
-    
-    .modal-input, .modal-textarea {
-        width: 100%;
-        padding: 14px;
-        border: 2px solid var(--prof-border);
-        border-radius: var(--prof-radius-sm);
-        background: var(--prof-bg);
-        color: var(--prof-text-main);
-        font-family: inherit;
-        font-size: 1rem;
-        margin-bottom: 20px;
-        transition: var(--prof-transition);
-    }
-    .modal-input:focus, .modal-textarea:focus {
-        border-color: var(--prof-accent);
-        outline: none;
-        box-shadow: 0 0 0 3px rgba(0, 180, 216, 0.15);
-    }
-    .modal-textarea { resize: vertical; min-height: 100px; }
-    
-    /* Fullscreen Story Viewer */
-    .story-viewer {
-        max-width: 100%;
-        height: 85vh;
-        background: #000;
-        padding: 0;
-        border: none;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        position: relative;
-    }
-    .story-viewer img, .story-viewer video {
-        max-width: 100%;
-        max-height: 100%;
-        object-fit: contain;
-    }
-    .story-viewer .close-btn {
-        position: absolute;
-        top: 20px;
-        right: 20px;
-        color: #fff;
-        background: rgba(0,0,0,0.5);
-        border-radius: 50%;
-        width: 40px;
-        height: 40px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-
-    /* Responsive */
-    @media (max-width: 768px) {
-        .profile-header-top {
-            flex-direction: column;
-            align-items: center;
-            text-align: center;
-            margin-top: -60px;
-            gap: 20px;
-        }
-        .profile-avatar { width: 140px; height: 140px; border-width: 4px; }
-        .stats-row { justify-content: center; }
-        .actions-row { justify-content: center; width: 100%; flex-wrap: wrap; }
-        .profile-info { padding: 24px; text-align: center; }
-        .profile-username { justify-content: center; }
-        .modal-box { padding: 24px; }
-    }
-    @media (prefers-reduced-motion: reduce) {
-        * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
-    }
-</style>
-
-<div class="profile-wrapper">
-    <!-- Premium Hero -->
-    <div class="profile-hero"></div>
-
-    <div class="profile-container">
-        <!-- Header / Stats / Actions -->
-        <div class="profile-header-top">
-            <div class="avatar-wrapper">
-                {% if user.profile_pic %}
-                    <img src="{{ url_for('static', filename='uploads/' + user.profile_pic) }}" alt="{{ user.username }} avatar" class="profile-avatar">
-                {% else %}
-                    <img src="https://cdn-icons-png.flaticon.com/512/847/847969.png" alt="Default avatar" class="profile-avatar" style="padding: 20px;">
-                {% endif %}
-            </div>
-
-            <div class="profile-stats-actions">
-                <div class="stats-row">
-                    <div class="stat-box">
-                        <span class="stat-val">{{ post_count }}</span>
-                        <span class="stat-label">Vault Assets</span>
-                    </div>
-                    <div class="stat-box">
-                        <span class="stat-val">{{ user.friends_count }}</span>
-                        <span class="stat-label">Connections</span>
-                    </div>
-                </div>
-
-                <div class="actions-row">
-                    {% if session.username == user.username %}
-                        <button type="button" class="prof-btn primary" onclick="openModal('editProfileModal')">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-                            Edit Profile
-                        </button>
-                        <button type="button" class="prof-btn" onclick="openModal('addStoryModal')">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
-                            Add Story
-                        </button>
-                    {% endif %}
-                    <a href="{{ url_for('dashboard') }}" class="prof-btn">⬅ Dashboard</a>
-                </div>
-            </div>
-        </div>
-
-        <!-- Identity & Bio -->
-        <div class="profile-info">
-            <h1 class="profile-username">{{ user.username }}</h1>
-            <div class="profile-country">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
-                {{ user.country }}
-            </div>
-            <div class="profile-bio">
-                {% if user.bio %}
-                    {{ user.bio }}
-                {% else %}
-                    <span style="font-style: italic; opacity: 0.7;">Classified Agent of SOCHO KYA HOGA. No biography available.</span>
-                {% endif %}
-            </div>
-        </div>
-
-        <!-- Stories Carousel -->
-        <div class="stories-section">
-            <h2 class="section-title">Active Stories</h2>
-            <div class="stories-scroll">
-                {% if session.username == user.username %}
-                <div class="story-item" onclick="openModal('addStoryModal')">
-                    <div class="story-add-btn">+</div>
-                    <span style="font-size: 0.8rem; font-weight: 600; color: var(--prof-text-muted);">New</span>
-                </div>
-                {% endif %}
-
-                {% for s in stories %}
-                <div class="story-item" onclick="viewStory('{{ url_for('static', filename='uploads/' + s.filename) }}')">
-                    <div class="story-ring">
-                        <div class="story-inner">
-                            <!-- Assuming stories are mostly images. For video, logic would be similar -->
-                            <img src="{{ url_for('static', filename='uploads/' + s.filename) }}" class="story-img" alt="Story">
-                        </div>
-                    </div>
-                    <span style="font-size: 0.8rem; font-weight: 600; color: var(--prof-text-main);">Story</span>
-                </div>
-                {% else %}
-                    {% if session.username != user.username %}
-                    <div style="padding: 20px; color: var(--prof-text-muted); font-style: italic; font-weight: 500;">No active stories.</div>
-                    {% endif %}
-                {% endfor %}
-            </div>
-        </div>
-
-        <!-- Profile Media / Uploads Grid -->
-        <div class="stories-section">
-            <h2 class="section-title">Vault Contributions</h2>
-            <div class="media-grid">
-                {% if my_uploads %}
-                    {% for item in my_uploads %}
-                    <div class="media-card">
-                        {% if item.filename == 'SHAYARI_TEXT' %}
-                            <div style="background: linear-gradient(135deg, var(--prof-accent), var(--prof-accent-dark)); color: white; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding: 20px; text-align: center; font-weight: 700; font-size: 1.1rem; font-style: italic;">
-                                "{{ item.prompt }}"
-                            </div>
-                        {% elif item.category == 'Video' %}
-                            <video src="{{ url_for('static', filename='uploads/' + item.filename) }}" muted loop onmouseover="this.play()" onmouseout="this.pause()"></video>
-                        {% elif item.category == 'Music' %}
-                            <div style="background: var(--prof-text-main); width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 3rem;">🎵</div>
-                        {% elif item.category == 'Document' %}
-                            <div style="background: var(--prof-bg); width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 3rem; color: var(--prof-accent-dark);">📄</div>
-                        {% else %}
-                            <img src="{{ url_for('static', filename='uploads/' + item.filename) }}" alt="{{ item.title }}" loading="lazy">
-                        {% endif %}
-                        
-                        <div class="media-overlay">
-                            <h4 style="margin: 0 0 4px 0; font-size: 1.1rem;">{{ item.title }}</h4>
-                            <span style="font-size: 0.8rem; opacity: 0.9;">{{ item.category }}</span>
-                        </div>
-                    </div>
-                    {% endfor %}
-                {% else %}
-                    <div class="empty-state">
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 16px; opacity: 0.5;"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
-                        <h3 style="margin-bottom: 8px;">No Data Found</h3>
-                        <p>No verified assets have been uploaded to the vault yet.</p>
-                    </div>
-                {% endif %}
-            </div>
-        </div>
+<div class="profile-header">
+    {% if user.profile_pic %}
+        <img src="{{ url_for('static', filename='uploads/' + user.profile_pic) }}" class="profile-pic" alt="Profile">
+    {% else %}
+        <div class="profile-pic" style="display:grid; place-items:center; font-size: 4rem;">👤</div>
+    {% endif %}
+    <div class="profile-info">
+        <h1>{{ user.username }} {% if user.role == 'admin' %}<span class="badge">ADMIN</span>{% endif %}</h1>
+        <p><strong>Identity (Bio):</strong> {{ user.bio }}</p>
+        <p><strong>Base Location:</strong> {{ user.country }}</p>
+        <p><strong>Total Contributions:</strong> <span style="color:var(--accent); font-weight:bold;">{{ post_count }}</span> assets</p>
     </div>
 </div>
 
-<!-- ================= MODALS ================= -->
-
-<!-- Edit Profile Modal -->
-<div class="modal-overlay" id="editProfileModal" role="dialog" aria-modal="true" aria-labelledby="editTitle">
-    <div class="modal-box">
-        <div class="modal-header">
-            <h3 id="editTitle">Update Identity Protocol</h3>
-            <button class="close-btn" onclick="closeModal('editProfileModal')" aria-label="Close">&times;</button>
-        </div>
-        <form action="{{ url_for('profile') }}" method="POST" enctype="multipart/form-data">
-            <label style="display:block; font-weight:700; margin-bottom:8px; color:var(--prof-text-main);">Location / Country</label>
-            <input type="text" name="country" class="modal-input" value="{{ user.country }}" placeholder="Enter Country">
-            
-            <label style="display:block; font-weight:700; margin-bottom:8px; color:var(--prof-text-main);">Biography</label>
-            <textarea name="bio" class="modal-textarea" placeholder="Update bio...">{{ user.bio }}</textarea>
-            
-            <label style="display:block; font-weight:700; margin-bottom:8px; color:var(--prof-text-main);">Profile Picture (Optional)</label>
-            <input type="file" name="profile_pic" class="modal-input" style="background:#fff;">
-            
-            <button type="submit" class="prof-btn primary" style="width: 100%; justify-content: center; margin-top: 10px;">Save Changes</button>
+<div class="grid-2">
+    <!-- Edit Bio -->
+    <div class="edit-card">
+        <h3>✏️ Update Identity Log</h3>
+        <form method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="form-group">
+                <label>Base Location (Country)</label>
+                <input type="text" name="country" value="{{ user.country }}">
+            </div>
+            <div class="form-group">
+                <label>Agent Bio</label>
+                <textarea name="bio" rows="3">{{ user.bio }}</textarea>
+            </div>
+            <button type="submit" class="btn" style="width: 100%;">Save Changes</button>
+        </form>
+    </div>
+    
+    <!-- Upload Avatar -->
+    <div class="edit-card">
+        <h3>🖼️ Update Avatar</h3>
+        <form method="POST" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="form-group">
+                <label>Select Image (PNG, JPG, WEBP)</label>
+                <input type="file" name="profile_pic" accept="image/*" required>
+            </div>
+            <button type="submit" class="btn" style="background: var(--success); width: 100%; color: white;">Upload Avatar</button>
         </form>
     </div>
 </div>
 
-<!-- Add Story Modal -->
-<div class="modal-overlay" id="addStoryModal" role="dialog" aria-modal="true" aria-labelledby="storyTitle">
-    <div class="modal-box">
-        <div class="modal-header">
-            <h3 id="storyTitle">Upload New Story</h3>
-            <button class="close-btn" onclick="closeModal('addStoryModal')" aria-label="Close">&times;</button>
-        </div>
-        <form action="{{ url_for('profile') }}" method="POST" enctype="multipart/form-data">
-            <label style="display:block; font-weight:700; margin-bottom:8px; color:var(--prof-text-main);">Select Story File</label>
-            <input type="file" name="story" class="modal-input" required style="background:#fff;">
-            <button type="submit" class="prof-btn primary" style="width: 100%; justify-content: center; margin-top: 10px;">Post Story</button>
-        </form>
+<!-- Uploads History -->
+<h2 style="margin-top: 50px; color: var(--accent); border-bottom: 1px solid var(--border-color); padding-bottom: 15px;">My Asset Contributions</h2>
+<div class="gallery-grid">
+    {% for item in my_uploads %}
+    <div class="media-box">
+        {% if item.category in ['Photo', 'Shayari'] %}
+            <img src="{{ url_for('static', filename='uploads/' + item.filename) }}" alt="{{ item.title }}">
+        {% elif item.category == 'Video' %}
+            <video src="{{ url_for('static', filename='uploads/' + item.filename) }}" controls></video>
+        {% else %}
+            <div style="height: 160px; display: grid; place-items: center; background: rgba(8, 17, 31, 0.6); border-radius: 8px; margin-bottom: 10px;">
+                <span style="font-size: 3rem;">📄</span>
+            </div>
+        {% endif %}
+        <p style="margin: 0; font-weight: 600; color: var(--text-main);">{{ item.title }}</p>
+        <p style="margin: 5px 0 0 0; font-size: 0.8rem; color: var(--text-muted);">{{ item.category }} Vault</p>
     </div>
+    {% else %}
+        <p style="color: var(--text-muted); grid-column: 1 / -1; font-size: 1.1rem; padding: 20px 0;">No assets contributed yet.</p>
+    {% endfor %}
 </div>
-
-<!-- Story Viewer Modal -->
-<div class="modal-overlay" id="storyViewerModal" role="dialog" aria-modal="true" aria-label="Story Viewer">
-    <div class="modal-box story-viewer">
-        <button class="close-btn" onclick="closeModal('storyViewerModal')" aria-label="Close">&times;</button>
-        <img id="storyViewerImage" src="" alt="Story View">
-    </div>
-</div>
-
-<script>
-    // Vanilla JS Modal Management
-    function openModal(id) {
-        const modal = document.getElementById(id);
-        if(modal) {
-            modal.classList.add('active');
-            // Accessibility focus trap logic could go here
-            document.body.style.overflow = 'hidden';
-        }
-    }
-
-    function closeModal(id) {
-        const modal = document.getElementById(id);
-        if(modal) {
-            modal.classList.remove('active');
-            document.body.style.overflow = '';
-        }
-    }
-
-    function viewStory(url) {
-        const viewer = document.getElementById('storyViewerImage');
-        if(viewer) {
-            viewer.src = url;
-            openModal('storyViewerModal');
-        }
-    }
-
-    // Close modals on outside click or Escape key
-    window.addEventListener('click', (e) => {
-        if(e.target.classList.contains('modal-overlay')) {
-            e.target.classList.remove('active');
-            document.body.style.overflow = '';
-        }
-    });
-
-    window.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-            document.querySelectorAll('.modal-overlay.active').forEach(modal => {
-                modal.classList.remove('active');
-                document.body.style.overflow = '';
-            });
-        }
-    });
-</script>
 {% endblock %}
