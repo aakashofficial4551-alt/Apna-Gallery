@@ -70,7 +70,7 @@ def timeago(dt):
     else: return f"{int(seconds/86400)}d ago"
 
 # =========================================================
-# DATABASE AUTO-HEALER (PHASES 45 & 46)
+# DATABASE AUTO-HEALER
 # =========================================================
 def upgrade_db():
     conn = get_db_connection()
@@ -82,8 +82,6 @@ def upgrade_db():
     c.execute("CREATE TABLE IF NOT EXISTS bookmarks (id SERIAL PRIMARY KEY, username VARCHAR(100) NOT NULL, media_id INTEGER NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE(username, media_id))")
     c.execute("CREATE TABLE IF NOT EXISTS global_chat (id SERIAL PRIMARY KEY, sender VARCHAR(100) NOT NULL, message TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
     c.execute("CREATE TABLE IF NOT EXISTS reports (id SERIAL PRIMARY KEY, media_id INTEGER NOT NULL, reported_by VARCHAR(100) NOT NULL, reason TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE(media_id, reported_by))")
-    
-    # NEW: COMMENT LIKES TABLE
     c.execute("CREATE TABLE IF NOT EXISTS comment_likes (id SERIAL PRIMARY KEY, comment_id INTEGER NOT NULL, username VARCHAR(100) NOT NULL, UNIQUE(comment_id, username))")
     conn.commit()
 
@@ -93,7 +91,6 @@ def upgrade_db():
         c.execute("ALTER TABLE media ADD COLUMN IF NOT EXISTS visibility VARCHAR(20) DEFAULT 'public'")
         c.execute("ALTER TABLE media ADD COLUMN IF NOT EXISTS views INTEGER DEFAULT 0")
         c.execute("ALTER TABLE media ADD COLUMN IF NOT EXISTS is_pinned BOOLEAN DEFAULT FALSE")
-        # NEW: LIKES COLUMN IN COMMENTS
         c.execute("ALTER TABLE comments ADD COLUMN IF NOT EXISTS likes INTEGER DEFAULT 0")
         conn.commit()
     except: conn.rollback()
@@ -413,7 +410,7 @@ def add_view(media_id):
     return jsonify({"success": True})
 
 # =========================================================
-# CORE ROUTES (FEED & DASHBOARD)
+# CORE ROUTES (FEED, EXPLORE, DASHBOARD)
 # =========================================================
 @app.route("/")
 def index():
@@ -454,18 +451,15 @@ def feed():
     
     return render_template("feed.html", posts=feed_posts, comments=comments, saved_ids=saved_ids, current_tab=tab)
 
-# 💥 PHASE 45: TRENDING HASHTAGS IN EXPLORE 💥
 @app.route("/explore")
 def explore():
     if "username" not in session: return redirect(url_for("login"))
     conn = get_db_connection()
     c = conn.cursor()
     
-    # Fetch posts for Pinterest Masonry Layout
     c.execute("SELECT m.id, m.filename, m.title, m.category, m.likes, m.views, m.uploaded_by FROM media m WHERE m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' ORDER BY RANDOM() LIMIT 40")
     explore_posts = c.fetchall()
     
-    # Calculate Top 5 Trending Tags (Fast Algorithm)
     c.execute("SELECT title FROM media WHERE approved = 1 AND visibility = 'public'")
     all_titles = c.fetchall()
     conn.close()
@@ -476,7 +470,6 @@ def explore():
             tags = re.findall(r'#(\w+)', row['title'])
             for t in tags: tag_counts[t.lower()] += 1
             
-    # Sort and pick top 6 tags
     trending_tags = [tag for tag, count in sorted(tag_counts.items(), key=lambda x: x[1], reverse=True)[:6]]
     
     return render_template("explore.html", posts=explore_posts, trending_tags=trending_tags)
@@ -723,8 +716,9 @@ def api_global_chat_history():
     return jsonify(formatted)
 
 # =========================================================
-# SEARCH & LIKES & REPORT
+# LIKES, COMMENTS, SEARCH, & GALLERY
 # =========================================================
+# 💥 THE MISSING SEARCH ROUTE FIX IS HERE 💥
 @app.route("/search")
 def search():
     if "username" not in session: return redirect(url_for("login"))
@@ -734,14 +728,104 @@ def search():
     c = conn.cursor()
     clean_query = query.replace("#", "").replace("@", "")
     search_term = f"%{clean_query}%"
-    
     c.execute("SELECT m.*, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' AND (m.title ILIKE %s OR m.prompt ILIKE %s) ORDER BY m.id DESC", (search_term, search_term))
     media_files = c.fetchall()
-    
     c.execute("SELECT username, profile_pic, role, bio FROM users WHERE username ILIKE %s LIMIT 20", (search_term,))
     found_users = c.fetchall()
     conn.close()
     return render_template("search.html", media_files=media_files, found_users=found_users, query=query)
+
+@app.route("/gallery/<category>", methods=["GET", "POST"])
+def gallery(category):
+    if "username" not in session: return redirect(url_for("login"))
+    conn = get_db_connection()
+    c = conn.cursor()
+    if request.method == "POST":
+        filename = "SHAYARI_TEXT"
+        if category != 'Shayari':
+            file = request.files.get("media")
+            if file and file.filename != "":
+                filename = save_uploaded_file(file, category)
+                if not filename:
+                    flash("Upload Failed! Check API keys.", "error")
+                    return redirect(url_for("gallery", category=category))
+        
+        is_approved = 1 if current_user_is_admin() else 0
+        visibility = request.form.get("visibility", "public")
+        c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved, visibility) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                  (filename, request.form.get("title", "Untitled"), category, "", session.get("username"), is_approved, visibility))
+        conn.commit()
+        flash("File live!" if is_approved else "Sent to Admin for approval.", "success")
+        return redirect(url_for("gallery", category=category))
+
+    c.execute("SELECT m.*, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.category = %s AND m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' ORDER BY m.id DESC", (category,))
+    if category == 'Shayari': c.execute("SELECT m.*, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.category = %s AND m.approved = 1 AND m.visibility = 'public' ORDER BY m.id DESC", (category,))
+    media_files = c.fetchall()
+    c.execute("SELECT c.*, u.role FROM comments c JOIN users u ON c.username = u.username ORDER BY c.id ASC")
+    comments_db = c.fetchall()
+    conn.close()
+    comments = defaultdict(list)
+    for comment in comments_db: comments[comment["media_id"]].append(comment)
+    return render_template("gallery.html", media_files=media_files, category=category, comments=comments)
+
+@app.route("/bookmark/<int:media_id>", methods=["POST"])
+def bookmark(media_id):
+    if "username" not in session: return jsonify({"error": "Login required."}), 401
+    username = session["username"]
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT id FROM bookmarks WHERE username = %s AND media_id = %s", (username, media_id))
+    if c.fetchone():
+        c.execute("DELETE FROM bookmarks WHERE username = %s AND media_id = %s", (username, media_id))
+        bookmarked = False
+    else:
+        c.execute("INSERT INTO bookmarks (username, media_id) VALUES (%s, %s)", (username, media_id))
+        bookmarked = True
+    conn.commit()
+    conn.close()
+    return jsonify({"bookmarked": bookmarked})
+
+# 💥 NEW AI CAPTION GENERATOR API 💥
+@app.route("/api/ai", methods=["POST"])
+def ai_endpoint():
+    if "username" not in session: return jsonify({"reply": "Login first."}), 401
+    query = request.get_json(silent=True).get("query", "")[:1000]
+    try: 
+        # Making sure AI responds without quotes to fit cleanly in input fields
+        reply = get_ai_response(query).replace('"', '').replace("'", "")
+    except: 
+        reply = "Beautiful day! #vibes #nature"
+    return jsonify({"reply": reply})
+
+@app.route("/ai-studio", methods=["GET", "POST"])
+def ai_studio():
+    if "username" not in session: return redirect(url_for("login"))
+    if request.method == "POST":
+        prompt = request.form.get("prompt", "").strip()
+        if not prompt: return redirect(url_for("ai_studio"))
+        trigger_words = ["create", "generate", "draw", "make an image", "paint"]
+        wants_image = any(word in prompt.lower() for word in trigger_words)
+        
+        if wants_image:
+            encoded_prompt = urllib.parse.quote(prompt)
+            image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?nologo=true"
+            try:
+                r = requests.get(image_url, timeout=15)
+                secure_url = cloudinary.uploader.upload(r.content, resource_type="image")["secure_url"] if r.status_code == 200 else image_url
+                conn = get_db_connection()
+                c = conn.cursor()
+                c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved, visibility) VALUES (%s, %s, %s, %s, %s, 1, 'public')",
+                          (secure_url, f"AI: {prompt[:20]}...", "Photo", prompt, session["username"]))
+                conn.commit()
+                conn.close()
+                flash("Image created successfully! (100% Free)", "success")
+                return redirect(url_for("gallery", category="Photo"))
+            except: flash("Image generation failed.", "error")
+        else:
+            try: reply = get_ai_response(prompt)
+            except: reply = "I am currently offline."
+            return render_template("ai_studio.html", chat_reply=reply, user_prompt=prompt)
+    return render_template("ai_studio.html")
 
 @app.route("/like/<int:media_id>", methods=["POST"])
 def like(media_id):
@@ -765,7 +849,6 @@ def like(media_id):
     conn.close()
     return jsonify({"likes": likes, "liked": liked_now})
 
-# 💥 PHASE 46: COMMENT LIKES SYSTEM 💥
 @app.route("/like_comment/<int:comment_id>", methods=["POST"])
 def like_comment(comment_id):
     if "username" not in session: return jsonify({"error": "Login required."}), 401
@@ -773,19 +856,16 @@ def like_comment(comment_id):
     conn = get_db_connection()
     c = conn.cursor()
     c.execute("INSERT INTO comment_likes (comment_id, username) VALUES (%s, %s) ON CONFLICT (comment_id, username) DO NOTHING", (comment_id, username))
-    
     if c.rowcount == 1:
         c.execute("UPDATE comments SET likes = COALESCE(likes, 0) + 1 WHERE id = %s", (comment_id,))
         c.execute("SELECT username, media_id FROM comments WHERE id = %s", (comment_id,))
         comment_info = c.fetchone()
-        
         if comment_info and comment_info['username'] != username:
             c.execute("SELECT category FROM media WHERE id = %s", (comment_info['media_id'],))
             media_cat = c.fetchone()
             cat = media_cat['category'] if media_cat else 'Photo'
             c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (comment_info['username'], f"❤️ {username} liked your comment!", f"/gallery/{cat}"))
         conn.commit()
-        
     c.execute("SELECT likes FROM comments WHERE id = %s", (comment_id,))
     likes = c.fetchone()["likes"]
     conn.close()
@@ -816,22 +896,16 @@ def add_comment(media_id):
         flash("Comment posted!", "success")
     return redirect(request.referrer or url_for("dashboard"))
 
-@app.route("/bookmark/<int:media_id>", methods=["POST"])
-def bookmark(media_id):
-    if "username" not in session: return jsonify({"error": "Login required."}), 401
-    username = session["username"]
+@app.route("/delete_own/<int:media_id>", methods=["POST"])
+def delete_own(media_id):
+    if "username" not in session: return redirect(url_for("login"))
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("SELECT id FROM bookmarks WHERE username = %s AND media_id = %s", (username, media_id))
-    if c.fetchone():
-        c.execute("DELETE FROM bookmarks WHERE username = %s AND media_id = %s", (username, media_id))
-        bookmarked = False
-    else:
-        c.execute("INSERT INTO bookmarks (username, media_id) VALUES (%s, %s)", (username, media_id))
-        bookmarked = True
+    c.execute("DELETE FROM media WHERE id = %s AND uploaded_by = %s", (media_id, session["username"]))
     conn.commit()
     conn.close()
-    return jsonify({"bookmarked": bookmarked})
+    flash("Asset permanently deleted.", "success")
+    return redirect(request.referrer or url_for("profile"))
 
 @app.route("/report/<int:media_id>", methods=["POST"])
 def report_asset(media_id):
@@ -842,8 +916,7 @@ def report_asset(media_id):
         c.execute("INSERT INTO reports (media_id, reported_by, reason) VALUES (%s, %s, 'Inappropriate Content')", (media_id, session["username"]))
         conn.commit()
         return jsonify({"success": True})
-    except:
-        return jsonify({"error": "Already reported"}), 400
+    except: return jsonify({"error": "Already reported"}), 400
     finally: conn.close()
 
 # =========================================================
@@ -879,10 +952,8 @@ def admin():
     likes_count = c.fetchone()['total'] or 0
     c.execute("SELECT * FROM users ORDER BY id DESC")
     all_users = c.fetchall()
-    
     c.execute("SELECT r.id as report_id, r.media_id, r.reported_by, r.reason, r.created_at, m.title, m.filename, m.category, m.uploaded_by FROM reports r JOIN media m ON r.media_id = m.id ORDER BY r.id DESC")
     reports = c.fetchall()
-    
     conn.close()
     return render_template("admin.html", pending_media=pending_media, user_count=user_count, media_count=media_count, likes_count=likes_count, all_users=all_users, reports=reports, auth_required=False)
 
@@ -953,6 +1024,13 @@ def dismiss_report(report_id):
     conn.close()
     flash("Report dismissed.", "success")
     return redirect(url_for("admin"))
+
+@app.route("/mystery", methods=["POST"])
+def mystery():
+    if hmac.compare_digest(request.form.get("passcode", ""), os.environ.get("MYSTERY_CODE", "SOCHO")): 
+        return render_template("mystery.html")
+    flash("Incorrect code.", "error")
+    return redirect(url_for("dashboard"))
 
 @app.errorhandler(404)
 def not_found_error(error): return render_template("404.html"), 404
