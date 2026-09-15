@@ -43,7 +43,7 @@ app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "development-only-secret
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
 
 # =========================================================
-# DATABASE AUTO-HEALER (FIXES 500 ADMIN ERRORS)
+# DATABASE AUTO-HEALER (FIXES ALL CRASHES)
 # =========================================================
 def upgrade_db():
     conn = get_db_connection()
@@ -80,7 +80,7 @@ def upgrade_db():
         except:
             conn.rollback()
             
-    # 3. THE FIX: Repair old users with NULL roles/status to prevent Admin Page Crash
+    # 3. Repair old users with NULL roles/status
     try:
         c.execute("UPDATE users SET role = 'user' WHERE role IS NULL")
         c.execute("UPDATE users SET status = 'ACTIVE' WHERE status IS NULL")
@@ -149,6 +149,24 @@ def save_uploaded_file(file, category="Photo"):
         return upload_result["secure_url"]
     except: return None
 
+def send_otp_email(to_email, otp):
+    sender = os.environ.get("SMTP_EMAIL")
+    password = os.environ.get("SMTP_PASSWORD")
+    if not sender or not password:
+        print(f"⚠️ SMTP NOT CONFIGURED. OTP for {to_email} is: {otp}")
+        return True 
+    try:
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login(sender, password)
+        msg = f"Subject: Apna Gallery Verification\n\nYour OTP is: {otp}\nDo not share this with anyone."
+        server.sendmail(sender, to_email, msg)
+        server.quit()
+        return True
+    except Exception as e:
+        print("EMAIL ERROR:", e)
+        return False
+
 def current_user_is_admin():
     username = session.get("username")
     if not username: return False
@@ -165,7 +183,7 @@ def sync_admin_session():
     return is_admin
 
 # =========================================================
-# ROUTES: AUTHENTICATION
+# ROUTES: AUTHENTICATION & RECOVERY
 # =========================================================
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -214,6 +232,11 @@ def login():
                 if user.get("status") == "BANNED":
                     flash("Account suspended.", "error")
                     return redirect(url_for("login"))
+                
+                if user.get("deletion_requested"):
+                    c.execute("UPDATE users SET deletion_requested = NULL WHERE id = %s", (user['id'],))
+                    conn.commit()
+                    flash("Welcome back! Account deletion cancelled.", "success")
                     
                 session.update({"username": user["username"], "is_registered": True, "is_admin": (user["role"] == "admin")})
                 conn.close()
@@ -222,11 +245,70 @@ def login():
             conn.close()
             flash("Invalid credentials.", "error")
 
+        elif action == "forgot":
+            email = request.form.get("email", "").strip()
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute("SELECT * FROM users WHERE email = %s", (email,))
+            user = c.fetchone()
+            if user:
+                otp = ''.join(secrets.choice("0123456789") for _ in range(6))
+                c.execute("UPDATE users SET otp = %s WHERE email = %s", (otp, email))
+                conn.commit()
+                send_otp_email(email, otp)
+                session['reset_email'] = email
+                flash("OTP sent to email.", "success")
+                return redirect(url_for("verify_otp"))
+            else:
+                flash("Email not found.", "error")
+            conn.close()
+
     return render_template("login.html")
+
+@app.route("/verify_otp", methods=["GET", "POST"])
+def verify_otp():
+    if 'reset_email' not in session: return redirect(url_for("login"))
+    if request.method == "POST":
+        otp = request.form.get("otp")
+        new_pass = request.form.get("new_password")
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT * FROM users WHERE email = %s AND otp = %s", (session['reset_email'], otp))
+        if c.fetchone():
+            c.execute("UPDATE users SET password = %s, otp = NULL WHERE email = %s", (generate_password_hash(new_pass), session['reset_email']))
+            conn.commit()
+            session.pop('reset_email', None)
+            flash("Password updated successfully! You can now login.", "success")
+            return redirect(url_for("login"))
+        flash("Invalid OTP.", "error")
+        conn.close()
+    return render_template_string("""
+    <div style="max-width:400px; margin: 100px auto; background:#101b2d; padding:30px; border-radius:12px; color:white; text-align:center;">
+        <h2 style="color:#38bdf8;">Enter OTP</h2>
+        <form method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="text" name="otp" placeholder="6-Digit OTP" required style="width:100%; padding:10px; margin-bottom:15px; border-radius:6px;"><br>
+            <input type="password" name="new_password" placeholder="New Password" required style="width:100%; padding:10px; margin-bottom:15px; border-radius:6px;"><br>
+            <button type="submit" style="background:#38bdf8; color:black; padding:10px 20px; border:none; border-radius:6px; cursor:pointer;">Reset Password</button>
+        </form>
+    </div>
+    """)
 
 @app.route("/logout")
 def logout():
     session.clear()
+    return redirect(url_for("login"))
+
+@app.route("/request_delete", methods=["POST"])
+def request_delete():
+    if "username" not in session: return redirect(url_for("login"))
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("UPDATE users SET deletion_requested = CURRENT_TIMESTAMP WHERE username = %s", (session["username"],))
+    conn.commit()
+    conn.close()
+    session.clear()
+    flash("Account scheduled for deletion in 7 days. Login before that to cancel.", "warning")
     return redirect(url_for("login"))
 
 # =========================================================
@@ -290,7 +372,6 @@ def gallery(category):
     c = conn.cursor()
     
     if request.method == "POST":
-        # PHASE 18: Check 5 Upload Limit for non-admins
         if not current_user_is_admin():
             c.execute("SELECT COUNT(id) as cnt FROM media WHERE uploaded_by = %s", (session["username"],))
             total_uploads = c.fetchone()['cnt']
@@ -431,13 +512,13 @@ def delete_own(media_id):
     return redirect(url_for("profile"))
 
 # =========================================================
-# ROUTES: ADMIN GOD MODE (CRASH FIXED)
+# ROUTES: ADMIN GOD MODE & MYSTERY
 # =========================================================
 @app.route("/admin", methods=["GET", "POST"])
 def admin():
     if request.method == "POST":
         if not session.get("is_registered"): return redirect(url_for("login"))
-        if hmac.compare_digest(request.form.get("passcode", ""), ADMIN_PASSCODE):
+        if hmac.compare_digest(request.form.get("passcode", ""), os.environ.get("ADMIN_PASSCODE", "")):
             conn = get_db_connection()
             c = conn.cursor()
             c.execute("UPDATE users SET role = 'admin' WHERE username = %s", (session["username"],))
@@ -446,7 +527,7 @@ def admin():
             session["is_admin"] = True
             flash("Admin active!", "success")
         else: flash("Access Denied!", "error")
-        return redirect(url_for("admin")) # FIXED REDIRECT ISSUE
+        return redirect(url_for("admin"))
 
     if not current_user_is_admin(): return render_template("admin.html", auth_required=True)
     
@@ -463,7 +544,6 @@ def admin():
     c.execute("SELECT SUM(likes) as total FROM media")
     likes_count = c.fetchone()['total'] or 0
     
-    # Safe fetch for all users
     c.execute("SELECT * FROM users ORDER BY id DESC")
     all_users = c.fetchall()
     conn.close()
@@ -490,6 +570,19 @@ def admin_user_action(user_id, action):
     conn.close()
     return redirect(url_for("admin"))
 
+@app.route("/admin/audit-logs")
+def admin_audit_logs():
+    if not current_user_is_admin(): return redirect(url_for("admin"))
+    conn = get_db_connection()
+    c = conn.cursor()
+    try:
+        c.execute("SELECT * FROM audit_logs ORDER BY id DESC LIMIT 100")
+        logs = c.fetchall()
+    except:
+        logs = []
+    conn.close()
+    return render_template("audit_logs.html", logs=logs)
+
 @app.route("/approve/<int:id>", methods=["POST"])
 def approve(id):
     if not current_user_is_admin(): return redirect(url_for("admin"))
@@ -511,6 +604,25 @@ def delete(id):
     conn.close()
     flash("Deleted!", "success")
     return redirect(url_for("admin"))
+
+@app.route("/mystery", methods=["POST"])
+def mystery():
+    if hmac.compare_digest(request.form.get("passcode", ""), os.environ.get("MYSTERY_CODE", "SOCHO")): 
+        return render_template("mystery.html")
+    flash("Incorrect code.", "error")
+    return redirect(url_for("dashboard"))
+
+# =========================================================
+# ERRORS & EXECUTION
+# =========================================================
+@app.errorhandler(404)
+def not_found_error(error): return render_template("404.html"), 404
+@app.errorhandler(500)
+def internal_error(error): return render_template("500.html"), 500
+@app.errorhandler(413)
+def request_entity_too_large(error):
+    flash("File too large (Max 50MB).", "error")
+    return redirect(request.referrer or url_for("dashboard"))
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=False)
