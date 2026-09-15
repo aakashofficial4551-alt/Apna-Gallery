@@ -43,13 +43,11 @@ app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "development-only-secret
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
 
 # =========================================================
-# DATABASE AUTO-HEALER (FIXES ALL CRASHES)
+# DATABASE AUTO-HEALER
 # =========================================================
 def upgrade_db():
     conn = get_db_connection()
     c = conn.cursor()
-    
-    # 1. Create Stories Table
     c.execute("""
         CREATE TABLE IF NOT EXISTS stories (
             id SERIAL PRIMARY KEY,
@@ -60,7 +58,6 @@ def upgrade_db():
     """)
     conn.commit()
 
-    # 2. Add Missing Columns
     queries = [
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(120) UNIQUE",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS user_code VARCHAR(10) UNIQUE",
@@ -80,7 +77,6 @@ def upgrade_db():
         except:
             conn.rollback()
             
-    # 3. Repair old users with NULL roles/status
     try:
         c.execute("UPDATE users SET role = 'user' WHERE role IS NULL")
         c.execute("UPDATE users SET status = 'ACTIVE' WHERE status IS NULL")
@@ -88,7 +84,6 @@ def upgrade_db():
     except:
         conn.rollback()
 
-    # 4. Generate 10-Digit codes for existing users
     try:
         c.execute("SELECT id FROM users WHERE user_code IS NULL")
         for row in c.fetchall():
@@ -152,9 +147,7 @@ def save_uploaded_file(file, category="Photo"):
 def send_otp_email(to_email, otp):
     sender = os.environ.get("SMTP_EMAIL")
     password = os.environ.get("SMTP_PASSWORD")
-    if not sender or not password:
-        print(f"⚠️ SMTP NOT CONFIGURED. OTP for {to_email} is: {otp}")
-        return True 
+    if not sender or not password: return True 
     try:
         server = smtplib.SMTP('smtp.gmail.com', 587)
         server.starttls()
@@ -163,27 +156,25 @@ def send_otp_email(to_email, otp):
         server.sendmail(sender, to_email, msg)
         server.quit()
         return True
-    except Exception as e:
-        print("EMAIL ERROR:", e)
-        return False
+    except: return False
 
 def current_user_is_admin():
-    username = session.get("username")
-    if not username: return False
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("SELECT role FROM users WHERE username = %s", (username,))
-    user = c.fetchone()
-    conn.close()
-    return bool(user and user.get("role") == "admin")
+    return session.get("role") == "admin"
 
 def sync_admin_session():
-    is_admin = current_user_is_admin()
-    session["is_admin"] = is_admin
-    return is_admin
+    # Sync roles into session for faster checks
+    if "username" in session:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT role FROM users WHERE username = %s", (session["username"],))
+        user = c.fetchone()
+        conn.close()
+        if user:
+            session["role"] = user["role"]
+            session["is_admin"] = (user["role"] == "admin")
 
 # =========================================================
-# ROUTES: AUTHENTICATION & RECOVERY
+# ROUTES: AUTHENTICATION
 # =========================================================
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -199,10 +190,10 @@ def login():
             code = ''.join(secrets.choice("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ") for _ in range(10))
             conn = get_db_connection()
             c = conn.cursor()
-            c.execute("INSERT INTO users (username, password, user_code) VALUES (%s, %s, %s)", (guest_name, "guest", code))
+            c.execute("INSERT INTO users (username, password, user_code, role) VALUES (%s, %s, %s, 'user')", (guest_name, "guest", code))
             conn.commit()
             conn.close()
-            session.update({"username": guest_name, "is_registered": False, "is_admin": False})
+            session.update({"username": guest_name, "is_registered": False, "is_admin": False, "role": "user"})
             return redirect(url_for("dashboard"))
 
         if action == "register":
@@ -211,10 +202,10 @@ def login():
             try:
                 conn = get_db_connection()
                 c = conn.cursor()
-                c.execute("INSERT INTO users (username, email, password, user_code) VALUES (%s, %s, %s, %s)", 
+                c.execute("INSERT INTO users (username, email, password, user_code, role) VALUES (%s, %s, %s, %s, 'user')", 
                           (username, email, generate_password_hash(password), code))
                 conn.commit()
-                session.update({"username": username, "is_registered": True, "is_admin": False})
+                session.update({"username": username, "is_registered": True, "is_admin": False, "role": "user"})
                 flash(f"Account created! ID: {code}", "success")
                 return redirect(url_for("dashboard"))
             except:
@@ -238,7 +229,7 @@ def login():
                     conn.commit()
                     flash("Welcome back! Account deletion cancelled.", "success")
                     
-                session.update({"username": user["username"], "is_registered": True, "is_admin": (user["role"] == "admin")})
+                session.update({"username": user["username"], "is_registered": True, "is_admin": (user["role"] == "admin"), "role": user["role"]})
                 conn.close()
                 return redirect(url_for("dashboard"))
             
@@ -285,12 +276,7 @@ def verify_otp():
     return render_template_string("""
     <div style="max-width:400px; margin: 100px auto; background:#101b2d; padding:30px; border-radius:12px; color:white; text-align:center;">
         <h2 style="color:#38bdf8;">Enter OTP</h2>
-        <form method="POST">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="text" name="otp" placeholder="6-Digit OTP" required style="width:100%; padding:10px; margin-bottom:15px; border-radius:6px;"><br>
-            <input type="password" name="new_password" placeholder="New Password" required style="width:100%; padding:10px; margin-bottom:15px; border-radius:6px;"><br>
-            <button type="submit" style="background:#38bdf8; color:black; padding:10px 20px; border:none; border-radius:6px; cursor:pointer;">Reset Password</button>
-        </form>
+        <form method="POST"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="text" name="otp" placeholder="6-Digit OTP" required style="width:100%; padding:10px; margin-bottom:15px; border-radius:6px;"><br><input type="password" name="new_password" placeholder="New Password" required style="width:100%; padding:10px; margin-bottom:15px; border-radius:6px;"><br><button type="submit" style="background:#38bdf8; color:black; padding:10px 20px; border:none; border-radius:6px; cursor:pointer;">Reset Password</button></form>
     </div>
     """)
 
@@ -312,7 +298,7 @@ def request_delete():
     return redirect(url_for("login"))
 
 # =========================================================
-# CORE ROUTES (Dashboard, Profile)
+# CORE ROUTES (Dashboard, Profile, Games)
 # =========================================================
 @app.route("/")
 @app.route("/dashboard")
@@ -323,7 +309,7 @@ def dashboard():
     c = conn.cursor()
     c.execute("SELECT * FROM media WHERE approved = 1 AND filename != 'SHAYARI_TEXT' ORDER BY likes DESC LIMIT 3")
     trending = c.fetchall()
-    c.execute("SELECT s.*, u.profile_pic FROM stories s JOIN users u ON s.username = u.username WHERE s.created_at >= NOW() - INTERVAL '12 hours' ORDER BY s.id DESC")
+    c.execute("SELECT s.*, u.profile_pic, u.role FROM stories s JOIN users u ON s.username = u.username WHERE s.created_at >= NOW() - INTERVAL '12 hours' ORDER BY s.id DESC")
     stories = c.fetchall()
     conn.close()
     return render_template("dashboard.html", trending=trending, stories=stories)
@@ -362,8 +348,22 @@ def profile():
     return render_template("profile.html", user=user, my_uploads=my_uploads, post_count=len(my_uploads))
 
 # =========================================================
-# ROUTES: GALLERY & PHASE 18 (SAAS LIMIT)
+# ROUTES: GALLERY & PHASE 18/19 (SAAS LIMIT & PRO)
 # =========================================================
+@app.route("/pro", methods=["GET", "POST"])
+def pro_upgrade():
+    if "username" not in session: return redirect(url_for("login"))
+    if request.method == "POST":
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("UPDATE users SET role = 'pro' WHERE username = %s", (session["username"],))
+        conn.commit()
+        conn.close()
+        session["role"] = "pro"
+        flash("🎉 Payment Successful! You are now a PRO Agent! Enjoy Unlimited Access.", "success")
+        return redirect(url_for("dashboard"))
+    return render_template("pro.html")
+
 @app.route("/gallery/<category>", methods=["GET", "POST"])
 def gallery(category):
     if "username" not in session: return redirect(url_for("login"))
@@ -372,13 +372,15 @@ def gallery(category):
     c = conn.cursor()
     
     if request.method == "POST":
-        if not current_user_is_admin():
+        # SAAS LIMIT: Bypass if admin or pro
+        user_role = session.get("role", "user")
+        if user_role not in ["admin", "pro"]:
             c.execute("SELECT COUNT(id) as cnt FROM media WHERE uploaded_by = %s", (session["username"],))
             total_uploads = c.fetchone()['cnt']
             if total_uploads >= 5:
-                flash("SAAS LIMIT REACHED: Upgrade to PRO to upload more than 5 assets.", "error")
+                flash("🔒 SAAS LIMIT REACHED: Upgrade to PRO to upload more than 5 assets.", "error")
                 conn.close()
-                return redirect(url_for("dashboard"))
+                return redirect(url_for("pro_upgrade"))
 
         filename = "SHAYARI_TEXT"
         if category != 'Shayari':
@@ -396,8 +398,8 @@ def gallery(category):
         flash("File live!" if is_approved else "Sent to Admin for approval.", "success")
         return redirect(url_for("gallery", category=category))
 
-    c.execute("SELECT * FROM media WHERE category = %s AND approved = 1 AND filename != 'SHAYARI_TEXT' ORDER BY id DESC", (category,))
-    if category == 'Shayari': c.execute("SELECT * FROM media WHERE category = %s AND approved = 1 ORDER BY id DESC", (category,))
+    c.execute("SELECT m.*, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.category = %s AND m.approved = 1 AND m.filename != 'SHAYARI_TEXT' ORDER BY m.id DESC", (category,))
+    if category == 'Shayari': c.execute("SELECT m.*, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.category = %s AND m.approved = 1 ORDER BY m.id DESC", (category,))
     media_files = c.fetchall()
     
     c.execute("SELECT * FROM comments ORDER BY id ASC")
@@ -416,7 +418,7 @@ def search():
     conn = get_db_connection()
     c = conn.cursor()
     search_term = f"%{query}%"
-    c.execute("SELECT * FROM media WHERE approved = 1 AND filename != 'SHAYARI_TEXT' AND (title ILIKE %s OR prompt ILIKE %s) ORDER BY id DESC", (search_term, search_term))
+    c.execute("SELECT m.*, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.approved = 1 AND m.filename != 'SHAYARI_TEXT' AND (m.title ILIKE %s OR m.prompt ILIKE %s) ORDER BY m.id DESC", (search_term, search_term))
     media_files = c.fetchall()
     conn.close()
     return render_template("search.html", media_files=media_files, query=query)
@@ -426,7 +428,7 @@ def leaderboard():
     if "username" not in session: return redirect(url_for("login"))
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("SELECT uploaded_by as username, COUNT(id) as total_uploads, COALESCE(SUM(likes), 0) as total_likes FROM media WHERE approved = 1 GROUP BY uploaded_by ORDER BY total_likes DESC")
+    c.execute("SELECT m.uploaded_by as username, COUNT(m.id) as total_uploads, COALESCE(SUM(m.likes), 0) as total_likes, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.approved = 1 GROUP BY m.uploaded_by, u.role ORDER BY total_likes DESC")
     leaders = c.fetchall()
     conn.close()
     return render_template("leaderboard.html", leaders=leaders)
@@ -525,6 +527,7 @@ def admin():
             conn.commit()
             conn.close()
             session["is_admin"] = True
+            session["role"] = "admin"
             flash("Admin active!", "success")
         else: flash("Access Denied!", "error")
         return redirect(url_for("admin"))
@@ -536,14 +539,12 @@ def admin():
     
     c.execute("SELECT * FROM media WHERE approved = 0 ORDER BY id DESC")
     pending_media = c.fetchall()
-    
     c.execute("SELECT COUNT(*) as count FROM users")
     user_count = c.fetchone()['count']
     c.execute("SELECT COUNT(*) as count FROM media WHERE approved = 1")
     media_count = c.fetchone()['count']
     c.execute("SELECT SUM(likes) as total FROM media")
     likes_count = c.fetchone()['total'] or 0
-    
     c.execute("SELECT * FROM users ORDER BY id DESC")
     all_users = c.fetchall()
     conn.close()
@@ -565,6 +566,9 @@ def admin_user_action(user_id, action):
     elif action == "make_admin":
         c.execute("UPDATE users SET role = 'admin' WHERE id = %s", (user_id,))
         flash("Agent promoted to Admin HQ!", "success")
+    elif action == "make_pro":
+        c.execute("UPDATE users SET role = 'pro' WHERE id = %s", (user_id,))
+        flash("Agent granted PRO status manually!", "success")
         
     conn.commit()
     conn.close()
@@ -578,8 +582,7 @@ def admin_audit_logs():
     try:
         c.execute("SELECT * FROM audit_logs ORDER BY id DESC LIMIT 100")
         logs = c.fetchall()
-    except:
-        logs = []
+    except: logs = []
     conn.close()
     return render_template("audit_logs.html", logs=logs)
 
@@ -612,9 +615,6 @@ def mystery():
     flash("Incorrect code.", "error")
     return redirect(url_for("dashboard"))
 
-# =========================================================
-# ERRORS & EXECUTION
-# =========================================================
 @app.errorhandler(404)
 def not_found_error(error): return render_template("404.html"), 404
 @app.errorhandler(500)
