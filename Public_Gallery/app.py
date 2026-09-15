@@ -2,6 +2,8 @@ import os
 import sqlite3
 import secrets
 import time
+import cloudinary
+import cloudinary.uploader
 from collections import defaultdict, deque
 import hmac
 from uuid import uuid4
@@ -74,6 +76,12 @@ app.config["UPLOAD_FOLDER"] = os.path.join(
     BASE_DIR,
     "static",
     "uploads"
+)
+cloudinary.config(
+    cloud_name=os.environ.get("CLOUDINARY_CLOUD_NAME"),
+    api_key=os.environ.get("CLOUDINARY_API_KEY"),
+    api_secret=os.environ.get("CLOUDINARY_API_SECRET"),
+    secure=True
 )
 
 # 50 MB Maximum limit preserved
@@ -314,14 +322,12 @@ def save_uploaded_file(file, category="Photo"):
         print(f"UPLOAD REJECTED: {err_msg}")
         return None
 
-    filename = make_unique_filename(file.filename)
-    filepath = os.path.join(app.config["UPLOAD_FOLDER"], filename)
-
     try:
-        file.save(filepath)
-        return filename
+        # File seedha Cloudinary par jayegi, Render par nahi
+        upload_result = cloudinary.uploader.upload(file, resource_type="auto")
+        return upload_result["secure_url"]  # Ab database mein filename ki jagah URL save hoga
     except Exception as e:
-        print("SAVE UPLOAD ERROR:", repr(e))
+        print("CLOUDINARY UPLOAD ERROR:", repr(e))
         return None
 
 
