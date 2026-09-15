@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-
 {% block title %}Dashboard | Apna Gallery{% endblock %}
 
 {% block content %}
@@ -8,28 +7,14 @@
     <p style="color: var(--text-muted); margin-top: 5px;">Access your secure vaults and agent tools below.</p>
 </div>
 
-<!-- NEW: DAILY REWARD BANNER (FREE ECONOMY) -->
-{% if can_claim and session.get('role') not in ['admin', 'pro'] %}
-<div style="background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(16, 185, 129, 0.1)); border: 1px solid var(--success); padding: 20px; border-radius: 12px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 5px 15px rgba(34,197,94,0.15);">
-    <div>
-        <h3 style="margin: 0; color: var(--success); display: flex; align-items: center; gap: 8px;">🎁 Daily Bonus Available!</h3>
-        <p style="margin: 5px 0 0 0; color: var(--text-main); font-size: 0.9rem;">Claim your free 20 Apna Coins to use the AI Studio.</p>
-    </div>
-    <form method="POST" action="{{ url_for('claim_reward') }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button type="submit" class="btn" style="background: var(--success); color: white; padding: 10px 20px;">Claim Now</button>
-    </form>
-</div>
-{% endif %}
-
 <!-- INSTAGRAM STYLE LIVE STORIES -->
 {% if stories %}
 <div style="margin-bottom: 30px;">
-    <h3 style="color: var(--warning); margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">⏱️ Live Agent Stories (12H)</h3>
+    <h3 style="color: var(--warning); margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">⏱️ Live Agent Stories</h3>
     <div style="display: flex; gap: 20px; overflow-x: auto; padding-bottom: 15px;">
         {% for s in stories %}
         <div style="min-width: 80px; text-align: center;">
-            <div style="width: 75px; height: 75px; border-radius: 50%; border: 3px solid var(--accent); padding: 3px; margin: 0 auto 8px auto; cursor: pointer; transition: transform 0.2s;" onclick="openLightbox('{{ s.filename }}')" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
+            <div style="width: 75px; height: 75px; border-radius: 50%; border: 3px solid var(--accent); padding: 3px; margin: 0 auto 8px auto; cursor: pointer; transition: transform 0.2s;" onclick="openInstaStory('{{ s.filename }}', '{{ s.username }}', '{{ s.profile_pic or '' }}')" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
                 {% if s.profile_pic %}
                     <img src="{{ s.profile_pic }}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">
                 {% else %}
@@ -86,16 +71,65 @@
     </a>
 </div>
 
-<!-- Lightbox Modal for Stories -->
-<div id="lightbox" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 9999; justify-content: center; align-items: center; flex-direction: column; backdrop-filter: blur(5px);">
-    <span onclick="document.getElementById('lightbox').style.display='none'" style="position: absolute; top: 20px; right: 40px; font-size: 3rem; color: white; cursor: pointer;">&times;</span>
-    <img id="lightbox-img" src="" style="max-width: 90%; max-height: 80vh; border-radius: 12px; box-shadow: 0 0 30px rgba(56, 189, 248, 0.3);">
+<!-- NEW: INSTAGRAM STYLE STORY VIEWER -->
+<div id="storyViewer" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 10000; flex-direction: column;">
+    
+    <!-- Progress Bar Area -->
+    <div style="position: absolute; top: 15px; left: 15px; right: 15px; display: flex; gap: 5px;">
+        <div style="flex: 1; height: 3px; background: rgba(255,255,255,0.3); border-radius: 2px; overflow: hidden;">
+            <div id="storyProgress" style="height: 100%; width: 0%; background: white;"></div>
+        </div>
+    </div>
+
+    <!-- User Info Overlay -->
+    <div style="position: absolute; top: 30px; left: 15px; display: flex; align-items: center; gap: 10px; z-index: 10001;">
+        <img id="storyProfile" src="" style="width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--accent); object-fit: cover;">
+        <span id="storyUser" style="color: white; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.8); font-size: 1.1rem;"></span>
+    </div>
+
+    <!-- Close Button -->
+    <span onclick="closeStory()" style="position: absolute; top: 25px; right: 20px; font-size: 2.5rem; color: white; cursor: pointer; text-shadow: 0 2px 4px rgba(0,0,0,0.8); z-index: 10001;">&times;</span>
+    
+    <!-- Story Image Media -->
+    <img id="storyImg" src="" style="width: 100%; height: 100%; object-fit: contain;">
 </div>
 
 <script>
-    function openLightbox(imageSrc) {
-        document.getElementById('lightbox').style.display = 'flex';
-        document.getElementById('lightbox-img').src = imageSrc;
+    let storyTimer;
+    
+    function openInstaStory(imgSrc, username, profilePic) {
+        document.getElementById('storyViewer').style.display = 'flex';
+        document.getElementById('storyImg').src = imgSrc;
+        document.getElementById('storyUser').innerText = username;
+        
+        if (profilePic && profilePic !== '') {
+            document.getElementById('storyProfile').src = profilePic;
+            document.getElementById('storyProfile').style.display = 'block';
+        } else {
+            // Default placeholder if no profile pic
+            document.getElementById('storyProfile').src = 'https://placehold.co/100x100/1e293b/ffffff.png?text=' + username.charAt(0).toUpperCase();
+        }
+        
+        // Progress bar animation reset & start
+        const progress = document.getElementById('storyProgress');
+        progress.style.transition = 'none';
+        progress.style.width = '0%';
+        
+        setTimeout(() => {
+            progress.style.transition = 'width 5s linear';
+            progress.style.width = '100%';
+        }, 50);
+
+        // Auto close after 5 seconds
+        storyTimer = setTimeout(closeStory, 5000);
+    }
+    
+    function closeStory() {
+        document.getElementById('storyViewer').style.display = 'none';
+        clearTimeout(storyTimer);
+        const progress = document.getElementById('storyProgress');
+        progress.style.transition = 'none';
+        progress.style.width = '0%';
     }
 </script>
 {% endblock %}
