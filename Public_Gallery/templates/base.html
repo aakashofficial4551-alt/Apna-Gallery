@@ -110,7 +110,7 @@
         +
     </button>
 
-    <!-- UPLOAD MODAL WITH PRIVACY CONTROL -->
+    <!-- UPLOAD MODAL WITH AI CAPTION GENERATOR -->
     <div id="uploadModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
         <div style="background: var(--bg-card); padding: 30px; border-radius: 20px; border: 1px solid var(--border-color); width: 90%; max-width: 450px; position: relative; box-shadow: 0 10px 40px rgba(0,0,0,0.5);">
             <span onclick="document.getElementById('uploadModal').style.display='none'" style="position: absolute; top: 15px; right: 20px; font-size: 2rem; color: white; cursor: pointer;">&times;</span>
@@ -120,7 +120,7 @@
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 
                 <label style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: -10px;">Select Vault</label>
-                <select name="category" required style="padding: 12px; border-radius: 8px; background: rgba(8,17,31,0.8); color: white; border: 1px solid var(--border-color); outline: none;">
+                <select name="category" id="vaultCategory" required style="padding: 12px; border-radius: 8px; background: rgba(8,17,31,0.8); color: white; border: 1px solid var(--border-color); outline: none;">
                     <option value="Photo">📸 Photo</option>
                     <option value="Video">🎥 Video</option>
                     <option value="Music">🎵 Music</option>
@@ -128,7 +128,6 @@
                     <option value="Shayari">✍️ Shayari (Add #tags!)</option>
                 </select>
                 
-                <!-- NEW: PRIVACY OPTIONS -->
                 <label style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: -10px;">Visibility (Privacy)</label>
                 <select name="visibility" required style="padding: 12px; border-radius: 8px; background: rgba(8,17,31,0.8); color: white; border: 1px solid var(--border-color); outline: none;">
                     <option value="public">🌍 Public (Everyone can see)</option>
@@ -137,7 +136,10 @@
                 </select>
 
                 <label style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: -10px;">Caption / Hashtags</label>
-                <input type="text" name="title" placeholder="e.g., Beautiful day! #nature #vibes" required style="padding: 12px; border-radius: 8px; background: rgba(8,17,31,0.8); color: white; border: 1px solid var(--border-color); outline: none;">
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <input type="text" name="title" id="uploadCaption" placeholder="e.g., Beautiful day! #nature #vibes" required style="flex: 1; padding: 12px; border-radius: 8px; background: rgba(8,17,31,0.8); color: white; border: 1px solid var(--border-color); outline: none;">
+                    <button type="button" onclick="generateAICaption()" class="btn" style="padding: 12px; background: var(--warning); color: #000; border-radius: 8px;" title="Auto-Generate Viral Caption">✨</button>
+                </div>
                 
                 <label style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: -10px;">Upload File</label>
                 <input type="file" name="media" style="padding: 12px; border-radius: 8px; background: rgba(8,17,31,0.8); color: white; border: 1px solid var(--border-color); outline: none;">
@@ -195,6 +197,24 @@
                     .then((registration) => { console.log('ServiceWorker success'); })
                     .catch((err) => { console.log('ServiceWorker failed', err); });
             });
+        }
+        
+        // NEW: AI CAPTION GENERATOR 
+        async function generateAICaption() {
+            const cat = document.getElementById('vaultCategory').value;
+            const input = document.getElementById('uploadCaption');
+            input.value = "Generating ✨...";
+            try {
+                const res = await fetch('/api/ai', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': '{{ csrf_token() }}'},
+                    body: JSON.stringify({query: `Write a short, cool 1-sentence social media caption with 3 trending hashtags for a ${cat} post.`})
+                });
+                const data = await res.json();
+                input.value = data.reply;
+            } catch(e) {
+                input.value = "Error generating caption.";
+            }
         }
     </script>
 </body>
