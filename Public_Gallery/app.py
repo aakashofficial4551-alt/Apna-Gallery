@@ -44,7 +44,7 @@ app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "development-only-secret
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
 
 # =========================================================
-# TEXT FORMATTER & ONLINE FILTERS
+# TEXT & TIME FILTERS (PHASE 36)
 # =========================================================
 @app.template_filter('format_text')
 def format_text(text):
@@ -58,6 +58,17 @@ def is_online(last_active):
     if not last_active: return False
     return (datetime.datetime.now() - last_active).total_seconds() < 300
 
+@app.template_filter('timeago')
+def timeago(dt):
+    if not dt: return ""
+    now = datetime.datetime.now()
+    diff = now - dt
+    seconds = diff.total_seconds()
+    if seconds < 60: return "Just now"
+    elif seconds < 3600: return f"{int(seconds/60)}m ago"
+    elif seconds < 86400: return f"{int(seconds/3600)}h ago"
+    else: return f"{int(seconds/86400)}d ago"
+
 # =========================================================
 # DATABASE AUTO-HEALER
 # =========================================================
@@ -70,6 +81,13 @@ def upgrade_db():
     c.execute("CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, sender VARCHAR(100) NOT NULL, receiver VARCHAR(100) NOT NULL, message TEXT NOT NULL, is_read BOOLEAN DEFAULT FALSE, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
     c.execute("CREATE TABLE IF NOT EXISTS bookmarks (id SERIAL PRIMARY KEY, username VARCHAR(100) NOT NULL, media_id INTEGER NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE(username, media_id))")
     conn.commit()
+
+    # PHASE 36: Make sure media and comments have created_at
+    try:
+        c.execute("ALTER TABLE media ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+        c.execute("ALTER TABLE comments ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+        conn.commit()
+    except: conn.rollback()
 
     queries = [
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(120) UNIQUE",
@@ -89,8 +107,7 @@ def upgrade_db():
         try:
             c.execute(q)
             conn.commit()
-        except:
-            conn.rollback()
+        except: conn.rollback()
             
     try:
         c.execute("UPDATE users SET role = 'user' WHERE role IS NULL")
@@ -173,31 +190,13 @@ def inject_global_vars():
         except: pass
     return vars_dict
 
-# =========================================================
-# PHASE 35: OPTIMIZED UPLOAD ENGINE
-# =========================================================
 def save_uploaded_file(file, category="Photo"):
-    """
-    Saves the file to Cloudinary. 
-    If it's an image, it uses q_auto and f_auto to aggressively compress
-    and optimize it on the fly, saving bandwidth and storage.
-    """
     if not file or not file.filename: return None
     try:
         if category == "Photo" or category == "Image":
-            # Apply auto-quality and auto-format for images
-            upload_result = cloudinary.uploader.upload(
-                file, 
-                resource_type="image",
-                quality="auto",
-                fetch_format="auto"
-            )
+            upload_result = cloudinary.uploader.upload(file, resource_type="image", quality="auto", fetch_format="auto")
         else:
-            # Fallback for Videos, Documents, etc.
-            upload_result = cloudinary.uploader.upload(
-                file, 
-                resource_type="auto"
-            )
+            upload_result = cloudinary.uploader.upload(file, resource_type="auto")
         return upload_result["secure_url"]
     except Exception as e:
         print(f"Cloudinary Error: {e}")
@@ -349,7 +348,7 @@ def request_delete():
     return redirect(url_for("login"))
 
 # =========================================================
-# UNIVERSAL UPLOAD ROUTE WITH MENTIONS
+# UNIVERSAL UPLOAD ROUTE
 # =========================================================
 @app.route("/upload_asset", methods=["POST"])
 def upload_asset():
@@ -387,32 +386,21 @@ def upload_asset():
     flash("Asset published successfully!" if is_approved else "Asset sent to Admin for approval.", "success")
     return redirect(request.referrer or url_for("feed"))
 
-# =========================================================
-# NEW: NETWORK EXPLORER API
-# =========================================================
 @app.route("/api/network/<action_type>/<username>")
 def api_network(action_type, username):
     if "username" not in session: return jsonify([])
     conn = get_db_connection()
     c = conn.cursor()
     if action_type == "followers":
-        c.execute("""
-            SELECT u.username, u.profile_pic, u.role 
-            FROM users u JOIN followers f ON u.username = f.follower 
-            WHERE f.following = %s
-        """, (username,))
+        c.execute("SELECT u.username, u.profile_pic, u.role FROM users u JOIN followers f ON u.username = f.follower WHERE f.following = %s", (username,))
     else:
-        c.execute("""
-            SELECT u.username, u.profile_pic, u.role 
-            FROM users u JOIN followers f ON u.username = f.following 
-            WHERE f.follower = %s
-        """, (username,))
+        c.execute("SELECT u.username, u.profile_pic, u.role FROM users u JOIN followers f ON u.username = f.following WHERE f.follower = %s", (username,))
     results = c.fetchall()
     conn.close()
     return jsonify(results)
 
 # =========================================================
-# CORE ROUTES
+# CORE ROUTES (DUAL FEED)
 # =========================================================
 @app.route("/")
 def index():
@@ -425,19 +413,31 @@ def feed():
     conn = get_db_connection()
     c = conn.cursor()
     
-    c.execute("""
-        SELECT m.*, u.profile_pic, u.role 
-        FROM media m 
-        JOIN users u ON m.uploaded_by = u.username 
-        JOIN followers f ON f.following = m.uploaded_by 
-        WHERE f.follower = %s AND m.approved = 1 AND m.filename != 'SHAYARI_TEXT' 
-        ORDER BY m.id DESC LIMIT 50
-    """, (session["username"],))
-    feed_posts = c.fetchall()
+    # PHASE 36: Dual Feed Tab Logic
+    tab = request.args.get("tab", "foryou")
     
-    if not feed_posts:
-        c.execute("SELECT m.*, u.profile_pic, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.approved = 1 AND m.filename != 'SHAYARI_TEXT' ORDER BY m.id DESC LIMIT 30")
+    if tab == "global":
+        c.execute("""
+            SELECT m.*, u.profile_pic, u.role 
+            FROM media m JOIN users u ON m.uploaded_by = u.username 
+            WHERE m.approved = 1 AND m.filename != 'SHAYARI_TEXT' 
+            ORDER BY m.id DESC LIMIT 50
+        """)
         feed_posts = c.fetchall()
+    else:
+        c.execute("""
+            SELECT m.*, u.profile_pic, u.role 
+            FROM media m 
+            JOIN users u ON m.uploaded_by = u.username 
+            JOIN followers f ON f.following = m.uploaded_by 
+            WHERE f.follower = %s AND m.approved = 1 AND m.filename != 'SHAYARI_TEXT' 
+            ORDER BY m.id DESC LIMIT 50
+        """, (session["username"],))
+        feed_posts = c.fetchall()
+        # Fallback if no friends
+        if not feed_posts:
+            c.execute("SELECT m.*, u.profile_pic, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.approved = 1 AND m.filename != 'SHAYARI_TEXT' ORDER BY m.id DESC LIMIT 10")
+            feed_posts = c.fetchall()
 
     c.execute("SELECT c.*, u.role FROM comments c JOIN users u ON c.username = u.username ORDER BY c.id ASC")
     comments_db = c.fetchall()
@@ -447,7 +447,8 @@ def feed():
     c.execute("SELECT media_id FROM bookmarks WHERE username = %s", (session["username"],))
     saved_ids = [row['media_id'] for row in c.fetchall()]
     conn.close()
-    return render_template("feed.html", posts=feed_posts, comments=comments, saved_ids=saved_ids)
+    
+    return render_template("feed.html", posts=feed_posts, comments=comments, saved_ids=saved_ids, current_tab=tab)
 
 @app.route("/explore")
 def explore():
@@ -656,7 +657,6 @@ def api_chat_history(username):
     c.execute("UPDATE messages SET is_read = TRUE WHERE sender = %s AND receiver = %s AND is_read = FALSE", (username, me))
     conn.commit()
     conn.close()
-    
     formatted_history = [{"sender": r['sender'], "message": r['message'], "time": r['time']} for r in history]
     return jsonify(formatted_history)
 
@@ -844,7 +844,7 @@ def delete_own(media_id):
     return redirect(request.referrer or url_for("profile"))
 
 # =========================================================
-# ROUTES: ADMIN GOD MODE & MYSTERY
+# ADMIN ROUTE
 # =========================================================
 @app.route("/admin", methods=["GET", "POST"])
 def admin():
