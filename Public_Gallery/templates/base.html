@@ -68,7 +68,6 @@
                 
                 <a href="{{ url_for('feed') }}">📰 Feed</a>
                 <a href="{{ url_for('explore') }}">🌍 Explore</a>
-                <!-- NEW REELS ROUTE -->
                 <a href="{{ url_for('reels') }}" style="color: var(--accent);">🎬 Reels</a>
                 
                 <a href="{{ url_for('global_chat') }}" style="color: var(--success);">🌐 Chatroom</a>
@@ -81,7 +80,10 @@
                 </a>
                 
                 <a href="{{ url_for('dashboard') }}">HQ</a>
-                <a href="{{ url_for('profile') }}" style="color: var(--accent);">Profile</a>
+                <a href="{{ url_for('profile') }}" style="color: var(--accent);">
+                    <!-- NEW: DYNAMIC AVATAR IN NAVBAR -->
+                    <img src="{{ get_avatar(my_profile_pic, session.username) }}" style="width: 25px; height: 25px; border-radius: 50%; vertical-align: middle; border: 1px solid var(--accent); margin-right: 5px;"> Profile
+                </a>
                 
                 <span onclick="document.getElementById('settingsModal').style.display='flex'" style="font-size: 1.3rem; cursor: pointer;" title="Settings">⚙️</span>
                 
