@@ -290,6 +290,48 @@ def games():
     if "username" not in session: return redirect(url_for("login"))
     return render_template("games.html")
 
+# =========================================================
+# ROUTES: AI IMAGE STUDIO
+# =========================================================
+@app.route("/ai-studio", methods=["GET", "POST"])
+def ai_studio():
+    if "username" not in session: return redirect(url_for("login"))
+    
+    if request.method == "POST":
+        prompt = request.form.get("prompt", "").strip()
+        if not prompt:
+            flash("Prompt cannot be empty.", "error")
+            return redirect(url_for("ai_studio"))
+        
+        # Free Text-to-Image AI API (No keys required)
+        image_url = f"https://image.pollinations.ai/prompt/{prompt}?nologo=true"
+        
+        try:
+            # AI Image ko direct URL se Cloudinary par save karna
+            upload_result = cloudinary.uploader.upload(image_url, resource_type="image")
+            secure_url = upload_result["secure_url"]
+            
+            # Database mein as a 'Photo' save karna
+            is_approved = 1 if current_user_is_admin() else 0
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute(
+                "INSERT INTO media (filename, title, category, prompt, uploaded_by, approved) VALUES (%s, %s, %s, %s, %s, %s)",
+                (secure_url, f"AI Art: {prompt[:20]}...", "Photo", prompt, session["username"], is_approved)
+            )
+            conn.commit()
+            conn.close()
+            
+            flash("AI Image successfully generated and saved to Photo Vault!", "success")
+            return redirect(url_for("gallery", category="Photo"))
+            
+        except Exception as e:
+            print("AI GEN ERROR:", repr(e))
+            flash("AI failed to generate image. Try another prompt.", "error")
+            return redirect(url_for("ai_studio"))
+            
+    return render_template("ai_studio.html")
+
 @app.route("/profile", methods=["GET", "POST"])
 def profile():
     if "username" not in session: return redirect(url_for("login"))
