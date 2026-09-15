@@ -41,15 +41,31 @@
         <form id="storyForm" method="POST" enctype="multipart/form-data">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="action" value="story">
-            <label class="btn" style="background: var(--warning); color: #000; cursor: pointer;">
+            <label class="btn" style="background: var(--warning); color: #000; cursor: pointer; margin-right: 10px;">
                 ⏱️ Post 12-Hour Story
                 <input type="file" name="story_media" accept="image/*,video/*" style="display: none;" onchange="document.getElementById('storyForm').submit()">
             </label>
         </form>
+
+        <!-- NEW: THEME SELECTOR (PRO ONLY) -->
+        {% if user.role in ['pro', 'admin'] %}
+        <form method="POST" style="margin-top: 15px; display: inline-flex; gap: 10px; align-items: center;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="action" value="theme">
+            <span style="color: var(--text-muted); font-size: 0.9rem;">🎨 Profile Theme:</span>
+            <select name="theme" onchange="this.form.submit()" style="background: rgba(8,17,31,0.8); color: white; border: 1px solid var(--border-color); padding: 8px; border-radius: 6px; outline: none;">
+                <option value="cyan" {% if user.theme == 'cyan' %}selected{% endif %}>Cyan (Default)</option>
+                <option value="gold" {% if user.theme == 'gold' %}selected{% endif %}>Gold</option>
+                <option value="rose" {% if user.theme == 'rose' %}selected{% endif %}>Rose Pink</option>
+                <option value="matrix" {% if user.theme == 'matrix' %}selected{% endif %}>Matrix Green</option>
+            </select>
+        </form>
+        {% else %}
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 15px;">💎 Upgrade to PRO to unlock Custom Profile Themes.</p>
+        {% endif %}
     </div>
 </div>
 
-<!-- MY ASSETS -->
 <h2 style="color: var(--accent); border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">My Assets</h2>
 <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; margin-bottom: 50px;">
     {% for item in my_uploads %}
@@ -68,7 +84,6 @@
     {% endfor %}
 </div>
 
-<!-- NEW: SAVED/BOOKMARKED ASSETS -->
 <h2 style="color: var(--warning); border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">📌 Saved Vault (Private)</h2>
 <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px;">
     {% for item in saved_uploads %}
@@ -86,7 +101,6 @@
     {% endfor %}
 </div>
 
-<!-- ID CARD MODAL -->
 <div id="idCardModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 9999; justify-content: center; align-items: center;">
     <div style="background: linear-gradient(135deg, #101b2d, #08111f); padding: 40px; border-radius: 20px; border: 2px solid var(--accent); text-align: center; max-width: 400px; width: 100%; position: relative;">
         <span onclick="document.getElementById('idCardModal').style.display='none'" style="position: absolute; top: 15px; right: 20px; font-size: 2rem; color: white; cursor: pointer;">&times;</span>
