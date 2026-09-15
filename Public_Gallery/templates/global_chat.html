@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Global Chat | Apna Gallery{% endblock %}
+
+{% block content %}
+<div style="max-width: 900px; margin: 0 auto; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; display: flex; flex-direction: column; height: 80vh; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
+    
+    <div style="background: rgba(15,23,42,0.9); padding: 15px 20px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <span style="font-size: 2rem;">🌐</span>
+            <div>
+                <h2 style="margin: 0; color: var(--success); font-size: 1.3rem;">Global Chatroom</h2>
+                <span style="font-size: 0.8rem; color: var(--text-muted);">Everyone on Apna Gallery is here!</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- GLOBAL CHAT BOX -->
+    <div id="global-chat-box" style="flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; background: rgba(8,17,31,0.4);">
+        <!-- Messages loaded via JS -->
+    </div>
+
+    <form method="POST" style="background: rgba(15,23,42,0.9); padding: 15px; border-top: 1px solid var(--border-color); display: flex; gap: 10px;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="text" name="message" placeholder="Broadcast a message to the world..." required autocomplete="off" style="flex: 1; padding: 15px 20px; border-radius: 25px; border: 1px solid var(--border-color); background: #1e293b; color: white; outline: none; font-size: 1rem;">
+        <button type="submit" class="btn" style="background: var(--success); color: #fff; border: none; padding: 0 25px; border-radius: 25px; font-size: 1.1rem; font-weight: bold; cursor: pointer; transition: 0.2s;">Send 🚀</button>
+    </form>
+</div>
+
+<script>
+    const chatBox = document.getElementById("global-chat-box");
+    const myUsername = "{{ session.username }}";
+    
+    async function fetchGlobalMessages() {
+        try {
+            const res = await fetch(`/api/global_chat_history`);
+            const messages = await res.json();
+            
+            let html = "";
+            messages.forEach(msg => {
+                const isMe = (msg.sender === myUsername);
+                const badge = msg.role === 'admin' ? '<span style="color:#38bdf8; font-size:0.9rem;" title="Verified">☑️</span>' : '';
+                
+                if(isMe) {
+                    html += `
+                    <div style="align-self: flex-end; background: var(--success); color: #fff; padding: 10px 15px; border-radius: 15px 15px 0 15px; max-width: 75%; word-wrap: break-word; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
+                        <span style="font-size: 0.8rem; font-weight: bold; display: block; margin-bottom: 5px; color: rgba(255,255,255,0.7);">You ${badge}</span>
+                        <p style="margin: 0; font-size: 1rem;">${msg.message}</p>
+                        <span style="font-size: 0.7rem; color: rgba(255,255,255,0.6); display: block; text-align: right; margin-top: 5px;">${msg.time}</span>
+                    </div>`;
+                } else {
+                    html += `
+                    <div style="align-self: flex-start; background: #334155; color: white; padding: 10px 15px; border-radius: 15px 15px 15px 0; max-width: 75%; word-wrap: break-word; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
+                        <a href="/agent/${msg.sender}" style="font-size: 0.8rem; font-weight: bold; display: block; margin-bottom: 5px; color: var(--accent); text-decoration: none;">@${msg.sender} ${badge}</a>
+                        <p style="margin: 0; font-size: 1rem;">${msg.message}</p>
+                        <span style="font-size: 0.7rem; color: var(--text-muted); display: block; text-align: right; margin-top: 5px;">${msg.time}</span>
+                    </div>`;
+                }
+            });
+            
+            if(html === "") html = `<p style="text-align: center; color: var(--text-muted); font-size: 0.9rem; margin-top: auto; margin-bottom: auto;">The room is quiet. Say hi to the world! 🌍</p>`;
+            
+            if(chatBox.innerHTML !== html) {
+                chatBox.innerHTML = html;
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+        } catch(e) { console.error("Global chat sync error", e); }
+    }
+
+    fetchGlobalMessages();
+    setInterval(fetchGlobalMessages, 3000);
+</script>
+{% endblock %}
