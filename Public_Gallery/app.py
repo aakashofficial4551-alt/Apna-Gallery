@@ -48,7 +48,19 @@ app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
 def upgrade_db():
     conn = get_db_connection()
     c = conn.cursor()
-    # Safely add new columns if they don't exist
+    
+    # 1. NEW: CREATE STORIES TABLE (Bug Fixed!)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS stories (
+            id SERIAL PRIMARY KEY,
+            username VARCHAR(100) NOT NULL,
+            filename TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.commit()
+
+    # 2. Safely add new columns if they don't exist
     queries = [
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(120) UNIQUE",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS user_code VARCHAR(10) UNIQUE",
@@ -63,12 +75,16 @@ def upgrade_db():
         except:
             conn.rollback()
             
-    # Generate 10-Digit codes for existing users
-    c.execute("SELECT id FROM users WHERE user_code IS NULL")
-    for row in c.fetchall():
-        code = ''.join(secrets.choice("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ") for _ in range(10))
-        c.execute("UPDATE users SET user_code = %s WHERE id = %s", (code, row['id']))
-    conn.commit()
+    # 3. Generate 10-Digit codes for existing users
+    try:
+        c.execute("SELECT id FROM users WHERE user_code IS NULL")
+        for row in c.fetchall():
+            code = ''.join(secrets.choice("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ") for _ in range(10))
+            c.execute("UPDATE users SET user_code = %s WHERE id = %s", (code, row['id']))
+        conn.commit()
+    except:
+        conn.rollback()
+        
     conn.close()
 
 upgrade_db()
