@@ -2,7 +2,6 @@
 {% block title %}{{ agent.username }}'s Portfolio | Apna Gallery{% endblock %}
 
 {% block head %}
-<!-- MAGICAL THEME OVERRIDE -->
 <style>
     :root {
         --accent: {% if agent.theme == 'gold' %}#fbbf24{% elif agent.theme == 'rose' %}#f43f5e{% elif agent.theme == 'matrix' %}#22c55e{% else %}#38bdf8{% endif %} !important;
@@ -11,45 +10,58 @@
 {% endblock %}
 
 {% block content %}
-<div style="text-align: center; margin-bottom: 40px; padding: 40px; background: var(--bg-card); border-radius: 20px; border: 1px solid var(--border-color); box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
-    
-    {% if agent.profile_pic %}
-        <img src="{{ agent.profile_pic }}" style="width: 150px; height: 150px; border-radius: 50%; object-fit: cover; border: 4px solid var(--accent); margin-bottom: 20px;">
-    {% else %}
-        <div style="width: 150px; height: 150px; border-radius: 50%; background: #1e293b; border: 4px solid var(--accent); display: grid; place-items: center; font-size: 5rem; margin: 0 auto 20px auto;">👤</div>
-    {% endif %}
 
-    <h1 style="color: var(--accent); margin: 0; display: flex; align-items: center; justify-content: center; gap: 10px;">
-        {{ agent.username }}
-        {% if agent.role in ['pro', 'admin'] %}
-            <span style="color: #38bdf8; font-size: 1.8rem;" title="Verified PRO Agent">☑️</span>
+<!-- COVER PHOTO BANNER -->
+<div style="height: 250px; border-radius: 20px 20px 0 0; background: #1e293b url('{{ agent.cover_pic or '' }}') center/cover; border: 1px solid var(--border-color); border-bottom: none;"></div>
+
+<!-- PROFILE INFO CONTAINER -->
+<div style="background: var(--bg-card); padding: 20px 30px 30px 30px; border-radius: 0 0 20px 20px; border: 1px solid var(--border-color); border-top: none; margin-bottom: 40px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); display: flex; gap: 30px; flex-wrap: wrap;">
+    
+    <!-- AVATAR OVERLAPPING COVER -->
+    <div style="margin-top: -60px;">
+        {% if agent.profile_pic %}
+            <img src="{{ agent.profile_pic }}" style="width: 140px; height: 140px; border-radius: 50%; object-fit: cover; border: 6px solid var(--bg-main);">
+        {% else %}
+            <div style="width: 140px; height: 140px; border-radius: 50%; background: #1e293b; border: 6px solid var(--bg-main); display: grid; place-items: center; font-size: 4rem;">👤</div>
         {% endif %}
-    </h1>
-    
-    <p style="color: var(--text-muted); font-size: 1.1rem; margin-top: 10px;">{{ agent.bio or 'No bio provided.' }}</p>
-    
-    <div style="display: flex; justify-content: center; gap: 20px; margin-top: 20px; margin-bottom: 25px;">
-        <span style="background: rgba(8,17,31,0.6); padding: 8px 15px; border-radius: 8px; color: var(--text-main);">📍 {{ agent.country or 'Unknown' }}</span>
-        <span style="background: rgba(8,17,31,0.6); padding: 8px 15px; border-radius: 8px; color: var(--warning);">📸 {{ post_count }} Assets</span>
-        <span style="background: rgba(8,17,31,0.6); padding: 8px 15px; border-radius: 8px; color: var(--success);">👥 <span id="followers-count">{{ followers_count }}</span> Followers</span>
-        <span style="background: rgba(8,17,31,0.6); padding: 8px 15px; border-radius: 8px; color: var(--accent);">🫂 {{ following_count }} Following</span>
     </div>
 
-    {% if session.username != agent.username %}
-        <div style="display: flex; gap: 15px; justify-content: center;">
-            <button id="follow-btn" onclick="toggleFollow('{{ agent.username }}')" class="btn" style="
-                {% if is_following %}
-                    background: rgba(239, 68, 68, 0.2); border: 1px solid var(--danger); color: var(--danger);
-                {% else %}
-                    background: var(--accent); border: 1px solid var(--accent); color: #000;
-                {% endif %}
-                padding: 10px 30px; font-size: 1.1rem; border-radius: 20px;">
-                {% if is_following %}Unfollow{% else %}Follow{% endif %}
-            </button>
-            
-            <a href="{{ url_for('chat', username=agent.username) }}" class="btn" style="background: #334155; color: white; padding: 10px 30px; font-size: 1.1rem; border-radius: 20px; text-decoration: none;">💬 Message</a>
+    <div style="flex: 1; padding-top: 10px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap;">
+            <div>
+                <h1 style="color: var(--accent); margin: 0 0 5px 0; display: flex; align-items: center; gap: 8px;">
+                    {{ agent.username }}
+                    {% if agent.role == 'admin' %}
+                        <span style="color: #38bdf8; font-size: 1.5rem;" title="Verified Admin">☑️</span>
+                    {% endif %}
+                </h1>
+                
+                <p style="color: var(--text-muted); font-size: 1.1rem; margin: 0 0 15px 0;">{{ agent.bio or 'No bio provided.' }}</p>
+                
+                <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+                    <span style="color: var(--text-main);"><strong>{{ followers_count }}</strong> <span style="color: var(--text-muted);">Followers</span></span>
+                    <span style="color: var(--text-main);"><strong>{{ following_count }}</strong> <span style="color: var(--text-muted);">Following</span></span>
+                </div>
+            </div>
+
+            <!-- BUTTONS -->
+            {% if session.username != agent.username %}
+            <div style="display: flex; gap: 10px;">
+                <button id="follow-btn" onclick="toggleFollow('{{ agent.username }}')" class="btn" style="
+                    {% if is_following %}
+                        background: rgba(239, 68, 68, 0.2); border: 1px solid var(--danger); color: var(--danger);
+                    {% else %}
+                        background: var(--accent); border: 1px solid var(--accent); color: #000;
+                    {% endif %}
+                    padding: 8px 25px; border-radius: 20px;">
+                    {% if is_following %}Unfollow{% else %}Follow{% endif %}
+                </button>
+                
+                <a href="{{ url_for('chat', username=agent.username) }}" class="btn" style="background: #334155; color: white; padding: 8px 25px; border-radius: 20px; text-decoration: none;">💬 Message</a>
+            </div>
+            {% endif %}
         </div>
-    {% endif %}
+    </div>
 </div>
 
 <h2 style="color: var(--accent); border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">Public Showcase</h2>
@@ -76,13 +88,7 @@ async function toggleFollow(username) {
         const response = await fetch(`/follow/${username}`, { method: 'POST', headers: { 'X-CSRF-Token': '{{ csrf_token() }}' } });
         const data = await response.json();
         if (response.ok) {
-            document.getElementById('followers-count').innerText = data.followers;
-            const btn = document.getElementById('follow-btn');
-            if (data.following_now) {
-                btn.innerText = 'Unfollow'; btn.style.background = 'rgba(239, 68, 68, 0.2)'; btn.style.color = 'var(--danger)'; btn.style.borderColor = 'var(--danger)';
-            } else {
-                btn.innerText = 'Follow'; btn.style.background = 'var(--accent)'; btn.style.color = '#000'; btn.style.borderColor = 'var(--accent)';
-            }
+            location.reload(); // Simple reload to update counts and buttons properly
         }
     } catch (e) { console.error("Follow error:", e); }
 }
