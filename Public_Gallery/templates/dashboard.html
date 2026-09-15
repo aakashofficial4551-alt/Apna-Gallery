@@ -91,8 +91,40 @@
 {% endblock %}
 
 {% block content %}
-<div style="text-align: center; margin-bottom: 30px;">
-    <h1 style="color: var(--accent); font-size: 2.2rem; margin-bottom: 5px;">Welcome to HQ, {{ session.username }}</h1>
+<!-- INSTAGRAM STYLE LIVE STORIES -->
+{% if stories %}
+<div style="margin-bottom: 30px;">
+    <h3 style="color: var(--warning); margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">⏱️ Live Agent Stories (12H)</h3>
+    <div style="display: flex; gap: 20px; overflow-x: auto; padding-bottom: 15px;">
+        {% for s in stories %}
+        <div style="min-width: 80px; text-align: center;">
+            <!-- Story Ring -->
+            <div style="width: 75px; height: 75px; border-radius: 50%; border: 3px solid var(--accent); padding: 3px; margin: 0 auto 8px auto; cursor: pointer; transition: transform 0.2s;" onclick="openLightbox('{{ s.filename }}')" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
+                {% if s.profile_pic %}
+                    <img src="{{ s.profile_pic }}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">
+                {% else %}
+                    <div style="width: 100%; height: 100%; background: #1e293b; border-radius: 50%; display: grid; place-items: center; font-size: 1.5rem;">👤</div>
+                {% endif %}
+            </div>
+            <p style="margin: 0; font-size: 0.8rem; color: var(--text-main); font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ s.username }}</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Lightbox Modal (For viewing stories) -->
+<div id="lightbox" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 9999; justify-content: center; align-items: center; flex-direction: column; backdrop-filter: blur(5px);">
+    <span onclick="document.getElementById('lightbox').style.display='none'" style="position: absolute; top: 20px; right: 40px; font-size: 3rem; color: white; cursor: pointer;">&times;</span>
+    <img id="lightbox-img" src="" style="max-width: 90%; max-height: 80vh; border-radius: 12px; box-shadow: 0 0 30px rgba(56, 189, 248, 0.3);">
+</div>
+
+<script>
+    function openLightbox(imageSrc) {
+        document.getElementById('lightbox').style.display = 'flex';
+        document.getElementById('lightbox-img').src = imageSrc;
+    }
+</script>
+{% endif %}Welcome to HQ, {{ session.username }}</h1>
     <p style="color: var(--text-muted); font-size: 1.1rem;">Select a secure vault or access advanced modules.</p>
 </div>
 
