@@ -43,7 +43,7 @@ app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "development-only-secret
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
 
 # =========================================================
-# DATABASE AUTO-HEALER & PHASE 28 UPGRADE (COVER PICS)
+# DATABASE AUTO-HEALER
 # =========================================================
 def upgrade_db():
     conn = get_db_connection()
@@ -67,7 +67,6 @@ def upgrade_db():
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS country VARCHAR(100)",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_pic TEXT",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS theme VARCHAR(20) DEFAULT 'cyan'",
-        # NEW: COVER PHOTO
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS cover_pic TEXT"
     ]
     for q in queries:
@@ -311,7 +310,7 @@ def request_delete():
     return redirect(url_for("login"))
 
 # =========================================================
-# CORE ROUTES (Feed, Explore, Dashboard, Studio)
+# CORE ROUTES
 # =========================================================
 @app.route("/")
 def index():
@@ -467,8 +466,8 @@ def agent_profile(username):
     
     c.execute("SELECT id FROM followers WHERE follower = %s AND following = %s", (session["username"], username))
     is_following = bool(c.fetchone())
-    conn.close()
     
+    conn.close()
     return render_template("agent.html", agent=agent, uploads=agent_uploads, post_count=len(agent_uploads), followers_count=followers_count, following_count=following_count, is_following=is_following)
 
 @app.route("/follow/<username>", methods=["POST"])
@@ -545,7 +544,7 @@ def chat(username):
     return render_template("chat.html", chat_history=chat_history, contact=contact)
 
 # =========================================================
-# ALL 100% FREE GALLERY & AI STUDIO
+# GALLERY, SEARCH, AI STUDIO (100% FREE NOW)
 # =========================================================
 @app.route("/gallery/<category>", methods=["GET", "POST"])
 def gallery(category):
@@ -582,18 +581,27 @@ def gallery(category):
     for comment in comments_db: comments[comment["media_id"]].append(comment)
     return render_template("gallery.html", media_files=media_files, category=category, comments=comments)
 
+# NEW GLOBAL SEARCH ENGINE
 @app.route("/search")
 def search():
     if "username" not in session: return redirect(url_for("login"))
     query = request.args.get("q", "").strip()
     if not query: return redirect(url_for("dashboard"))
+    
     conn = get_db_connection()
     c = conn.cursor()
     search_term = f"%{query}%"
+    
+    # Search Assets
     c.execute("SELECT m.*, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.approved = 1 AND m.filename != 'SHAYARI_TEXT' AND (m.title ILIKE %s OR m.prompt ILIKE %s) ORDER BY m.id DESC", (search_term, search_term))
     media_files = c.fetchall()
+    
+    # Search Users (Agents)
+    c.execute("SELECT username, profile_pic, role, bio FROM users WHERE username ILIKE %s LIMIT 20", (search_term,))
+    found_users = c.fetchall()
+    
     conn.close()
-    return render_template("search.html", media_files=media_files, query=query)
+    return render_template("search.html", media_files=media_files, found_users=found_users, query=query)
 
 @app.route("/leaderboard")
 def leaderboard():
