@@ -8,7 +8,6 @@
         <h1 style="color: var(--accent); margin: 0;">📰 Timeline</h1>
     </div>
 
-    <!-- DUAL FEED TABS -->
     <div style="display: flex; justify-content: center; gap: 20px; margin-bottom: 30px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
         <a href="{{ url_for('feed', tab='foryou') }}" style="text-decoration: none; color: {% if current_tab == 'foryou' %}var(--accent){% else %}var(--text-muted){% endif %}; font-size: 1.2rem; font-weight: bold; padding-bottom: 5px; {% if current_tab == 'foryou' %}border-bottom: 3px solid var(--accent);{% endif %}">
             👥 For You
@@ -38,7 +37,12 @@
                         <span style="font-size: 0.8rem; color: var(--text-muted);">{{ post.created_at | timeago }}</span>
                     </div>
                 </a>
-                <span style="background: rgba(8,17,31,0.6); padding: 4px 10px; border-radius: 8px; font-size: 0.8rem; color: var(--text-muted);">{{ post.category }}</span>
+                
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <!-- DOWNLOAD BUTTON -->
+                    <a href="{{ post.filename }}" download target="_blank" style="background: rgba(255,255,255,0.1); padding: 5px 10px; border-radius: 6px; font-size: 1rem; color: white; text-decoration: none;" title="Download File">⬇️</a>
+                    <span style="background: rgba(8,17,31,0.6); padding: 4px 10px; border-radius: 8px; font-size: 0.8rem; color: var(--text-muted);">{{ post.category }}</span>
+                </div>
             </div>
 
             <div style="width: 100%; max-height: 500px; background: #000; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; cursor: pointer;" onclick="handleDoubleTap({{ post.id }}, this)">
@@ -65,7 +69,6 @@
                             📤 Share
                         </button>
                         
-                        <!-- NEW: TIPPING BUTTON -->
                         {% if post.uploaded_by != session.username %}
                         <button class="btn" onclick="tipCreator({{ post.id }})" style="background: rgba(251, 191, 36, 0.1); border: 1px solid var(--warning); color: var(--warning); padding: 8px 15px;" title="Send 10 Coins to Creator">
                             🪙 Tip
@@ -136,7 +139,6 @@ async function toggleBookmark(mediaId) {
     } catch (e) { console.error("Bookmark error:", e); }
 }
 
-// NEW: JS FOR TIPPING
 async function tipCreator(mediaId) {
     if(confirm("Send 10 Apna Coins to this creator?")) {
         try {
@@ -144,7 +146,6 @@ async function tipCreator(mediaId) {
             const data = await response.json();
             if (response.ok && data.success) {
                 alert(data.msg);
-                // Update live wallet balance in navbar
                 const walletElement = document.getElementById('wallet-balance');
                 if(walletElement) { walletElement.innerText = data.new_coins; }
             } else {
