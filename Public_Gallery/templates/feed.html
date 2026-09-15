@@ -6,14 +6,13 @@
     
     <div style="text-align: center; margin-bottom: 30px;">
         <h1 style="color: var(--accent); margin: 0;">📰 For You</h1>
-        <p style="color: var(--text-muted);">Double tap an image to like it! Try using #hashtags in comments.</p>
+        <p style="color: var(--text-muted);">Double tap an image to like it! Try using #hashtags and @mentions.</p>
     </div>
 
     <div style="display: flex; flex-direction: column; gap: 40px;">
         {% for post in posts %}
         <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
             
-            <!-- Post Header -->
             <div style="padding: 15px 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05);">
                 <a href="{{ url_for('agent_profile', username=post.uploaded_by) }}" style="display: flex; align-items: center; gap: 12px; text-decoration: none; color: inherit;">
                     {% if post.profile_pic %}
@@ -30,11 +29,8 @@
                 <span style="background: rgba(8,17,31,0.6); padding: 4px 10px; border-radius: 8px; font-size: 0.8rem; color: var(--text-muted);">{{ post.category }}</span>
             </div>
 
-            <!-- NEW: Post Media with Double Tap Logic -->
             <div style="width: 100%; max-height: 500px; background: #000; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; cursor: pointer;" onclick="handleDoubleTap({{ post.id }}, this)">
-                
                 <span class="heart-pop">❤️</span>
-
                 {% if post.category == 'Photo' %}
                     <img src="{{ post.filename }}" style="width: 100%; max-height: 500px; object-fit: contain;">
                 {% elif post.category == 'Video' %}
@@ -44,10 +40,9 @@
                 {% endif %}
             </div>
 
-            <!-- Post Actions & Comments -->
             <div style="padding: 20px;">
-                <!-- NEW: HASHTAG FILTER APPLIED TO TITLE -->
-                <h3 style="margin: 0 0 15px 0; font-size: 1.2rem; line-height: 1.4;">{{ post.title | hashtag | safe }}</h3>
+                <!-- MAGIC FORMATTER APPLIED HERE -->
+                <h3 style="margin: 0 0 15px 0; font-size: 1.2rem; line-height: 1.4;">{{ post.title | format_text | safe }}</h3>
                 
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <div style="display: flex; gap: 10px;">
@@ -55,7 +50,6 @@
                             ❤️ <span id="like-count-{{ post.id }}">{{ post.likes }}</span>
                         </button>
                         
-                        <!-- NEW: SHARE BUTTON -->
                         <button class="btn" onclick="sharePost('{{ post.title | escape }}', '{{ url_for('agent_profile', username=post.uploaded_by, _external=True) }}')" style="background: transparent; border: 1px solid var(--accent); color: var(--accent); padding: 8px 15px;">
                             📤 Share
                         </button>
@@ -66,7 +60,6 @@
                     </button>
                 </div>
 
-                <!-- Comments -->
                 <div style="background: rgba(8, 17, 31, 0.4); border-radius: 8px; padding: 15px;">
                     <div style="max-height: 120px; overflow-y: auto; margin-bottom: 10px; font-size: 0.9rem;">
                         {% if comments and comments[post.id] %}
@@ -75,16 +68,16 @@
                                     <strong style="color: var(--accent);">
                                         {{ c.username }}
                                         {% if c.role == 'admin' %} <span style="font-size: 0.9rem;">☑️</span> {% endif %}
-                                    </strong>: {{ c.comment_text | hashtag | safe }}
+                                    </strong>: {{ c.comment_text | format_text | safe }}
                                 </div>
                             {% endfor %}
                         {% else %}
-                            <div style="color: var(--text-muted); font-style: italic;">Be the first to comment. Add a #hashtag!</div>
+                            <div style="color: var(--text-muted); font-style: italic;">Be the first to comment. Try tagging a friend using @username!</div>
                         {% endif %}
                     </div>
                     <form method="POST" action="{{ url_for('add_comment', media_id=post.id) }}" style="display: flex; gap: 10px;">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <input type="text" name="comment_text" placeholder="Write a comment..." required style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(8, 17, 31, 0.8); color: white; outline: none;">
+                        <input type="text" name="comment_text" placeholder="Add a comment... use @ to tag." required style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(8, 17, 31, 0.8); color: white; outline: none;">
                         <button type="submit" class="btn">Post</button>
                     </form>
                 </div>
@@ -121,13 +114,11 @@ async function toggleBookmark(mediaId) {
     } catch (e) { console.error("Bookmark error:", e); }
 }
 
-// NEW: Double Tap to Like Logic
 let lastTap = 0;
 function handleDoubleTap(mediaId, element) {
     const currentTime = new Date().getTime();
     const tapLength = currentTime - lastTap;
     if (tapLength < 500 && tapLength > 0) {
-        // Double tap confirmed!
         toggleLike(mediaId);
         const heart = element.querySelector('.heart-pop');
         if(heart) {
@@ -138,12 +129,11 @@ function handleDoubleTap(mediaId, element) {
     lastTap = currentTime;
 }
 
-// NEW: Native Share API Logic
 function sharePost(title, url) {
     if (navigator.share) {
         navigator.share({
             title: 'Apna Gallery',
-            text: 'Check out this post from ' + title,
+            text: 'Check out this post: ' + title,
             url: url
         }).catch(console.error);
     } else {
