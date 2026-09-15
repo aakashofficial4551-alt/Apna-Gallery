@@ -1,358 +1,160 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
-
-    <meta
-        name="theme-color"
-        content="#0b0b0f"
-    >
-
-    <meta
-        name="description"
-        content="Apna Gallery - Socho Kya Hoga"
-    >
-
-    <title>
-        {% block title %}Apna Gallery{% endblock %}
-    </title>
-
-    <!-- Google Font -->
-    <link
-        rel="preconnect"
-        href="https://fonts.googleapis.com"
-    >
-
-    <link
-        rel="preconnect"
-        href="https://fonts.gstatic.com"
-        crossorigin
-    >
-
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700;800&display=swap"
-        rel="stylesheet"
-    >
-
-    <!-- Main CSS -->
-    <link
-        rel="stylesheet"
-        href="{{ url_for('static', filename='css/main.css') }}"
-    >
-
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Apna Gallery{% endblock %}</title>
+    <style>
+        :root {
+            --bg-main: #08111f;
+            --bg-card: rgba(16, 27, 45, 0.7);
+            --accent: #38bdf8;
+            --accent-hover: #0ea5e9;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border-glow: rgba(56, 189, 248, 0.2);
+            --danger: #ef4444;
+            --success: #22c55e;
+        }
+        body {
+            font-family: 'Montserrat', system-ui, sans-serif;
+            background: linear-gradient(135deg, var(--bg-main), #101b2d);
+            color: var(--text-main);
+            min-height: 100vh;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+        }
+        /* Navbar */
+        nav {
+            background: rgba(8, 17, 31, 0.8);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-glow);
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .nav-brand {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--accent);
+            text-decoration: none;
+            letter-spacing: 1px;
+        }
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .nav-links a {
+            color: var(--text-main);
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.3s;
+        }
+        .nav-links a:hover {
+            color: var(--accent);
+        }
+        /* Container */
+        .container {
+            flex: 1;
+            padding: 30px 15px;
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        /* Flash Messages */
+        .flash-messages {
+            margin-bottom: 20px;
+        }
+        .alert {
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            font-weight: 600;
+            backdrop-filter: blur(5px);
+        }
+        .alert.success { background: rgba(34, 197, 94, 0.2); border: 1px solid var(--success); color: #4ade80; }
+        .alert.error, .alert.danger { background: rgba(239, 68, 68, 0.2); border: 1px solid var(--danger); color: #f87171; }
+        
+        /* Global Glass Card */
+        .glass-card {
+            background: var(--bg-card);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border-glow);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+        /* Buttons */
+        .btn {
+            display: inline-block;
+            background: var(--accent);
+            color: #08111f;
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 700;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn:hover { background: var(--accent-hover); transform: translateY(-2px); }
+        
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 20px;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            border-top: 1px solid rgba(255,255,255,0.05);
+            margin-top: auto;
+        }
+    </style>
     {% block head %}{% endblock %}
 </head>
-
 <body>
-
-    <!-- ================================
-         PAGE LOADER
-    ================================= -->
-    <div
-        id="pageLoader"
-        class="page-loader"
-        aria-hidden="true"
-    >
-        <div class="loader-content">
-            <div class="loader-logo">AG</div>
-
-            <div class="loader-spinner"></div>
-
-            <p>Loading...</p>
-        </div>
-    </div>
-
-
-    <!-- ================================
-         NAVBAR
-    ================================= -->
-    <header class="site-header">
-
-        <nav class="navbar">
-
-            <!-- LOGO -->
-            <a
-                href="{{ url_for('dashboard') }}"
-                class="brand"
-                aria-label="Apna Gallery Home"
-            >
-                <span class="brand-icon">AG</span>
-
-                <span class="brand-text">
-                    <span class="brand-name">
-                        Apna Gallery
-                    </span>
-
-                    <span class="brand-tagline">
-                        SOCHO KYA HOGA
-                    </span>
-                </span>
-            </a>
-
-
-            <!-- MOBILE MENU BUTTON -->
-            <button
-                type="button"
-                class="mobile-menu-btn"
-                id="mobileMenuBtn"
-                aria-label="Open navigation menu"
-                aria-expanded="false"
-            >
-                <span></span>
-                <span></span>
-                <span></span>
-            </button>
-
-
-            <!-- NAVIGATION -->
-            <div
-                class="nav-menu"
-                id="navMenu"
-            >
-
-                {% if session.get('username') %}
-
-                    <a
-                        href="{{ url_for('dashboard') }}"
-                        class="nav-link"
-                    >
-                        <span class="nav-icon">⌂</span>
-                        <span>Home</span>
-                    </a>
-
-                    <a
-                        href="{{ url_for('games') }}"
-                        class="nav-link"
-                    >
-                        <span class="nav-icon">🎮</span>
-                        <span>Games</span>
-                    </a>
-
-                    <a
-                        href="{{ url_for('profile') }}"
-                        class="nav-link"
-                    >
-                        <span class="nav-icon">👤</span>
-                        <span>Profile</span>
-                    </a>
-
-                    {% if session.get('is_admin') %}
-
-                        <a
-                            href="{{ url_for('admin') }}"
-                            class="nav-link admin-nav-link"
-                        >
-                            <span class="nav-icon">🛡️</span>
-                            <span>Admin</span>
-                        </a>
-
-                    {% endif %}
-
-                    <a
-                        href="{{ url_for('logout') }}"
-                        class="nav-link logout-link"
-                    >
-                        <span class="nav-icon">↪</span>
-                        <span>Logout</span>
-                    </a>
-
-                {% else %}
-
-                    <a
-                        href="{{ url_for('login') }}"
-                        class="nav-link nav-login"
-                    >
-                        Login
-                    </a>
-
+    <nav>
+        <a href="{{ url_for('dashboard') }}" class="nav-brand">APNA GALLERY</a>
+        <div class="nav-links">
+            {% if session.get('username') %}
+                <a href="{{ url_for('dashboard') }}">Dashboard</a>
+                <a href="{{ url_for('games') }}">Games</a>
+                <a href="{{ url_for('profile') }}">Profile</a>
+                {% if session.get('is_admin') %}
+                    <a href="{{ url_for('admin') }}" style="color: #fbbf24;">Admin HQ</a>
                 {% endif %}
-
-            </div>
-
-        </nav>
-
-    </header>
-
-
-    <!-- ================================
-         FLASH MESSAGES
-    ================================= -->
-    <div
-        class="flash-container"
-        id="flashContainer"
-    >
-
-        {% with messages = get_flashed_messages(with_categories=true) %}
-
-            {% if messages %}
-
-                {% for category, message in messages %}
-
-                    <div
-                        class="flash-message flash-{{ category }}"
-                        role="alert"
-                    >
-
-                        <span class="flash-icon">
-
-                            {% if category == 'success' %}
-                                ✓
-                            {% elif category == 'error' %}
-                                !
-                            {% elif category == 'warning' %}
-                                ⚠
-                            {% else %}
-                                i
-                            {% endif %}
-
-                        </span>
-
-                        <span class="flash-text">
-                            {{ message }}
-                        </span>
-
-                        <button
-                            type="button"
-                            class="flash-close"
-                            aria-label="Close message"
-                            onclick="this.parentElement.remove()"
-                        >
-                            ×
-                        </button>
-
-                    </div>
-
-                {% endfor %}
-
+                <a href="{{ url_for('logout') }}" class="btn" style="padding: 8px 16px;">Logout</a>
+            {% else %}
+                <a href="{{ url_for('login') }}" class="btn">Login</a>
             {% endif %}
+        </div>
+    </nav>
 
-        {% endwith %}
-
+    <div class="container">
+        <div class="flash-messages">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert {{ category }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        </div>
+        
+        {% block content %}{% endblock %}
     </div>
 
-
-    <!-- ================================
-         MAIN CONTENT
-    ================================= -->
-    <main
-        id="mainContent"
-        class="main-content"
-    >
-
-        {% block content %}
-
-        {% endblock %}
-
-    </main>
-
-
-    <!-- ================================
-         GLOBAL FOOTER
-    ================================= -->
-    <footer class="site-footer">
-
-        <div class="footer-inner">
-
-            <div class="footer-brand">
-
-                <div class="footer-logo">
-                    AG
-                </div>
-
-                <div>
-                    <strong>
-                        Apna Gallery
-                    </strong>
-
-                    <p>
-                        SOCHO KYA HOGA
-                    </p>
-                </div>
-
-            </div>
-
-
-            <div class="footer-links">
-
-                {% if session.get('username') %}
-
-                    <a
-                        href="{{ url_for('dashboard') }}"
-                    >
-                        Home
-                    </a>
-
-                    <a
-                        href="{{ url_for('games') }}"
-                    >
-                        Games
-                    </a>
-
-                    <a
-                        href="{{ url_for('profile') }}"
-                    >
-                        Profile
-                    </a>
-
-                {% else %}
-
-                    <a
-                        href="{{ url_for('login') }}"
-                    >
-                        Login
-                    </a>
-
-                {% endif %}
-
-            </div>
-
-
-            <div class="footer-copy">
-
-                <p>
-                    © {{ current_year if current_year else 2026 }}
-                    Apna Gallery
-                </p>
-
-                <span>
-                    Made with ❤️
-                </span>
-
-            </div>
-
-        </div>
-
+    <footer>
+        &copy; 2026 Apna Gallery. Secure Asset Vault.
     </footer>
-
-
-    <!-- ================================
-         GLOBAL BACK TO TOP BUTTON
-    ================================= -->
-    <button
-        type="button"
-        id="backToTop"
-        class="back-to-top"
-        aria-label="Back to top"
-    >
-        ↑
-    </button>
-
-
-    <!-- ================================
-         MAIN JAVASCRIPT
-    ================================= -->
-    <script
-        src="{{ url_for('static', filename='js/main.js') }}"
-        defer
-    ></script>
-
-
-    {% block scripts %}{% endblock %}
-
 </body>
 </html>
