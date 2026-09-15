@@ -6,7 +6,7 @@
     
     <div style="text-align: center; margin-bottom: 30px;">
         <h1 style="color: var(--accent); margin: 0;">📰 For You</h1>
-        <p style="color: var(--text-muted);">Latest assets from your network.</p>
+        <p style="color: var(--text-muted);">Double tap an image to like it! Try using #hashtags in comments.</p>
     </div>
 
     <div style="display: flex; flex-direction: column; gap: 40px;">
@@ -24,14 +24,17 @@
                     
                     <h3 style="margin: 0; display: flex; align-items: center; gap: 5px; font-size: 1.1rem;">
                         {{ post.uploaded_by }}
-                        {% if post.role in ['pro', 'admin'] %}<span style="color: #38bdf8; font-size: 1.1rem;">☑️</span>{% endif %}
+                        {% if post.role == 'admin' %}<span style="color: #38bdf8; font-size: 1.1rem;" title="Verified Admin">☑️</span>{% endif %}
                     </h3>
                 </a>
                 <span style="background: rgba(8,17,31,0.6); padding: 4px 10px; border-radius: 8px; font-size: 0.8rem; color: var(--text-muted);">{{ post.category }}</span>
             </div>
 
-            <!-- Post Media -->
-            <div style="width: 100%; max-height: 500px; background: #000; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+            <!-- NEW: Post Media with Double Tap Logic -->
+            <div style="width: 100%; max-height: 500px; background: #000; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; cursor: pointer;" onclick="handleDoubleTap({{ post.id }}, this)">
+                
+                <span class="heart-pop">❤️</span>
+
                 {% if post.category == 'Photo' %}
                     <img src="{{ post.filename }}" style="width: 100%; max-height: 500px; object-fit: contain;">
                 {% elif post.category == 'Video' %}
@@ -43,14 +46,21 @@
 
             <!-- Post Actions & Comments -->
             <div style="padding: 20px;">
-                <h3 style="margin: 0 0 10px 0; font-size: 1.2rem;">{{ post.title }}</h3>
+                <!-- NEW: HASHTAG FILTER APPLIED TO TITLE -->
+                <h3 style="margin: 0 0 15px 0; font-size: 1.2rem; line-height: 1.4;">{{ post.title | hashtag | safe }}</h3>
                 
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                    <button class="btn" id="like-btn-{{ post.id }}" onclick="toggleLike({{ post.id }})" style="background: transparent; border: 1px solid var(--danger); color: var(--danger); padding: 8px 15px;">
-                        ❤️ <span id="like-count-{{ post.id }}">{{ post.likes }}</span>
-                    </button>
-                    
-                    <!-- NEW: BOOKMARK BUTTON -->
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn" id="like-btn-{{ post.id }}" onclick="toggleLike({{ post.id }})" style="background: transparent; border: 1px solid var(--danger); color: var(--danger); padding: 8px 15px;">
+                            ❤️ <span id="like-count-{{ post.id }}">{{ post.likes }}</span>
+                        </button>
+                        
+                        <!-- NEW: SHARE BUTTON -->
+                        <button class="btn" onclick="sharePost('{{ post.title | escape }}', '{{ url_for('agent_profile', username=post.uploaded_by, _external=True) }}')" style="background: transparent; border: 1px solid var(--accent); color: var(--accent); padding: 8px 15px;">
+                            📤 Share
+                        </button>
+                    </div>
+
                     <button class="btn" id="bookmark-btn-{{ post.id }}" onclick="toggleBookmark({{ post.id }})" style="background: transparent; border: 1px solid var(--warning); color: var(--warning); padding: 8px 15px; font-size: 1.1rem;">
                         {% if post.id in saved_ids %}📌 Saved{% else %}📍 Save{% endif %}
                     </button>
@@ -62,11 +72,14 @@
                         {% if comments and comments[post.id] %}
                             {% for c in comments[post.id] %}
                                 <div style="margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 5px;">
-                                    <strong style="color: var(--accent);">{{ c.username }}:</strong> {{ c.comment_text }}
+                                    <strong style="color: var(--accent);">
+                                        {{ c.username }}
+                                        {% if c.role == 'admin' %} <span style="font-size: 0.9rem;">☑️</span> {% endif %}
+                                    </strong>: {{ c.comment_text | hashtag | safe }}
                                 </div>
                             {% endfor %}
                         {% else %}
-                            <div style="color: var(--text-muted); font-style: italic;">Be the first to comment.</div>
+                            <div style="color: var(--text-muted); font-style: italic;">Be the first to comment. Add a #hashtag!</div>
                         {% endif %}
                     </div>
                     <form method="POST" action="{{ url_for('add_comment', media_id=post.id) }}" style="display: flex; gap: 10px;">
@@ -103,13 +116,40 @@ async function toggleBookmark(mediaId) {
         const data = await response.json();
         if (response.ok) {
             const btn = document.getElementById(`bookmark-btn-${mediaId}`);
-            if (data.bookmarked) {
-                btn.innerHTML = '📌 Saved';
-            } else {
-                btn.innerHTML = '📍 Save';
-            }
+            btn.innerHTML = data.bookmarked ? '📌 Saved' : '📍 Save';
         }
     } catch (e) { console.error("Bookmark error:", e); }
+}
+
+// NEW: Double Tap to Like Logic
+let lastTap = 0;
+function handleDoubleTap(mediaId, element) {
+    const currentTime = new Date().getTime();
+    const tapLength = currentTime - lastTap;
+    if (tapLength < 500 && tapLength > 0) {
+        // Double tap confirmed!
+        toggleLike(mediaId);
+        const heart = element.querySelector('.heart-pop');
+        if(heart) {
+            heart.classList.add('active');
+            setTimeout(() => heart.classList.remove('active'), 800);
+        }
+    }
+    lastTap = currentTime;
+}
+
+// NEW: Native Share API Logic
+function sharePost(title, url) {
+    if (navigator.share) {
+        navigator.share({
+            title: 'Apna Gallery',
+            text: 'Check out this post from ' + title,
+            url: url
+        }).catch(console.error);
+    } else {
+        navigator.clipboard.writeText(url);
+        alert("Link copied to clipboard! Share it anywhere.");
+    }
 }
 </script>
 {% endblock %}
