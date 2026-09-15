@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Search Results | Apna Gallery{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 30px;">
+    <h1 style="color: var(--accent); margin: 0;">🔍 Search Results for "{{ query }}"</h1>
+    <a href="{{ url_for('dashboard') }}" class="btn" style="background: #334155; color: white; margin-top: 15px;">&larr; Back to HQ</a>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 25px;">
+    {% for item in media_files %}
+    <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 10px 20px rgba(0,0,0,0.2);">
+        <div style="width: 100%; height: 220px; background: #000; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+            {% if item.category == 'Photo' %}
+                <img src="{{ item.filename }}" alt="{{ item.title }}" style="width: 100%; height: 100%; object-fit: cover;">
+            {% elif item.category == 'Video' %}
+                <video src="{{ item.filename }}" controls style="width: 100%; height: 100%; object-fit: cover;"></video>
+            {% else %}
+                <span style="font-size: 4rem;">📁</span>
+            {% endif %}
+        </div>
+        <div style="padding: 20px;">
+            <h3 style="margin: 0 0 10px 0; color: var(--text-main); font-size: 1.2rem;">{{ item.title }}</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px;">Vault: <span style="color: var(--accent);">{{ item.category }}</span></p>
+            <p style="font-size: 0.85rem; color: var(--danger); font-weight: bold;">❤️ {{ item.likes }} Likes</p>
+        </div>
+    </div>
+    {% else %}
+    <div style="grid-column: 1 / -1; text-align: center; padding: 50px; background: var(--bg-card); border-radius: 16px; border: 1px solid var(--border-color);">
+        <span style="font-size: 4rem;">🕵️‍♂️</span>
+        <h2 style="color: var(--text-muted);">No assets found for "{{ query }}"</h2>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
