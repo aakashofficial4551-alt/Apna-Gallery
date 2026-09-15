@@ -1,244 +1,78 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HQ Dashboard | SOCHO KYA HOGA</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-</head>
-<body>
-    <!-- Sound Assets -->
-    <audio id="click-sound" src="https://actions.google.com/sounds/v1/ui/button_click.ogg" preload="auto"></audio>
-    <audio id="mascot-sound" src="https://actions.google.com/sounds/v1/cartoon/cartoon_boing.ogg" preload="auto"></audio>
+{% extends "base.html" %}
 
-    <!-- Glassmorphic Navigation -->
-    <header class="glass-header">
-        <h1>SOCHO KYA <span class="text-gradient">HOGA</span></h1>
-        <nav class="nav-links" aria-label="Main Navigation">
-            <span class="nav-link" style="background: var(--surface); pointer-events: none;">Agent: {{ session.username }}</span>
-            <a href="{{ url_for('profile') }}" class="nav-link">👤 My Profile</a>
-            <a href="{{ url_for('logout') }}" class="nav-link" style="color: var(--danger);">🚪 Logout</a>
-        </nav>
-    </header>
+{% block title %}Dashboard | Apna Gallery{% endblock %}
 
-    <main class="container">
-        <!-- Admin Access Banner -->
-        <a href="{{ url_for('admin') }}" class="admin-banner" aria-label="Access Admin Panel">
-            <span style="display: block; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 2px; color: var(--accent-light); margin-bottom: 4px;">Restricted Area</span>
-            🛠️ ADMIN APPROVAL PANEL 🛠️
-        </a>
+{% block head %}
+<style>
+    .vault-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin-top: 30px;
+    }
+    .vault-card {
+        background: rgba(16, 27, 45, 0.7);
+        border: 1px solid rgba(56, 189, 248, 0.2);
+        border-radius: 16px;
+        padding: 30px 20px;
+        text-align: center;
+        text-decoration: none;
+        color: white;
+        transition: all 0.3s ease;
+        backdrop-filter: blur(10px);
+    }
+    .vault-card:hover {
+        transform: translateY(-5px);
+        border-color: #38bdf8;
+        box-shadow: 0 10px 20px rgba(56, 189, 248, 0.1);
+    }
+    .vault-icon {
+        font-size: 3rem;
+        margin-bottom: 15px;
+        display: block;
+    }
+    .welcome-header {
+        text-align: center;
+        margin-bottom: 40px;
+    }
+    .welcome-header h1 {
+        color: #38bdf8;
+        font-size: 2.5rem;
+        margin-bottom: 10px;
+    }
+</style>
+{% endblock %}
 
-        <div style="text-align: center; margin-bottom: 40px;">
-            <h2 class="text-gradient" style="font-size: 2rem;">VAULT CATEGORIES</h2>
-            <p style="color: var(--text-secondary); font-weight: 700;">Select a secure vault to manage classified assets.</p>
-        </div>
+{% block content %}
+<div class="welcome-header">
+    <h1>Welcome, {{ session.username }}</h1>
+    <p style="color: #94a3b8;">Select a secure vault to manage your assets.</p>
+</div>
 
-        <!-- Dashboard Grid -->
-        <div class="category-grid">
-            <a href="{{ url_for('gallery', category='Photo') }}" class="category-card interactive-element">
-                <span style="font-size: 3rem; margin-bottom: 12px;">📸</span>
-                <h2>Photo Vault</h2>
-            </a>
-            
-            <a href="{{ url_for('gallery', category='Video') }}" class="category-card interactive-element">
-                <span style="font-size: 3rem; margin-bottom: 12px;">🎥</span>
-                <h2>Video Vault</h2>
-            </a>
-            
-            <a href="{{ url_for('gallery', category='Music') }}" class="category-card interactive-element">
-                <span style="font-size: 3rem; margin-bottom: 12px;">🎵</span>
-                <h2>Audio Vault</h2>
-            </a>
-            
-            <a href="{{ url_for('gallery', category='Document') }}" class="category-card interactive-element">
-                <span style="font-size: 3rem; margin-bottom: 12px;">📄</span>
-                <h2>Doc Vault</h2>
-            </a>
-            
-            <a href="{{ url_for('gallery', category='Shayari') }}" class="category-card interactive-element" style="border-color: rgba(255, 152, 0, 0.5);">
-                <span style="font-size: 3rem; margin-bottom: 12px;">✍️</span>
-                <h2 style="color: var(--warning);">Shayari</h2>
-            </a>
-            
-            <div class="category-card interactive-element" onclick="askMystery()" role="button" tabindex="0" aria-label="Access Mystery Vault" style="border-color: rgba(157, 78, 221, 0.5); cursor: pointer;">
-                <span style="font-size: 3rem; margin-bottom: 12px;">🔒</span>
-                <h2 style="color: var(--mystery);">Mystery</h2>
-            </div>
-        </div>
-
-        <a href="{{ url_for('games') }}" class="btn interactive-element" style="width: 100%; padding: 24px; font-size: 1.5rem; border-radius: var(--radius-lg);">
-            🎮 ENTER ARCADE ZONE
-        </a>
-    </main>
-
-    <!-- RESTORED: ALWAYS VISIBLE MASCOT (VIDEO MAGIC WITH AUTO BG REMOVER) -->
-    <div id="mascot-widget" onclick="toggleAI()" role="button" aria-label="Toggle AI Assistant" tabindex="0">
-        <div class="mascot-bubble">Talk to A.I. 🤖</div>
-        <!-- Canvas that displays the background-removed character -->
-        <canvas id="ff-mascot"></canvas>
-        <!-- Hidden Original MP4 Video -->
-        <video id="ff-mascot-video" src="{{ url_for('static', filename='mascot/cartoon_ff.mp4') }}" autoplay loop muted playsinline style="display:none;" crossorigin="anonymous"></video>
-    </div>
-
-    <!-- AI Chat Interface -->
-    <aside class="ai-chat-box" id="ai-chat" aria-hidden="true" aria-label="AI Chat Assistant">
-        <div class="ai-header">
-            <h3><span style="font-size: 1.2rem;">🤖</span> VAULT A.I.</h3>
-            <button type="button" style="background:none; border:none; color:var(--text-tertiary); cursor:pointer; font-size:1.5rem; transition:color 0.2s;" onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--text-tertiary)'" onclick="toggleAI()" aria-label="Close Chat">&times;</button>
-        </div>
-        <div class="ai-messages" id="ai-messages" role="log" aria-live="polite">
-            <div class="chat-bubble chat-bot">System Online. Welcome to the dashboard, Agent. How can I assist you today?</div>
-        </div>
-        <div class="ai-input-group">
-            <input type="text" id="ai-input" class="form-input" placeholder="Type a command..." autocomplete="off">
-            <button type="button" class="btn" style="padding: 12px 16px;" onclick="sendAI()" aria-label="Send Message">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
-            </button>
-        </div>
-    </aside>
-
-    <!-- Hidden Mystery Form -->
-    <form id="mystery-form" action="{{ url_for('mystery') }}" method="POST" style="display:none;">
-        <input type="hidden" name="passcode" id="mystery-pass">
-    </form>
+<div class="vault-grid">
+    <a href="{{ url_for('gallery', category='Photo') }}" class="vault-card">
+        <span class="vault-icon">📸</span>
+        <h3>Photo Vault</h3>
+    </a>
     
-    <script>
-        // --- RESTORED LIVE VIDEO BACKGROUND REMOVER LOGIC ---
-        window.addEventListener('load', function() {
-            const video = document.getElementById('ff-mascot-video');
-            const canvas = document.getElementById('ff-mascot');
-            if (video && canvas) {
-                const ctx = canvas.getContext('2d', { willReadFrequently: true });
-                video.addEventListener('loadedmetadata', function() {
-                    canvas.width = video.videoWidth / 2;
-                    canvas.height = video.videoHeight / 2;
-                });
-                video.addEventListener('play', function() {
-                    function processFrame() {
-                        if (video.paused || video.ended) return;
-                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                        let frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                        let length = frame.data.length / 4;
-                        for (let i = 0; i < length; i++) {
-                            let r = frame.data[i * 4 + 0];
-                            let g = frame.data[i * 4 + 1];
-                            let b = frame.data[i * 4 + 2];
-                            // Auto remove Black & Green background from video frames
-                            if ((r < 30 && g < 30 && b < 30) || (g > 90 && r < 80 && b < 80)) {
-                                frame.data[i * 4 + 3] = 0; 
-                            }
-                        }
-                        ctx.putImageData(frame, 0, 0);
-                        requestAnimationFrame(processFrame);
-                    }
-                    requestAnimationFrame(processFrame);
-                });
-            }
-        });
+    <a href="{{ url_for('gallery', category='Video') }}" class="vault-card">
+        <span class="vault-icon">🎥</span>
+        <h3>Video Vault</h3>
+    </a>
+    
+    <a href="{{ url_for('gallery', category='Music') }}" class="vault-card">
+        <span class="vault-icon">🎵</span>
+        <h3>Music Vault</h3>
+    </a>
 
-        // Audio Feedback Interaction
-        document.querySelectorAll('.interactive-element, .nav-link').forEach(item => {
-            item.addEventListener('click', () => { 
-                const sound = document.getElementById('click-sound');
-                if (sound) sound.play().catch(() => {}); 
-            });
-        });
+    <a href="{{ url_for('gallery', category='Document') }}" class="vault-card">
+        <span class="vault-icon">📄</span>
+        <h3>Document Vault</h3>
+    </a>
 
-        function askMystery() {
-            const sound = document.getElementById('click-sound');
-            if (sound) sound.play().catch(() => {});
-            
-            // Minimal modern prompt
-            let pass = prompt("CLASSIFIED AREA\n\nEnter Security Protocol Code:");
-            if (pass) { 
-                document.getElementById('mystery-pass').value = pass; 
-                document.getElementById('mystery-form').submit(); 
-            }
-        }
-
-        // AI Chat Logic
-        function toggleAI() { 
-            const mascotSound = document.getElementById('mascot-sound');
-            if (mascotSound) mascotSound.play().catch(() => {});
-            
-            const chatBox = document.getElementById('ai-chat'); 
-            const input = document.getElementById('ai-input');
-            if (chatBox) {
-                const isVisible = chatBox.style.display === 'block';
-                chatBox.style.display = isVisible ? 'none' : 'block';
-                chatBox.setAttribute('aria-hidden', isVisible ? 'true' : 'false');
-                if (!isVisible && input) {
-                    setTimeout(() => input.focus(), 100);
-                }
-            }
-        }
-        
-        function sendAI() {
-            const clickSound = document.getElementById('click-sound');
-            if (clickSound) clickSound.play().catch(() => {});
-            
-            const input = document.getElementById('ai-input');
-            const msgs = document.getElementById('ai-messages');
-            if (!input || !input.value.trim()) return;
-            
-            const userText = input.value.trim();
-            const userDiv = document.createElement('div');
-            userDiv.className = 'chat-bubble chat-user';
-            userDiv.textContent = userText;
-            msgs.appendChild(userDiv);
-            
-            input.value = ''; 
-            msgs.scrollTop = msgs.scrollHeight;
-            
-            // Loading indicator
-            const typingDiv = document.createElement('div');
-            typingDiv.className = 'chat-bubble chat-bot';
-            typingDiv.textContent = 'Processing...';
-            typingDiv.id = 'ai-typing';
-            msgs.appendChild(typingDiv);
-            msgs.scrollTop = msgs.scrollHeight;
-            
-            fetch("{{ url_for('ai_endpoint') }}", { 
-                method: 'POST', 
-                headers: {'Content-Type': 'application/json'}, 
-                body: JSON.stringify({query: userText}) 
-            })
-            .then(res => res.json())
-            .then(data => {
-                const indicator = document.getElementById('ai-typing');
-                if(indicator) indicator.remove();
-                
-                const botDiv = document.createElement('div');
-                botDiv.className = 'chat-bubble chat-bot';
-                botDiv.textContent = data.reply;
-                msgs.appendChild(botDiv);
-                msgs.scrollTop = msgs.scrollHeight;
-            })
-            .catch(() => {
-                const indicator = document.getElementById('ai-typing');
-                if(indicator) indicator.remove();
-                
-                const errDiv = document.createElement('div');
-                errDiv.className = 'chat-bubble chat-bot';
-                errDiv.style.color = 'var(--danger)';
-                errDiv.textContent = 'Connection Error: A.I. module unresponsive.';
-                msgs.appendChild(errDiv);
-                msgs.scrollTop = msgs.scrollHeight;
-            });
-        }
-
-        const aiInput = document.getElementById('ai-input');
-        if (aiInput) {
-            aiInput.addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    sendAI();
-                }
-            });
-        }
-    </script>
-</body>
-</html>
+    <a href="{{ url_for('gallery', category='Shayari') }}" class="vault-card">
+        <span class="vault-icon">✍️</span>
+        <h3>Shayari Vault</h3>
+    </a>
+</div>
+{% endblock %}
