@@ -63,7 +63,9 @@
                     <a href="{{ url_for('pro_upgrade') }}" class="btn pro-btn" style="padding: 8px 15px; margin-right: 10px;">💎 PRO</a>
                 {% endif %}
                 
-                <!-- NEW: INBOX MESSAGE ICON -->
+                <!-- NEW: FEED ROUTE -->
+                <a href="{{ url_for('feed') }}" style="color: var(--accent);">📰 Feed</a>
+                
                 <a href="{{ url_for('inbox') }}" style="font-size: 1.3rem; margin-right: 5px;">
                     ✉️
                     {% if unread_messages > 0 %}<span class="notif-badge">{{ unread_messages }}</span>{% endif %}
@@ -75,7 +77,6 @@
                 </a>
                 
                 <a href="{{ url_for('dashboard') }}">Dashboard</a>
-                <a href="{{ url_for('leaderboard') }}" style="color: var(--success);">🏆 Agents</a>
                 <a href="{{ url_for('profile') }}">Profile</a>
                 
                 {% if session.get('role') == 'admin' %}
