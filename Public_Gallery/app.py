@@ -43,7 +43,7 @@ app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "development-only-secret
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
 
 # =========================================================
-# DATABASE AUTO-HEALER & ECONOMY UPGRADE (PHASE 26)
+# DATABASE AUTO-HEALER & DAILY REWARDS UPGRADE
 # =========================================================
 def upgrade_db():
     conn = get_db_connection()
@@ -66,9 +66,10 @@ def upgrade_db():
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS country VARCHAR(100)",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_pic TEXT",
-        # NEW: ECONOMY & THEMES
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS coins INTEGER DEFAULT 50",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS theme VARCHAR(20) DEFAULT 'cyan'"
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS theme VARCHAR(20) DEFAULT 'cyan'",
+        # NEW: DAILY REWARDS TRACKER
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_reward_claim TIMESTAMP"
     ]
     for q in queries:
         try:
@@ -228,7 +229,7 @@ def login():
                           (username, email, generate_password_hash(password), code))
                 conn.commit()
                 session.update({"username": username, "is_registered": True, "is_admin": False, "role": "user"})
-                flash(f"Account created! ID: {code}. You received 50 Apna Coins!", "success")
+                flash(f"Account created! ID: {code}. You received 50 Free Coins!", "success")
                 return redirect(url_for("feed"))
             except:
                 flash("Username or Email exists.", "error")
@@ -313,7 +314,31 @@ def request_delete():
     return redirect(url_for("login"))
 
 # =========================================================
-# CORE ROUTES
+# DAILY REWARDS ENGINE (PHASE 27)
+# =========================================================
+@app.route("/claim_reward", methods=["POST"])
+def claim_reward():
+    if "username" not in session: return redirect(url_for("login"))
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT last_reward_claim FROM users WHERE username = %s", (session["username"],))
+    user = c.fetchone()
+    
+    now = datetime.datetime.now()
+    last_claim = user['last_reward_claim']
+    
+    if not last_claim or (now - last_claim).total_seconds() > 86400: # 24 hours
+        c.execute("UPDATE users SET coins = coins + 20, last_reward_claim = CURRENT_TIMESTAMP WHERE username = %s", (session["username"],))
+        conn.commit()
+        flash("🎁 Daily Reward Claimed! You got +20 Free Coins.", "success")
+    else:
+        flash("⏳ You already claimed your reward today. Come back tomorrow!", "warning")
+        
+    conn.close()
+    return redirect(request.referrer or url_for("profile"))
+
+# =========================================================
+# CORE ROUTES (Dashboard, Feed, Profile)
 # =========================================================
 @app.route("/")
 def index():
@@ -384,8 +409,17 @@ def dashboard():
     trending = c.fetchall()
     c.execute("SELECT s.*, u.profile_pic, u.role FROM stories s JOIN users u ON s.username = u.username WHERE s.created_at >= NOW() - INTERVAL '12 hours' ORDER BY s.id DESC")
     stories = c.fetchall()
+    
+    # Check if reward is claimable
+    c.execute("SELECT last_reward_claim FROM users WHERE username = %s", (session["username"],))
+    user_data = c.fetchone()
+    last_claim = user_data['last_reward_claim'] if user_data else None
+    can_claim = False
+    if not last_claim or (datetime.datetime.now() - last_claim).total_seconds() > 86400:
+        can_claim = True
+        
     conn.close()
-    return render_template("dashboard.html", trending=trending, stories=stories)
+    return render_template("dashboard.html", trending=trending, stories=stories, can_claim=can_claim)
 
 @app.route("/notifications")
 def notifications():
@@ -438,8 +472,14 @@ def profile():
     c.execute("SELECT m.* FROM media m JOIN bookmarks b ON m.id = b.media_id WHERE b.username = %s ORDER BY b.id DESC", (session["username"],))
     saved_uploads = c.fetchall()
     
+    # Check claim status
+    last_claim = user['last_reward_claim']
+    can_claim = False
+    if not last_claim or (datetime.datetime.now() - last_claim).total_seconds() > 86400:
+        can_claim = True
+        
     conn.close()
-    return render_template("profile.html", user=user, my_uploads=my_uploads, saved_uploads=saved_uploads, post_count=len(my_uploads), followers_count=followers_count, following_count=following_count)
+    return render_template("profile.html", user=user, my_uploads=my_uploads, saved_uploads=saved_uploads, post_count=len(my_uploads), followers_count=followers_count, following_count=following_count, can_claim=can_claim)
 
 # =========================================================
 # PUBLIC PORTFOLIO & FOLLOW SYSTEM
@@ -556,7 +596,7 @@ def pro_upgrade():
         conn.commit()
         conn.close()
         session["role"] = "pro"
-        flash("🎉 Payment Successful! You are now a PRO Agent! Enjoy Unlimited Access & Verified Badge.", "success")
+        flash("🎉 Welcome to PRO! Enjoy Infinite Uploads & Verified Status.", "success")
         return redirect(url_for("dashboard"))
     return render_template("pro.html")
 
@@ -571,8 +611,8 @@ def gallery(category):
         if user_role not in ["admin", "pro"]:
             c.execute("SELECT COUNT(id) as cnt FROM media WHERE uploaded_by = %s", (session["username"],))
             total_uploads = c.fetchone()['cnt']
-            if total_uploads >= 5:
-                flash("🔒 SAAS LIMIT REACHED: Upgrade to PRO to upload more than 5 assets.", "error")
+            if total_uploads >= 10: # Increased to 10 as a bonus!
+                flash("🔒 SAAS LIMIT REACHED (10 Assets). Upgrade to PRO for unlimited.", "error")
                 conn.close()
                 return redirect(url_for("pro_upgrade"))
 
@@ -661,14 +701,13 @@ def ai_studio():
             conn = get_db_connection()
             c = conn.cursor()
             
-            # PHASE 26: Coin Economy System
             if user_role not in ["pro", "admin"]:
                 c.execute("SELECT coins FROM users WHERE username = %s", (session["username"],))
                 coins = c.fetchone()['coins']
                 if coins < 5:
-                    flash("Not enough Apna Coins (Costs 5). Upgrade to PRO for infinite coins!", "error")
+                    flash("Not enough Apna Coins (Costs 5). Claim daily rewards or Upgrade to PRO!", "error")
                     conn.close()
-                    return redirect(url_for("pro_upgrade"))
+                    return redirect(url_for("profile"))
                 c.execute("UPDATE users SET coins = coins - 5 WHERE username = %s", (session["username"],))
                 conn.commit()
 
@@ -684,7 +723,6 @@ def ai_studio():
                 flash("Image created! (-5 Coins)", "success")
                 return redirect(url_for("gallery", category="Photo"))
             except: 
-                # Refund coins if failed
                 if user_role not in ["pro", "admin"]:
                     c.execute("UPDATE users SET coins = coins + 5 WHERE username = %s", (session["username"],))
                     conn.commit()
