@@ -43,7 +43,6 @@
         .pro-btn { background: linear-gradient(45deg, #fbbf24, #f59e0b); color: #000; box-shadow: 0 0 15px rgba(251,191,36,0.4); animation: pulsePro 2s infinite; }
         @keyframes pulsePro { 0% { box-shadow: 0 0 0 0 rgba(251,191,36,0.7); } 70% { box-shadow: 0 0 0 10px rgba(251,191,36,0); } 100% { box-shadow: 0 0 0 0 rgba(251,191,36,0); } }
 
-        /* Notification Badge */
         .notif-badge { position: absolute; top: -5px; right: -10px; background: var(--danger); color: white; border-radius: 50%; padding: 2px 6px; font-size: 0.7rem; font-weight: bold; }
     </style>
     {% block head %}{% endblock %}
@@ -64,12 +63,15 @@
                     <a href="{{ url_for('pro_upgrade') }}" class="btn pro-btn" style="padding: 8px 15px; margin-right: 10px;">💎 PRO</a>
                 {% endif %}
                 
-                <!-- NOTIFICATION BELL -->
+                <!-- NEW: INBOX MESSAGE ICON -->
+                <a href="{{ url_for('inbox') }}" style="font-size: 1.3rem; margin-right: 5px;">
+                    ✉️
+                    {% if unread_messages > 0 %}<span class="notif-badge">{{ unread_messages }}</span>{% endif %}
+                </a>
+                
                 <a href="{{ url_for('notifications') }}" style="font-size: 1.3rem; margin-right: 10px;">
                     🔔
-                    {% if unread_notifications > 0 %}
-                        <span class="notif-badge">{{ unread_notifications }}</span>
-                    {% endif %}
+                    {% if unread_notifications > 0 %}<span class="notif-badge">{{ unread_notifications }}</span>{% endif %}
                 </a>
                 
                 <a href="{{ url_for('dashboard') }}">Dashboard</a>
