@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Upgrade to PRO | Apna Gallery{% endblock %}
+
+{% block content %}
+<div style="max-width: 800px; margin: 40px auto; text-align: center;">
+    
+    <span style="font-size: 5rem; display: block; margin-bottom: 20px;">💎</span>
+    <h1 style="color: var(--warning); font-size: 3rem; margin: 0;">Unlock Infinite Power.</h1>
+    <p style="color: var(--text-muted); font-size: 1.2rem; margin-bottom: 40px;">Upgrade to PRO and break the limits of Apna Gallery.</p>
+
+    <!-- Pricing Card -->
+    <div style="background: linear-gradient(145deg, rgba(30,41,59,0.8), rgba(15,23,42,0.9)); border: 1px solid var(--warning); border-radius: 20px; padding: 50px; box-shadow: 0 15px 40px rgba(251, 191, 36, 0.15); position: relative; overflow: hidden;">
+        
+        <!-- Decoration -->
+        <div style="position: absolute; top: -50px; right: -50px; width: 150px; height: 150px; background: var(--warning); opacity: 0.1; filter: blur(50px); border-radius: 50%;"></div>
+
+        <h2 style="color: white; font-size: 2rem; margin-top: 0;">PRO Agent Pass</h2>
+        <h1 style="color: var(--warning); font-size: 4rem; margin: 20px 0;">₹499<span style="font-size: 1.5rem; color: var(--text-muted);">/lifetime</span></h1>
+        
+        <ul style="list-style: none; padding: 0; margin: 30px 0; text-align: left; font-size: 1.1rem; color: var(--text-main); display: inline-block;">
+            <li style="margin-bottom: 15px;">✅ <strong>Unlimited Storage</strong> in all Vaults</li>
+            <li style="margin-bottom: 15px;">✅ <strong>Verified Blue Tick</strong> next to your name</li>
+            <li style="margin-bottom: 15px;">✅ <strong>Priority AI Image Generation</strong></li>
+            <li style="margin-bottom: 15px;">✅ <strong>Ad-Free Experience</strong> forever</li>
+        </ul>
+
+        <!-- Fake Payment Form for Dev Mode -->
+        <form method="POST" onsubmit="document.getElementById('pay-btn').innerHTML = 'Processing Payment... 🔄';">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" id="pay-btn" style="width: 100%; background: linear-gradient(90deg, #fbbf24, #f59e0b); color: #000; border: none; padding: 20px; border-radius: 12px; font-size: 1.3rem; font-weight: 900; cursor: pointer; transition: transform 0.2s; box-shadow: 0 10px 20px rgba(251, 191, 36, 0.3);">
+                Activate PRO Now (Dev Mode)
+            </button>
+            <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 15px;">*This is a developer bypass. No real card required.*</p>
+        </form>
+
+    </div>
+</div>
+{% endblock %}
