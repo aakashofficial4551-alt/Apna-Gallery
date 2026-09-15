@@ -43,7 +43,7 @@ app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "development-only-secret
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
 
 # =========================================================
-# DATABASE AUTO-HEALER & DAILY REWARDS UPGRADE
+# DATABASE AUTO-HEALER & PHASE 28 UPGRADE (COVER PICS)
 # =========================================================
 def upgrade_db():
     conn = get_db_connection()
@@ -66,10 +66,9 @@ def upgrade_db():
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS country VARCHAR(100)",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_pic TEXT",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS coins INTEGER DEFAULT 50",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS theme VARCHAR(20) DEFAULT 'cyan'",
-        # NEW: DAILY REWARDS TRACKER
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_reward_claim TIMESTAMP"
+        # NEW: COVER PHOTO
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS cover_pic TEXT"
     ]
     for q in queries:
         try:
@@ -81,7 +80,6 @@ def upgrade_db():
     try:
         c.execute("UPDATE users SET role = 'user' WHERE role IS NULL")
         c.execute("UPDATE users SET status = 'ACTIVE' WHERE status IS NULL")
-        c.execute("UPDATE users SET coins = 50 WHERE coins IS NULL")
         c.execute("UPDATE users SET theme = 'cyan' WHERE theme IS NULL")
         conn.commit()
     except: conn.rollback()
@@ -139,7 +137,7 @@ def update_activity():
 
 @app.context_processor
 def inject_global_vars():
-    vars_dict = {"csrf_token": get_csrf_token, "unread_notifications": 0, "unread_messages": 0, "my_coins": 0, "my_theme": "cyan"}
+    vars_dict = {"csrf_token": get_csrf_token, "unread_notifications": 0, "unread_messages": 0, "my_theme": "cyan"}
     if session.get("username"):
         try:
             conn = get_db_connection()
@@ -152,10 +150,9 @@ def inject_global_vars():
             res2 = c.fetchone()
             if res2: vars_dict["unread_messages"] = res2['cnt']
             
-            c.execute("SELECT coins, theme FROM users WHERE username = %s", (session.get("username"),))
+            c.execute("SELECT theme FROM users WHERE username = %s", (session.get("username"),))
             u_data = c.fetchone()
             if u_data:
-                vars_dict["my_coins"] = u_data["coins"]
                 vars_dict["my_theme"] = u_data["theme"]
             conn.close()
         except: pass
@@ -213,7 +210,7 @@ def login():
             code = ''.join(secrets.choice("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ") for _ in range(10))
             conn = get_db_connection()
             c = conn.cursor()
-            c.execute("INSERT INTO users (username, password, user_code, role, coins) VALUES (%s, %s, %s, 'user', 50)", (guest_name, "guest", code))
+            c.execute("INSERT INTO users (username, password, user_code, role) VALUES (%s, %s, %s, 'user')", (guest_name, "guest", code))
             conn.commit()
             conn.close()
             session.update({"username": guest_name, "is_registered": False, "is_admin": False, "role": "user"})
@@ -225,11 +222,11 @@ def login():
             try:
                 conn = get_db_connection()
                 c = conn.cursor()
-                c.execute("INSERT INTO users (username, email, password, user_code, role, coins) VALUES (%s, %s, %s, %s, 'user', 50)", 
+                c.execute("INSERT INTO users (username, email, password, user_code, role) VALUES (%s, %s, %s, %s, 'user')", 
                           (username, email, generate_password_hash(password), code))
                 conn.commit()
                 session.update({"username": username, "is_registered": True, "is_admin": False, "role": "user"})
-                flash(f"Account created! ID: {code}. You received 50 Free Coins!", "success")
+                flash(f"Account created! ID: {code}. Welcome to Apna Gallery!", "success")
                 return redirect(url_for("feed"))
             except:
                 flash("Username or Email exists.", "error")
@@ -314,31 +311,7 @@ def request_delete():
     return redirect(url_for("login"))
 
 # =========================================================
-# DAILY REWARDS ENGINE (PHASE 27)
-# =========================================================
-@app.route("/claim_reward", methods=["POST"])
-def claim_reward():
-    if "username" not in session: return redirect(url_for("login"))
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("SELECT last_reward_claim FROM users WHERE username = %s", (session["username"],))
-    user = c.fetchone()
-    
-    now = datetime.datetime.now()
-    last_claim = user['last_reward_claim']
-    
-    if not last_claim or (now - last_claim).total_seconds() > 86400: # 24 hours
-        c.execute("UPDATE users SET coins = coins + 20, last_reward_claim = CURRENT_TIMESTAMP WHERE username = %s", (session["username"],))
-        conn.commit()
-        flash("🎁 Daily Reward Claimed! You got +20 Free Coins.", "success")
-    else:
-        flash("⏳ You already claimed your reward today. Come back tomorrow!", "warning")
-        
-    conn.close()
-    return redirect(request.referrer or url_for("profile"))
-
-# =========================================================
-# CORE ROUTES (Dashboard, Feed, Profile)
+# CORE ROUTES (Feed, Explore, Dashboard, Studio)
 # =========================================================
 @app.route("/")
 def index():
@@ -409,17 +382,8 @@ def dashboard():
     trending = c.fetchall()
     c.execute("SELECT s.*, u.profile_pic, u.role FROM stories s JOIN users u ON s.username = u.username WHERE s.created_at >= NOW() - INTERVAL '12 hours' ORDER BY s.id DESC")
     stories = c.fetchall()
-    
-    # Check if reward is claimable
-    c.execute("SELECT last_reward_claim FROM users WHERE username = %s", (session["username"],))
-    user_data = c.fetchone()
-    last_claim = user_data['last_reward_claim'] if user_data else None
-    can_claim = False
-    if not last_claim or (datetime.datetime.now() - last_claim).total_seconds() > 86400:
-        can_claim = True
-        
     conn.close()
-    return render_template("dashboard.html", trending=trending, stories=stories, can_claim=can_claim)
+    return render_template("dashboard.html", trending=trending, stories=stories)
 
 @app.route("/notifications")
 def notifications():
@@ -445,14 +409,17 @@ def profile():
             c.execute("UPDATE users SET bio = %s, country = %s WHERE username = %s", 
                       (request.form.get("bio", ""), request.form.get("country", "India"), session["username"]))
             flash("Profile updated!", "success")
-        elif action == "theme" and session.get("role") in ["pro", "admin"]:
+        elif action == "theme":
             theme = request.form.get("theme", "cyan")
             if theme in ["cyan", "gold", "rose", "matrix"]:
                 c.execute("UPDATE users SET theme = %s WHERE username = %s", (theme, session["username"]))
-                flash("PRO Theme applied successfully!", "success")
+                flash("Theme applied successfully!", "success")
         elif action == "avatar" and "profile_pic" in request.files:
             url = save_uploaded_file(request.files["profile_pic"], "Photo")
             if url: c.execute("UPDATE users SET profile_pic = %s WHERE username = %s", (url, session["username"]))
+        elif action == "cover" and "cover_pic" in request.files:
+            url = save_uploaded_file(request.files["cover_pic"], "Photo")
+            if url: c.execute("UPDATE users SET cover_pic = %s WHERE username = %s", (url, session["username"]))
         elif action == "story" and "story_media" in request.files:
             url = save_uploaded_file(request.files["story_media"], "Photo")
             if url: c.execute("INSERT INTO stories (username, filename) VALUES (%s, %s)", (session["username"], url))
@@ -471,15 +438,9 @@ def profile():
     
     c.execute("SELECT m.* FROM media m JOIN bookmarks b ON m.id = b.media_id WHERE b.username = %s ORDER BY b.id DESC", (session["username"],))
     saved_uploads = c.fetchall()
-    
-    # Check claim status
-    last_claim = user['last_reward_claim']
-    can_claim = False
-    if not last_claim or (datetime.datetime.now() - last_claim).total_seconds() > 86400:
-        can_claim = True
-        
     conn.close()
-    return render_template("profile.html", user=user, my_uploads=my_uploads, saved_uploads=saved_uploads, post_count=len(my_uploads), followers_count=followers_count, following_count=following_count, can_claim=can_claim)
+    
+    return render_template("profile.html", user=user, my_uploads=my_uploads, saved_uploads=saved_uploads, post_count=len(my_uploads), followers_count=followers_count, following_count=following_count)
 
 # =========================================================
 # PUBLIC PORTFOLIO & FOLLOW SYSTEM
@@ -506,8 +467,8 @@ def agent_profile(username):
     
     c.execute("SELECT id FROM followers WHERE follower = %s AND following = %s", (session["username"], username))
     is_following = bool(c.fetchone())
-    
     conn.close()
+    
     return render_template("agent.html", agent=agent, uploads=agent_uploads, post_count=len(agent_uploads), followers_count=followers_count, following_count=following_count, is_following=is_following)
 
 @app.route("/follow/<username>", methods=["POST"])
@@ -584,22 +545,8 @@ def chat(username):
     return render_template("chat.html", chat_history=chat_history, contact=contact)
 
 # =========================================================
-# ROUTES: GALLERY & PRO
+# ALL 100% FREE GALLERY & AI STUDIO
 # =========================================================
-@app.route("/pro", methods=["GET", "POST"])
-def pro_upgrade():
-    if "username" not in session: return redirect(url_for("login"))
-    if request.method == "POST":
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute("UPDATE users SET role = 'pro' WHERE username = %s", (session["username"],))
-        conn.commit()
-        conn.close()
-        session["role"] = "pro"
-        flash("🎉 Welcome to PRO! Enjoy Infinite Uploads & Verified Status.", "success")
-        return redirect(url_for("dashboard"))
-    return render_template("pro.html")
-
 @app.route("/gallery/<category>", methods=["GET", "POST"])
 def gallery(category):
     if "username" not in session: return redirect(url_for("login"))
@@ -607,15 +554,6 @@ def gallery(category):
     c = conn.cursor()
     
     if request.method == "POST":
-        user_role = session.get("role", "user")
-        if user_role not in ["admin", "pro"]:
-            c.execute("SELECT COUNT(id) as cnt FROM media WHERE uploaded_by = %s", (session["username"],))
-            total_uploads = c.fetchone()['cnt']
-            if total_uploads >= 10: # Increased to 10 as a bonus!
-                flash("🔒 SAAS LIMIT REACHED (10 Assets). Upgrade to PRO for unlimited.", "error")
-                conn.close()
-                return redirect(url_for("pro_upgrade"))
-
         filename = "SHAYARI_TEXT"
         if category != 'Shayari':
             file = request.files.get("media")
@@ -667,9 +605,6 @@ def leaderboard():
     conn.close()
     return render_template("leaderboard.html", leaders=leaders)
 
-# =========================================================
-# AI STUDIO (COSTS COINS), LIKES, COMMENTS, BOOKMARKS
-# =========================================================
 @app.route("/bookmark/<int:media_id>", methods=["POST"])
 def bookmark(media_id):
     if "username" not in session: return jsonify({"error": "Login required."}), 401
@@ -697,36 +632,20 @@ def ai_studio():
         wants_image = any(word in prompt.lower() for word in trigger_words)
         
         if wants_image:
-            user_role = session.get("role", "user")
-            conn = get_db_connection()
-            c = conn.cursor()
-            
-            if user_role not in ["pro", "admin"]:
-                c.execute("SELECT coins FROM users WHERE username = %s", (session["username"],))
-                coins = c.fetchone()['coins']
-                if coins < 5:
-                    flash("Not enough Apna Coins (Costs 5). Claim daily rewards or Upgrade to PRO!", "error")
-                    conn.close()
-                    return redirect(url_for("profile"))
-                c.execute("UPDATE users SET coins = coins - 5 WHERE username = %s", (session["username"],))
-                conn.commit()
-
             encoded_prompt = urllib.parse.quote(prompt)
             image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?nologo=true"
             try:
                 r = requests.get(image_url, timeout=15)
                 secure_url = cloudinary.uploader.upload(r.content, resource_type="image")["secure_url"] if r.status_code == 200 else image_url
+                conn = get_db_connection()
+                c = conn.cursor()
                 c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved) VALUES (%s, %s, %s, %s, %s, 1)",
                           (secure_url, f"AI: {prompt[:20]}...", "Photo", prompt, session["username"]))
                 conn.commit()
                 conn.close()
-                flash("Image created! (-5 Coins)", "success")
+                flash("Image created successfully! (100% Free)", "success")
                 return redirect(url_for("gallery", category="Photo"))
             except: 
-                if user_role not in ["pro", "admin"]:
-                    c.execute("UPDATE users SET coins = coins + 5 WHERE username = %s", (session["username"],))
-                    conn.commit()
-                conn.close()
                 flash("Image generation failed.", "error")
         else:
             try: reply = get_ai_response(prompt)
@@ -846,9 +765,6 @@ def admin_user_action(user_id, action):
     elif action == "make_admin":
         c.execute("UPDATE users SET role = 'admin' WHERE id = %s", (user_id,))
         flash("Promoted to Admin HQ!", "success")
-    elif action == "make_pro":
-        c.execute("UPDATE users SET role = 'pro' WHERE id = %s", (user_id,))
-        flash("Granted PRO status manually!", "success")
     conn.commit()
     conn.close()
     return redirect(url_for("admin"))
