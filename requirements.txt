@@ -5,3 +5,4 @@ gunicorn==21.2.0
 google-genai
 Cloudinary
 psycopg2-binary
+requests
