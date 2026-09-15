@@ -38,7 +38,7 @@
 
     <!-- CHAT BOX -->
     <div id="chat-box" style="flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; background: rgba(8,17,31,0.4);">
-        <!-- JavaScript loads messages -->
+        <!-- Messages loaded via JS -->
     </div>
 
     <form method="POST" style="background: rgba(15,23,42,0.9); padding: 15px; border-top: 1px solid var(--border-color); display: flex; gap: 10px;">
@@ -57,7 +57,7 @@
     async function unsendMessage(msgId) {
         if(confirm("Unsend this message?")) {
             await fetch(`/unsend_message/${msgId}`, { method: 'POST', headers: { 'X-CSRF-Token': '{{ csrf_token() }}' } });
-            fetchMessages(); // Refresh immediately
+            fetchMessages(); 
         }
     }
 
