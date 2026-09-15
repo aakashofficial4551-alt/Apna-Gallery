@@ -8,6 +8,7 @@ from uuid import uuid4
 import datetime
 import random
 import smtplib
+import re  # NEW: For Hashtag parsing
 
 import psycopg2
 import cloudinary
@@ -16,7 +17,7 @@ import requests
 from dotenv import load_dotenv
 
 from flask import (
-    Flask, request, render_template, redirect, url_for, flash, session, jsonify
+    Flask, request, render_template, redirect, url_for, flash, session, jsonify, render_template_string
 )
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -41,6 +42,15 @@ init_db()
 
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "development-only-secret-change-me")
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
+
+# =========================================================
+# HASHTAG FILTER ENGINE (PHASE 31)
+# =========================================================
+@app.template_filter('hashtag')
+def hashtag_filter(text):
+    if not text: return ""
+    # Converts #word into a clickable link that points to the search engine
+    return re.sub(r'#(\w+)', r'<a href="/search?q=\1" style="color: var(--accent); text-decoration: none; font-weight: bold;">#\1</a>', text)
 
 # =========================================================
 # DATABASE AUTO-HEALER
@@ -225,7 +235,7 @@ def login():
                           (username, email, generate_password_hash(password), code))
                 conn.commit()
                 session.update({"username": username, "is_registered": True, "is_admin": False, "role": "user"})
-                flash(f"Account created! Welcome to Apna Gallery!", "success")
+                flash(f"Account created! ID: {code}. Welcome to Apna Gallery!", "success")
                 return redirect(url_for("feed"))
             except:
                 flash("Username or Email exists.", "error")
@@ -310,7 +320,7 @@ def request_delete():
     return redirect(url_for("login"))
 
 # =========================================================
-# UNIVERSAL UPLOAD ROUTE (PHASE 30)
+# UNIVERSAL UPLOAD ROUTE
 # =========================================================
 @app.route("/upload_asset", methods=["POST"])
 def upload_asset():
@@ -339,7 +349,7 @@ def upload_asset():
     return redirect(request.referrer or url_for("feed"))
 
 # =========================================================
-# CORE ROUTES (Feed, Explore, Dashboard, Studio)
+# CORE ROUTES
 # =========================================================
 @app.route("/")
 def index():
@@ -573,7 +583,7 @@ def chat(username):
     return render_template("chat.html", chat_history=chat_history, contact=contact)
 
 # =========================================================
-# GALLERY, SEARCH, AI STUDIO (100% FREE NOW)
+# GALLERY, SEARCH, AI STUDIO
 # =========================================================
 @app.route("/gallery/<category>", methods=["GET", "POST"])
 def gallery(category):
@@ -610,7 +620,6 @@ def gallery(category):
     for comment in comments_db: comments[comment["media_id"]].append(comment)
     return render_template("gallery.html", media_files=media_files, category=category, comments=comments)
 
-# GLOBAL SEARCH ENGINE
 @app.route("/search")
 def search():
     if "username" not in session: return redirect(url_for("login"))
