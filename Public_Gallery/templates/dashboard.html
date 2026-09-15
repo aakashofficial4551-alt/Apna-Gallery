@@ -1,78 +1,189 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard | Apna Gallery{% endblock %}
+{% block title %}HQ Dashboard | Apna Gallery{% endblock %}
 
 {% block head %}
 <style>
     .vault-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
         gap: 20px;
         margin-top: 30px;
     }
     .vault-card {
-        background: rgba(16, 27, 45, 0.7);
-        border: 1px solid rgba(56, 189, 248, 0.2);
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
         border-radius: 16px;
         padding: 30px 20px;
         text-align: center;
         text-decoration: none;
         color: white;
         transition: all 0.3s ease;
-        backdrop-filter: blur(10px);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
     }
     .vault-card:hover {
         transform: translateY(-5px);
-        border-color: #38bdf8;
-        box-shadow: 0 10px 20px rgba(56, 189, 248, 0.1);
+        border-color: var(--accent);
+        box-shadow: 0 10px 20px rgba(56, 189, 248, 0.15);
     }
     .vault-icon {
         font-size: 3rem;
         margin-bottom: 15px;
         display: block;
     }
-    .welcome-header {
-        text-align: center;
-        margin-bottom: 40px;
+    
+    /* Feature Section */
+    .dashboard-features {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 25px;
+        margin-top: 40px;
     }
-    .welcome-header h1 {
-        color: #38bdf8;
-        font-size: 2.5rem;
-        margin-bottom: 10px;
+    @media (max-width: 768px) {
+        .dashboard-features { grid-template-columns: 1fr; }
     }
+
+    .feature-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        padding: 25px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+    .feature-card h3 {
+        color: var(--text-main);
+        margin-top: 0;
+        margin-bottom: 20px;
+        font-size: 1.3rem;
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 15px;
+    }
+
+    /* AI Chat */
+    .chat-box {
+        background: var(--bg-main);
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        height: 200px;
+        overflow-y: auto;
+        padding: 15px;
+        margin-bottom: 15px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    .chat-msg { padding: 10px 14px; border-radius: 10px; font-size: 0.9rem; max-width: 85%; line-height: 1.4; }
+    .chat-user { background: var(--accent); color: var(--bg-main); align-self: flex-end; border-bottom-right-radius: 2px; font-weight: 600; }
+    .chat-bot { background: #1e293b; color: white; align-self: flex-start; border-bottom-left-radius: 2px; }
+    
+    .chat-input { display: flex; gap: 10px; }
+    .chat-input input {
+        flex: 1; background: var(--bg-main); border: 1px solid var(--border-color); color: white; padding: 12px; border-radius: 8px; outline: none;
+    }
+    .chat-input input:focus { border-color: var(--accent); }
+
+    /* Forms & Inputs */
+    .input-box {
+        width: 100%; background: var(--bg-main); border: 1px solid var(--border-color); color: white; padding: 12px; border-radius: 8px; outline: none; box-sizing: border-box; text-align: center; letter-spacing: 2px; font-weight: bold; margin-bottom: 15px;
+    }
+    .input-box:focus { border-color: var(--warning); }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="welcome-header">
-    <h1>Welcome, {{ session.username }}</h1>
-    <p style="color: #94a3b8;">Select a secure vault to manage your assets.</p>
+<div style="text-align: center; margin-bottom: 30px;">
+    <h1 style="color: var(--accent); font-size: 2.2rem; margin-bottom: 5px;">Welcome to HQ, {{ session.username }}</h1>
+    <p style="color: var(--text-muted); font-size: 1.1rem;">Select a secure vault or access advanced modules.</p>
 </div>
 
+<!-- Vault Grid -->
 <div class="vault-grid">
-    <a href="{{ url_for('gallery', category='Photo') }}" class="vault-card">
-        <span class="vault-icon">📸</span>
-        <h3>Photo Vault</h3>
-    </a>
-    
-    <a href="{{ url_for('gallery', category='Video') }}" class="vault-card">
-        <span class="vault-icon">🎥</span>
-        <h3>Video Vault</h3>
-    </a>
-    
-    <a href="{{ url_for('gallery', category='Music') }}" class="vault-card">
-        <span class="vault-icon">🎵</span>
-        <h3>Music Vault</h3>
-    </a>
-
-    <a href="{{ url_for('gallery', category='Document') }}" class="vault-card">
-        <span class="vault-icon">📄</span>
-        <h3>Document Vault</h3>
-    </a>
-
-    <a href="{{ url_for('gallery', category='Shayari') }}" class="vault-card">
-        <span class="vault-icon">✍️</span>
-        <h3>Shayari Vault</h3>
-    </a>
+    <a href="{{ url_for('gallery', category='Photo') }}" class="vault-card"><span class="vault-icon">📸</span><h3>Photo Vault</h3></a>
+    <a href="{{ url_for('gallery', category='Video') }}" class="vault-card"><span class="vault-icon">🎥</span><h3>Video Vault</h3></a>
+    <a href="{{ url_for('gallery', category='Music') }}" class="vault-card"><span class="vault-icon">🎵</span><h3>Music Vault</h3></a>
+    <a href="{{ url_for('gallery', category='Document') }}" class="vault-card"><span class="vault-icon">📄</span><h3>Doc Vault</h3></a>
+    <a href="{{ url_for('gallery', category='Shayari') }}" class="vault-card"><span class="vault-icon">✍️</span><h3>Shayari</h3></a>
 </div>
+
+<!-- Features Area -->
+<div class="dashboard-features">
+    
+    <!-- AI Assistant -->
+    <div class="feature-card">
+        <h3 style="color: var(--accent);">🤖 SOCHO AI Assistant</h3>
+        <div class="chat-box" id="chatBox">
+            <div class="chat-msg chat-bot">Hello Agent! How can I assist you today?</div>
+        </div>
+        <div class="chat-input">
+            <input type="text" id="aiInput" placeholder="Type your message..." onkeypress="if(event.key === 'Enter') sendAIMessage()">
+            <button class="btn" onclick="sendAIMessage()">Send</button>
+        </div>
+    </div>
+
+    <!-- Admin & Mystery Section -->
+    <div class="feature-card">
+        <h3 style="color: var(--warning);">🕵️‍♂️ The Mystery Box</h3>
+        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 15px;">Enter the classified passcode to unlock hidden sectors.</p>
+        
+        <form action="{{ url_for('mystery') }}" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="password" name="passcode" class="input-box" placeholder="ENTER CODE" required>
+            <button type="submit" class="btn" style="background: var(--warning); width: 100%;">Unlock Mystery</button>
+        </form>
+
+        <h3 style="margin-top: 35px; border-top: 1px solid var(--border-color); padding-top: 20px;">🛡️ Authorization Status</h3>
+        
+        {% if session.get('is_admin') %}
+            <p style="color: var(--success); font-weight: bold; font-size: 1.1rem; margin-bottom: 10px;">🟢 ACTIVE - Administrator</p>
+            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 15px;">You have elevated privileges. Manage assets carefully.</p>
+            <a href="{{ url_for('admin') }}" class="btn" style="background: var(--success); width: 100%; box-sizing: border-box; text-align: center;">Access Admin HQ</a>
+        {% else %}
+            <p style="color: var(--danger); font-weight: bold; font-size: 1.1rem;">🔴 INACTIVE</p>
+            <p style="color: var(--text-muted); font-size: 0.9rem;">Standard user clearance only.</p>
+        {% endif %}
+    </div>
+    
+</div>
+
+<!-- AI Chat Script -->
+<script>
+    async function sendAIMessage() {
+        const input = document.getElementById('aiInput');
+        const chatBox = document.getElementById('chatBox');
+        const query = input.value.trim();
+        
+        if (!query) return;
+        
+        // Add User message
+        chatBox.innerHTML += `<div class="chat-msg chat-user">${query}</div>`;
+        input.value = '';
+        chatBox.scrollTop = chatBox.scrollHeight;
+        
+        // Add Loading
+        const loadId = 'load-' + Date.now();
+        chatBox.innerHTML += `<div id="${loadId}" class="chat-msg chat-bot">...</div>`;
+        chatBox.scrollTop = chatBox.scrollHeight;
+        
+        try {
+            const response = await fetch("{{ url_for('ai_endpoint') }}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': '{{ csrf_token() }}' },
+                body: JSON.stringify({ query: query })
+            });
+            
+            const data = await response.json();
+            document.getElementById(loadId).remove();
+            
+            if (data.reply) {
+                chatBox.innerHTML += `<div class="chat-msg chat-bot">${data.reply}</div>`;
+            } else {
+                chatBox.innerHTML += `<div class="chat-msg chat-bot" style="color: var(--danger);">Error processing request.</div>`;
+            }
+        } catch (e) {
+            if(document.getElementById(loadId)) document.getElementById(loadId).remove();
+            chatBox.innerHTML += `<div class="chat-msg chat-bot" style="color: var(--danger);">Connection failed.</div>`;
+        }
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+</script>
 {% endblock %}
