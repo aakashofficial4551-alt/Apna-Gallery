@@ -4,6 +4,11 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Apna Gallery{% endblock %}</title>
+    
+    <!-- PWA MOBILE APP LINKS (ADDED) -->
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <meta name="theme-color" content="#08111f">
+    
     <style>
         :root {
             --bg-main: #08111f;
@@ -147,5 +152,14 @@
     <footer>
         &copy; 2026 Apna Gallery. Secure Asset Vault.
     </footer>
+
+    <!-- PWA SERVICE WORKER SCRIPT (ADDED) -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register("{{ url_for('static', filename='sw.js') }}");
+            });
+        }
+    </script>
 </body>
 </html>
