@@ -43,7 +43,7 @@ app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "development-only-secret
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
 
 # =========================================================
-# DATABASE AUTO-HEALER & NOTIFICATIONS UPGRADE
+# DATABASE AUTO-HEALER & NETWORK UPGRADE
 # =========================================================
 def upgrade_db():
     conn = get_db_connection()
@@ -56,7 +56,6 @@ def upgrade_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    # NEW: NOTIFICATIONS TABLE
     c.execute("""
         CREATE TABLE IF NOT EXISTS notifications (
             id SERIAL PRIMARY KEY,
@@ -65,6 +64,16 @@ def upgrade_db():
             link TEXT,
             is_read BOOLEAN DEFAULT FALSE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    # NEW: FOLLOWERS TABLE
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS followers (
+            id SERIAL PRIMARY KEY,
+            follower VARCHAR(100) NOT NULL,
+            following VARCHAR(100) NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(follower, following)
         )
     """)
     conn.commit()
@@ -119,7 +128,6 @@ def cleanup_database():
         c.execute("DELETE FROM users WHERE username LIKE 'Guest-%%' AND last_active < NOW() - INTERVAL '30 days'")
         c.execute("DELETE FROM users WHERE role = 'user' AND last_active < NOW() - INTERVAL '90 days'")
         c.execute("DELETE FROM stories WHERE created_at < NOW() - INTERVAL '12 hours'")
-        # Keep only last 50 notifications per user
         c.execute("DELETE FROM notifications WHERE id NOT IN (SELECT id FROM notifications ORDER BY id DESC LIMIT 500)")
         conn.commit()
     except: pass
@@ -344,7 +352,6 @@ def notifications():
     c = conn.cursor()
     c.execute("SELECT * FROM notifications WHERE username = %s ORDER BY id DESC LIMIT 50", (session["username"],))
     notifs = c.fetchall()
-    # Mark as read
     c.execute("UPDATE notifications SET is_read = TRUE WHERE username = %s AND is_read = FALSE", (session["username"],))
     conn.commit()
     conn.close()
@@ -380,9 +387,19 @@ def profile():
     user = c.fetchone()
     c.execute("SELECT * FROM media WHERE uploaded_by = %s ORDER BY id DESC", (session["username"],))
     my_uploads = c.fetchall()
+    
+    # NETWORK COUNTS
+    c.execute("SELECT COUNT(*) as cnt FROM followers WHERE following = %s", (session["username"],))
+    followers_count = c.fetchone()['cnt']
+    c.execute("SELECT COUNT(*) as cnt FROM followers WHERE follower = %s", (session["username"],))
+    following_count = c.fetchone()['cnt']
+    
     conn.close()
-    return render_template("profile.html", user=user, my_uploads=my_uploads, post_count=len(my_uploads))
+    return render_template("profile.html", user=user, my_uploads=my_uploads, post_count=len(my_uploads), followers_count=followers_count, following_count=following_count)
 
+# =========================================================
+# PUBLIC PORTFOLIO & FOLLOW SYSTEM
+# =========================================================
 @app.route("/agent/<username>")
 def agent_profile(username):
     if "username" not in session: return redirect(url_for("login"))
@@ -394,10 +411,51 @@ def agent_profile(username):
         flash("Agent not found.", "error")
         conn.close()
         return redirect(url_for("dashboard"))
-    c.execute("SELECT * FROM media WHERE uploaded_by = %s AND approved = 1 AND filename != 'SHAYARI_TEXT' ORDER BY id DESC", (username,))
+        
+    c.execute("SELECT m.*, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.uploaded_by = %s AND m.approved = 1 AND m.filename != 'SHAYARI_TEXT' ORDER BY m.id DESC", (username,))
     agent_uploads = c.fetchall()
+    
+    c.execute("SELECT COUNT(*) as cnt FROM followers WHERE following = %s", (username,))
+    followers_count = c.fetchone()['cnt']
+    c.execute("SELECT COUNT(*) as cnt FROM followers WHERE follower = %s", (username,))
+    following_count = c.fetchone()['cnt']
+    
+    c.execute("SELECT id FROM followers WHERE follower = %s AND following = %s", (session["username"], username))
+    is_following = bool(c.fetchone())
+    
     conn.close()
-    return render_template("agent.html", agent=agent, uploads=agent_uploads, post_count=len(agent_uploads))
+    return render_template("agent.html", agent=agent, uploads=agent_uploads, post_count=len(agent_uploads), followers_count=followers_count, following_count=following_count, is_following=is_following)
+
+@app.route("/follow/<username>", methods=["POST"])
+def follow(username):
+    if "username" not in session: return jsonify({"error": "Login required"}), 401
+    current_user = session["username"]
+    if current_user == username: return jsonify({"error": "Cannot follow yourself"}), 400
+    
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT id FROM users WHERE username = %s", (username,))
+    if not c.fetchone(): return jsonify({"error": "User not found"}), 404
+    
+    c.execute("SELECT id FROM followers WHERE follower = %s AND following = %s", (current_user, username))
+    is_following = c.fetchone()
+    
+    if is_following:
+        c.execute("DELETE FROM followers WHERE follower = %s AND following = %s", (current_user, username))
+        following_now = False
+    else:
+        c.execute("INSERT INTO followers (follower, following) VALUES (%s, %s)", (current_user, username))
+        msg = f"👤 {current_user} started following you!"
+        link = f"/agent/{current_user}"
+        c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (username, msg, link))
+        following_now = True
+        
+    conn.commit()
+    c.execute("SELECT COUNT(*) as cnt FROM followers WHERE following = %s", (username,))
+    followers_count = c.fetchone()['cnt']
+    conn.close()
+    
+    return jsonify({"followers": followers_count, "following_now": following_now})
 
 # =========================================================
 # ROUTES: GALLERY & PRO
@@ -536,7 +594,6 @@ def like(media_id):
     
     if c.rowcount == 1:
         c.execute("UPDATE media SET likes = likes + 1 WHERE id = %s", (media_id,))
-        # NOTIFICATION LOGIC
         c.execute("SELECT uploaded_by, title, category FROM media WHERE id = %s", (media_id,))
         media_info = c.fetchone()
         if media_info and media_info['uploaded_by'] != username:
@@ -560,7 +617,6 @@ def add_comment(media_id):
         conn = get_db_connection()
         c = conn.cursor()
         c.execute("INSERT INTO comments (media_id, username, comment_text) VALUES (%s, %s, %s)", (media_id, session["username"], text[:200]))
-        # NOTIFICATION LOGIC
         c.execute("SELECT uploaded_by, title, category FROM media WHERE id = %s", (media_id,))
         media_info = c.fetchone()
         if media_info and media_info['uploaded_by'] != session["username"]:
@@ -662,7 +718,6 @@ def approve(id):
     conn = get_db_connection()
     c = conn.cursor()
     c.execute("UPDATE media SET approved = 1 WHERE id = %s", (id,))
-    # NOTIFICATION LOGIC
     c.execute("SELECT uploaded_by, title, category FROM media WHERE id = %s", (id,))
     media_info = c.fetchone()
     if media_info:
