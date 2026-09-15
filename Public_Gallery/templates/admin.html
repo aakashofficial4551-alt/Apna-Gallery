@@ -40,7 +40,6 @@
             
             <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 20px; margin-bottom: 30px;">
                 <h1 style="color: var(--warning); margin: 0;">⚡ Commander HQ Dashboard</h1>
-                <a href="{{ url_for('admin_audit_logs') }}" class="btn" style="background: #334155; color: white;">View Security Logs</a>
             </div>
 
             <!-- Admin Analytics -->
@@ -65,13 +64,9 @@
                 <div class="media-row">
                     <div class="media-info">
                         <div class="media-preview">
-                            {% if item.category == 'Photo' %}
-                                <img src="{{ item.filename }}">
-                            {% elif item.category == 'Video' %}
-                                <video src="{{ item.filename }}"></video>
-                            {% else %}
-                                <span style="font-size: 2rem;">📄</span>
-                            {% endif %}
+                            {% if item.category == 'Photo' %}<img src="{{ item.filename }}">
+                            {% elif item.category == 'Video' %}<video src="{{ item.filename }}"></video>
+                            {% else %}<span style="font-size: 2rem;">📄</span>{% endif %}
                         </div>
                         <div>
                             <h3 style="margin: 0 0 5px 0; color: var(--text-main);">{{ item.title }}</h3>
@@ -95,7 +90,7 @@
                 <p style="color: var(--text-muted); font-style: italic; background: rgba(8, 17, 31, 0.3); padding: 20px; border-radius: 10px;">No pending assets. HQ is clear.</p>
             {% endfor %}
             
-            <!-- NEW: GOD MODE (USER MANAGEMENT) -->
+            <!-- GOD MODE (USER MANAGEMENT) -->
             <h2 style="color: var(--warning); margin-top: 50px; margin-bottom: 20px;">🛡️ God Mode: Agent Management</h2>
             <div style="overflow-x: auto;">
                 <table class="users-table">
@@ -112,19 +107,22 @@
                         {% for u in all_users %}
                         <tr>
                             <td style="color: var(--text-muted);">#{{ u.id }}</td>
-                            <td style="font-weight: bold; color: white;">{{ u.username }}</td>
-                            <td style="color: var(--accent);">{{ u.role|upper }}</td>
+                            <td style="font-weight: bold; color: white;">{{ u.username or 'Unknown' }}</td>
+                            
+                            <!-- SAFE RENDER: Uses 'USER' if role is missing -->
+                            <td style="color: var(--accent);">{{ (u.role or 'USER') | upper }}</td>
+                            
+                            <!-- SAFE RENDER: Uses 'ACTIVE' if status is missing -->
                             <td>
-                                {% if u.status == 'BANNED' %}
+                                {% if (u.status or 'ACTIVE') == 'BANNED' %}
                                     <span class="badge-banned">BANNED</span>
                                 {% else %}
                                     <span class="badge-active">ACTIVE</span>
                                 {% endif %}
                             </td>
                             <td>
-                                <!-- Action Buttons -->
                                 <div style="display: flex; gap: 10px;">
-                                    {% if u.status == 'ACTIVE' and u.role != 'admin' %}
+                                    {% if (u.status or 'ACTIVE') == 'ACTIVE' and (u.role or 'user') != 'admin' %}
                                     <form method="POST" action="{{ url_for('admin_user_action', user_id=u.id, action='ban') }}" onsubmit="return confirm('Ban this user?');">
                                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                         <button type="submit" class="btn" style="background: transparent; border: 1px solid var(--danger); color: var(--danger); padding: 4px 10px; font-size: 0.8rem;">Ban</button>
@@ -133,7 +131,7 @@
                                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                         <button type="submit" class="btn" style="background: transparent; border: 1px solid var(--warning); color: var(--warning); padding: 4px 10px; font-size: 0.8rem;">Make Admin</button>
                                     </form>
-                                    {% elif u.status == 'BANNED' %}
+                                    {% elif (u.status or 'ACTIVE') == 'BANNED' %}
                                     <form method="POST" action="{{ url_for('admin_user_action', user_id=u.id, action='unban') }}">
                                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                         <button type="submit" class="btn" style="background: transparent; border: 1px solid var(--success); color: var(--success); padding: 4px 10px; font-size: 0.8rem;">Unban</button>
