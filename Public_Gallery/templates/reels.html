@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Reels | Apna Gallery{% endblock %}
+
+{% block head %}
+<style>
+    /* TIKTOK STYLE VERTICAL SCROLLING */
+    .reels-container {
+        height: 85vh;
+        overflow-y: scroll;
+        scroll-snap-type: y mandatory;
+        scrollbar-width: none; /* Hide scrollbar */
+        border-radius: 20px;
+        background: #000;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+    }
+    .reels-container::-webkit-scrollbar { display: none; }
+    
+    .reel-video {
+        height: 100%;
+        width: 100%;
+        scroll-snap-align: start;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #000;
+    }
+    .reel-video video { 
+        height: 100%; 
+        width: 100%; 
+        object-fit: contain; 
+        cursor: pointer;
+    }
+    
+    .reel-overlay {
+        position: absolute; 
+        bottom: 0; left: 0; right: 0;
+        padding: 60px 20px 20px 20px;
+        background: linear-gradient(transparent, rgba(0,0,0,0.9));
+        display: flex; 
+        justify-content: space-between; 
+        align-items: flex-end;
+        pointer-events: none;
+    }
+    .reel-actions { pointer-events: auto; display: flex; flex-direction: column; gap: 20px; align-items: center; }
+    .reel-info { pointer-events: auto; color: white; text-shadow: 0 2px 4px rgba(0,0,0,0.8); max-width: 80%; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 500px; margin: 0 auto;">
+    
+    <div style="text-align: center; margin-bottom: 10px;">
+        <h1 style="color: var(--accent); margin: 0; font-size: 1.5rem;">🎬 Video Vault</h1>
+        <p style="color: var(--text-muted); font-size: 0.85rem; margin: 5px 0;">Scroll down for more • Tap video to Mute/Unmute</p>
+    </div>
+
+    <div class="reels-container">
+        {% for vid in videos %}
+        <div class="reel-video">
+            <video src="{{ vid.filename }}" autoplay loop muted playsinline onclick="this.muted = !this.muted;"></video>
+            
+            <div class="reel-overlay">
+                <div class="reel-info">
+                    <a href="{{ url_for('agent_profile', username=vid.uploaded_by) }}" style="text-decoration: none; color: white;">
+                        <h3 style="margin:0; display: flex; align-items: center; gap: 8px;">
+                            @{{ vid.uploaded_by }} 
+                            {% if vid.role == 'admin' %}<span style="color: #38bdf8; font-size: 1rem;">☑️</span>{% endif %}
+                        </h3>
+                    </a>
+                    <p style="margin: 8px 0 0 0; font-size: 1.1rem; line-height: 1.3;">{{ vid.title | format_text | safe }}</p>
+                </div>
+                
+                <div class="reel-actions">
+                    <div>
+                        <button class="btn" onclick="toggleReelLike({{ vid.id }})" style="background: rgba(0,0,0,0.5); color: var(--danger); border-radius: 50%; width: 55px; height: 55px; padding:0; font-size:1.8rem; border: 2px solid rgba(255,255,255,0.2);">❤️</button>
+                        <span id="like-count-{{ vid.id }}" style="display: block; text-align: center; font-weight: bold; margin-top: 5px; color: white; text-shadow: 0 2px 4px #000;">{{ vid.likes }}</span>
+                    </div>
+                    
+                    <a href="{{ vid.filename }}" download target="_blank" class="btn" style="background: rgba(0,0,0,0.5); color: white; border-radius: 50%; width: 55px; height: 55px; padding:0; font-size:1.5rem; display: grid; place-items: center; border: 2px solid rgba(255,255,255,0.2); text-decoration: none;">⬇️</a>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div style="height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; color: var(--text-muted);">
+            <span style="font-size: 4rem; margin-bottom: 20px;">🎥</span>
+            <h3>No videos found.</h3>
+            <p>Upload a video to start the reels feed!</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<script>
+// Auto-Play the video in view, Pause others
+const videos = document.querySelectorAll('video');
+const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+        if(entry.isIntersecting) { entry.target.play(); }
+        else { entry.target.pause(); }
+    });
+}, { threshold: 0.6 });
+
+videos.forEach(v => observer.observe(v));
+
+async function toggleReelLike(mediaId) {
+    try {
+        const response = await fetch(`/like/${mediaId}`, { method: 'POST', headers: { 'X-CSRF-Token': '{{ csrf_token() }}' } });
+        const data = await response.json();
+        if (response.ok) { document.getElementById(`like-count-${mediaId}`).innerText = data.likes; }
+    } catch (e) { console.error("Like error:", e); }
+}
+</script>
+{% endblock %}
