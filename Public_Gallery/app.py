@@ -162,7 +162,6 @@ def current_user_is_admin():
     return session.get("role") == "admin"
 
 def sync_admin_session():
-    # Sync roles into session for faster checks
     if "username" in session:
         conn = get_db_connection()
         c = conn.cursor()
@@ -298,7 +297,7 @@ def request_delete():
     return redirect(url_for("login"))
 
 # =========================================================
-# CORE ROUTES (Dashboard, Profile, Games)
+# CORE ROUTES (Dashboard, Profile)
 # =========================================================
 @app.route("/")
 @app.route("/dashboard")
@@ -348,7 +347,29 @@ def profile():
     return render_template("profile.html", user=user, my_uploads=my_uploads, post_count=len(my_uploads))
 
 # =========================================================
-# ROUTES: GALLERY & PHASE 18/19 (SAAS LIMIT & PRO)
+# PUBLIC PORTFOLIO (NEW - PHASE 20)
+# =========================================================
+@app.route("/agent/<username>")
+def agent_profile(username):
+    if "username" not in session: return redirect(url_for("login"))
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT * FROM users WHERE username = %s", (username,))
+    agent = c.fetchone()
+    
+    if not agent:
+        flash("Agent not found.", "error")
+        conn.close()
+        return redirect(url_for("dashboard"))
+        
+    c.execute("SELECT * FROM media WHERE uploaded_by = %s AND approved = 1 AND filename != 'SHAYARI_TEXT' ORDER BY id DESC", (username,))
+    agent_uploads = c.fetchall()
+    conn.close()
+    
+    return render_template("agent.html", agent=agent, uploads=agent_uploads, post_count=len(agent_uploads))
+
+# =========================================================
+# SAAS PRO TIER & GALLERY
 # =========================================================
 @app.route("/pro", methods=["GET", "POST"])
 def pro_upgrade():
@@ -360,7 +381,7 @@ def pro_upgrade():
         conn.commit()
         conn.close()
         session["role"] = "pro"
-        flash("🎉 Payment Successful! You are now a PRO Agent! Enjoy Unlimited Access.", "success")
+        flash("🎉 Payment Successful! You are now a PRO Agent! Enjoy Unlimited Access & Verified Badge.", "success")
         return redirect(url_for("dashboard"))
     return render_template("pro.html")
 
@@ -372,7 +393,6 @@ def gallery(category):
     c = conn.cursor()
     
     if request.method == "POST":
-        # SAAS LIMIT: Bypass if admin or pro
         user_role = session.get("role", "user")
         if user_role not in ["admin", "pro"]:
             c.execute("SELECT COUNT(id) as cnt FROM media WHERE uploaded_by = %s", (session["username"],))
@@ -402,7 +422,7 @@ def gallery(category):
     if category == 'Shayari': c.execute("SELECT m.*, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.category = %s AND m.approved = 1 ORDER BY m.id DESC", (category,))
     media_files = c.fetchall()
     
-    c.execute("SELECT * FROM comments ORDER BY id ASC")
+    c.execute("SELECT c.*, u.role FROM comments c JOIN users u ON c.username = u.username ORDER BY c.id ASC")
     comments_db = c.fetchall()
     conn.close()
 
@@ -434,7 +454,7 @@ def leaderboard():
     return render_template("leaderboard.html", leaders=leaders)
 
 # =========================================================
-# ROUTES: AI STUDIO
+# AI STUDIO, LIKES, COMMENTS
 # =========================================================
 @app.route("/ai-studio", methods=["GET", "POST"])
 def ai_studio():
@@ -469,9 +489,13 @@ def ai_studio():
             
     return render_template("ai_studio.html")
 
-# =========================================================
-# LIKES & COMMENTS
-# =========================================================
+@app.route("/api/ai", methods=["POST"])
+def ai_endpoint():
+    if "username" not in session: return jsonify({"reply": "Login first."}), 401
+    try: reply = get_ai_response(request.get_json(silent=True).get("query", "")[:1000])
+    except: reply = "Assistant unavailable."
+    return jsonify({"reply": reply})
+
 @app.route("/like/<int:media_id>", methods=["POST"])
 def like(media_id):
     if "username" not in session: return jsonify({"error": "Login required."}), 401
@@ -559,16 +583,16 @@ def admin_user_action(user_id, action):
     
     if action == "ban":
         c.execute("UPDATE users SET status = 'BANNED' WHERE id = %s", (user_id,))
-        flash("Agent Suspended successfully!", "success")
+        flash("Agent Suspended!", "success")
     elif action == "unban":
         c.execute("UPDATE users SET status = 'ACTIVE' WHERE id = %s", (user_id,))
         flash("Agent Reactivated!", "success")
     elif action == "make_admin":
         c.execute("UPDATE users SET role = 'admin' WHERE id = %s", (user_id,))
-        flash("Agent promoted to Admin HQ!", "success")
+        flash("Promoted to Admin HQ!", "success")
     elif action == "make_pro":
         c.execute("UPDATE users SET role = 'pro' WHERE id = %s", (user_id,))
-        flash("Agent granted PRO status manually!", "success")
+        flash("Granted PRO status manually!", "success")
         
     conn.commit()
     conn.close()
