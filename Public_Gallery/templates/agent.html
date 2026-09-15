@@ -1,6 +1,15 @@
 {% extends "base.html" %}
 {% block title %}{{ agent.username }}'s Portfolio | Apna Gallery{% endblock %}
 
+{% block head %}
+<!-- MAGICAL THEME OVERRIDE -->
+<style>
+    :root {
+        --accent: {% if agent.theme == 'gold' %}#fbbf24{% elif agent.theme == 'rose' %}#f43f5e{% elif agent.theme == 'matrix' %}#22c55e{% else %}#38bdf8{% endif %} !important;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div style="text-align: center; margin-bottom: 40px; padding: 40px; background: var(--bg-card); border-radius: 20px; border: 1px solid var(--border-color); box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
     
@@ -26,7 +35,6 @@
         <span style="background: rgba(8,17,31,0.6); padding: 8px 15px; border-radius: 8px; color: var(--accent);">🫂 {{ following_count }} Following</span>
     </div>
 
-    <!-- BUTTONS -->
     {% if session.username != agent.username %}
         <div style="display: flex; gap: 15px; justify-content: center;">
             <button id="follow-btn" onclick="toggleFollow('{{ agent.username }}')" class="btn" style="
@@ -39,7 +47,6 @@
                 {% if is_following %}Unfollow{% else %}Follow{% endif %}
             </button>
             
-            <!-- MESSAGE BUTTON -->
             <a href="{{ url_for('chat', username=agent.username) }}" class="btn" style="background: #334155; color: white; padding: 10px 30px; font-size: 1.1rem; border-radius: 20px; text-decoration: none;">💬 Message</a>
         </div>
     {% endif %}
