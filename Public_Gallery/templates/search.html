@@ -2,34 +2,72 @@
 {% block title %}Search Results | Apna Gallery{% endblock %}
 
 {% block content %}
-<div style="margin-bottom: 30px;">
-    <h1 style="color: var(--accent); margin: 0;">🔍 Search Results for "{{ query }}"</h1>
-    <a href="{{ url_for('dashboard') }}" class="btn" style="background: #334155; color: white; margin-top: 15px;">&larr; Back to HQ</a>
+<div style="text-align: center; margin-bottom: 30px;">
+    <h1 style="color: var(--accent); margin: 0;">Search Results</h1>
+    <p style="color: var(--text-muted);">Showing results for "<strong>{{ query }}</strong>"</p>
 </div>
 
-<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 25px;">
-    {% for item in media_files %}
-    <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 10px 20px rgba(0,0,0,0.2);">
-        <div style="width: 100%; height: 220px; background: #000; display: flex; align-items: center; justify-content: center; overflow: hidden;">
-            {% if item.category == 'Photo' %}
-                <img src="{{ item.filename }}" alt="{{ item.title }}" style="width: 100%; height: 100%; object-fit: cover;">
-            {% elif item.category == 'Video' %}
-                <video src="{{ item.filename }}" controls style="width: 100%; height: 100%; object-fit: cover;"></video>
-            {% else %}
-                <span style="font-size: 4rem;">📁</span>
-            {% endif %}
-        </div>
-        <div style="padding: 20px;">
-            <h3 style="margin: 0 0 10px 0; color: var(--text-main); font-size: 1.2rem;">{{ item.title }}</h3>
-            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px;">Vault: <span style="color: var(--accent);">{{ item.category }}</span></p>
-            <p style="font-size: 0.85rem; color: var(--danger); font-weight: bold;">❤️ {{ item.likes }} Likes</p>
-        </div>
-    </div>
-    {% else %}
-    <div style="grid-column: 1 / -1; text-align: center; padding: 50px; background: var(--bg-card); border-radius: 16px; border: 1px solid var(--border-color);">
-        <span style="font-size: 4rem;">🕵️‍♂️</span>
-        <h2 style="color: var(--text-muted);">No assets found for "{{ query }}"</h2>
-    </div>
-    {% endfor %}
+<!-- TABS -->
+<div style="display: flex; justify-content: center; gap: 20px; margin-bottom: 30px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
+    <button onclick="showTab('assets')" id="tab-assets" style="background: none; border: none; color: var(--accent); font-size: 1.2rem; font-weight: bold; cursor: pointer; border-bottom: 3px solid var(--accent); padding-bottom: 5px;">🖼️ Assets ({{ media_files|length }})</button>
+    <button onclick="showTab('agents')" id="tab-agents" style="background: none; border: none; color: var(--text-muted); font-size: 1.2rem; font-weight: bold; cursor: pointer; padding-bottom: 5px;">🕵️‍♂️ Agents ({{ found_users|length }})</button>
 </div>
+
+<!-- ASSETS TAB -->
+<div id="content-assets">
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px;">
+        {% for item in media_files %}
+        <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px;">
+            <div style="height: 180px; background: #000; border-radius: 8px; margin-bottom: 10px; overflow: hidden; display: grid; place-items: center;">
+                {% if item.category == 'Photo' %}<img src="{{ item.filename }}" style="width: 100%; height: 100%; object-fit: cover;">
+                {% elif item.category == 'Video' %}<video src="{{ item.filename }}" controls style="width: 100%; height: 100%; object-fit: cover;"></video>
+                {% else %}<span style="font-size: 3rem;">📁</span>{% endif %}
+            </div>
+            <p style="margin: 0; font-weight: bold; font-size: 1.1rem;">{{ item.title }}</p>
+            <p style="margin: 5px 0 0 0; font-size: 0.85rem; color: var(--text-muted);">By: <a href="{{ url_for('agent_profile', username=item.uploaded_by) }}" style="color: var(--accent); text-decoration: none;">{{ item.uploaded_by }}</a></p>
+        </div>
+        {% else %}
+        <p style="grid-column: 1 / -1; text-align: center; color: var(--text-muted); font-size: 1.2rem; padding: 40px;">No assets found for "{{ query }}".</p>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- AGENTS TAB -->
+<div id="content-agents" style="display: none;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px;">
+        {% for user in found_users %}
+        <a href="{{ url_for('agent_profile', username=user.username) }}" style="text-decoration: none; color: inherit;">
+            <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; display: flex; align-items: center; gap: 15px; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                {% if user.profile_pic %}
+                    <img src="{{ user.profile_pic }}" style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover; border: 2px solid var(--accent);">
+                {% else %}
+                    <div style="width: 60px; height: 60px; border-radius: 50%; background: #1e293b; border: 2px solid var(--accent); display: grid; place-items: center; font-size: 1.5rem;">👤</div>
+                {% endif %}
+                <div>
+                    <h3 style="margin: 0; display: flex; align-items: center; gap: 5px;">
+                        {{ user.username }}
+                        {% if user.role in ['admin', 'pro'] %}<span style="color: #38bdf8; font-size: 1.1rem;">☑️</span>{% endif %}
+                    </h3>
+                    <p style="margin: 5px 0 0 0; color: var(--text-muted); font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px;">{{ user.bio or 'No bio available' }}</p>
+                </div>
+            </div>
+        </a>
+        {% else %}
+        <p style="grid-column: 1 / -1; text-align: center; color: var(--text-muted); font-size: 1.2rem; padding: 40px;">No agents found for "{{ query }}".</p>
+        {% endfor %}
+    </div>
+</div>
+
+<script>
+function showTab(tabName) {
+    document.getElementById('content-assets').style.display = tabName === 'assets' ? 'block' : 'none';
+    document.getElementById('content-agents').style.display = tabName === 'agents' ? 'block' : 'none';
+    
+    document.getElementById('tab-assets').style.color = tabName === 'assets' ? 'var(--accent)' : 'var(--text-muted)';
+    document.getElementById('tab-assets').style.borderBottom = tabName === 'assets' ? '3px solid var(--accent)' : 'none';
+    
+    document.getElementById('tab-agents').style.color = tabName === 'agents' ? 'var(--accent)' : 'var(--text-muted)';
+    document.getElementById('tab-agents').style.borderBottom = tabName === 'agents' ? '3px solid var(--accent)' : 'none';
+}
+</script>
 {% endblock %}
