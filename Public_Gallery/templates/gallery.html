@@ -1,187 +1,98 @@
 {% extends "base.html" %}
-
 {% block title %}{{ category }} Vault | Apna Gallery{% endblock %}
 
-{% block head %}
-<style>
-    .upload-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; padding: 30px; margin-bottom: 40px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
-    .upload-card h2 { color: var(--accent); margin-top: 0; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; }
-    .form-group { margin-bottom: 15px; }
-    .form-group label { display: block; margin-bottom: 8px; color: var(--text-muted); font-weight: 600; font-size: 0.95rem; }
-    .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(8, 17, 31, 0.6); color: white; box-sizing: border-box; outline: none; }
-    .form-group input:focus, .form-group textarea:focus { border-color: var(--accent); }
-    
-    .media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 25px; }
-    .media-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 10px 20px rgba(0,0,0,0.2); transition: transform 0.3s; }
-    .media-card:hover { transform: translateY(-5px); border-color: var(--accent); }
-    
-    .media-content { width: 100%; height: 220px; background: #000; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; cursor: pointer; }
-    .media-content img, .media-content video { width: 100%; height: 100%; object-fit: cover; transition: 0.3s; }
-    .media-content img:hover { opacity: 0.8; transform: scale(1.05); }
-    .media-content audio { width: 90%; }
-    .media-content .doc-icon { font-size: 4rem; }
-    
-    .media-details { padding: 20px; flex: 1; display: flex; flex-direction: column; }
-    .media-title { margin: 0 0 10px 0; color: var(--text-main); font-size: 1.2rem; }
-    .media-meta { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px; }
-    .media-meta span { color: var(--accent); font-weight: bold; }
-    
-    .action-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-top: 1px solid var(--border-color); padding-top: 15px; }
-    .btn-like { background: transparent; border: 1px solid var(--danger); color: var(--danger); padding: 6px 12px; border-radius: 6px; cursor: pointer; transition: 0.2s; font-weight: bold; }
-    .btn-like:hover, .btn-like.liked { background: var(--danger); color: white; }
-    .btn-share { background: transparent; border: 1px solid var(--accent); color: var(--accent); padding: 6px 12px; border-radius: 6px; cursor: pointer; transition: 0.2s; font-weight: bold; }
-    .btn-share:hover { background: var(--accent); color: #000; }
-    
-    .comments-section { background: rgba(8, 17, 31, 0.4); border-radius: 8px; padding: 10px; flex: 1; }
-    .comments-list { max-height: 120px; overflow-y: auto; margin-bottom: 10px; font-size: 0.85rem; }
-    .comment-item { margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 5px; }
-    .comment-item strong { color: var(--accent); }
-    .comment-form { display: flex; gap: 10px; }
-    .comment-form input { flex: 1; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(8, 17, 31, 0.8); color: white; outline: none; }
-    .comment-form button { background: var(--accent); border: none; color: #000; padding: 8px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; }
-    
-    /* Lightbox CSS */
-    #lightbox { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 9999; justify-content: center; align-items: center; flex-direction: column; backdrop-filter: blur(5px); }
-    #lightbox-img { max-width: 90%; max-height: 75vh; border-radius: 12px; box-shadow: 0 0 30px rgba(56, 189, 248, 0.3); }
-    .close-btn { position: absolute; top: 20px; right: 40px; font-size: 3rem; color: white; cursor: pointer; transition: 0.2s; }
-    .close-btn:hover { color: var(--danger); }
-
-    /* Toast Notification */
-    #toast { visibility: hidden; min-width: 250px; background-color: var(--success); color: white; text-align: center; border-radius: 8px; padding: 16px; position: fixed; z-index: 10000; left: 50%; bottom: 30px; transform: translateX(-50%); font-weight: bold; font-size: 1rem; box-shadow: 0 5px 15px rgba(0,0,0,0.4); }
-    #toast.show { visibility: visible; animation: fadein 0.5s, fadeout 0.5s 2.5s; }
-    @keyframes fadein { from { bottom: 0; opacity: 0; } to { bottom: 30px; opacity: 1; } }
-    @keyframes fadeout { from { bottom: 30px; opacity: 1; } to { bottom: 0; opacity: 0; } }
-</style>
-{% endblock %}
-
 {% block content %}
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+<div style="text-align: center; margin-bottom: 40px;">
     <h1 style="color: var(--accent); margin: 0;">{{ category }} Vault</h1>
-    <a href="{{ url_for('dashboard') }}" class="btn" style="background: #334155; color: white;">&larr; Back to HQ</a>
+    <p style="color: var(--text-muted);">Explore the secure collection.</p>
 </div>
 
-<!-- Upload Form -->
-<div class="upload-card">
-    <h2>Secure Asset Upload</h2>
-    <form method="POST" enctype="multipart/form-data">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <div class="form-group"><label>Asset Title</label><input type="text" name="title" placeholder="Enter a secure title..." required></div>
-        {% if category != 'Shayari' %}
-        <div class="form-group"><label>Select File (Max 50MB)</label><input type="file" name="media" required></div>
-        {% endif %}
-        <div class="form-group"><label>{% if category == 'Shayari' %}Write Shayari / Text{% else %}Description / Prompt (Optional){% endif %}</label><textarea name="prompt" rows="3" {% if category == 'Shayari' %}required{% endif %} placeholder="Context details..."></textarea></div>
-        <button type="submit" class="btn" style="width: 100%; font-size: 1.1rem; padding: 12px;">Transmit Asset</button>
-    </form>
-</div>
-
-<!-- Media Display Grid -->
-<div class="media-grid">
+<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 30px;">
     {% for item in media_files %}
-    <div class="media-card">
-        <div class="media-content">
-            {% if category == 'Shayari' %}
-                <div style="padding: 20px; text-align: center; color: white; font-style: italic; background: linear-gradient(135deg, #1e293b, #0f172a); width: 100%; height: 100%; display: grid; place-items: center; overflow-y: auto;">"{{ item.prompt }}"</div>
-            {% elif category == 'Photo' %}
-                <!-- ADDED LAZY LOADING -->
-                <img src="{{ item.filename }}" alt="{{ item.title }}" loading="lazy" onclick="openLightbox('{{ item.filename }}')">
-            {% elif category == 'Video' %}
-                <video src="{{ item.filename }}" controls preload="metadata"></video>
-            {% elif category == 'Music' %}
-                <audio src="{{ item.filename }}" controls preload="metadata"></audio>
-            {% elif category == 'Document' %}
-                <a href="{{ item.filename }}" target="_blank" style="text-decoration: none; color: inherit; display: flex; flex-direction: column; align-items: center;"><span class="doc-icon">📄</span><span style="margin-top: 10px; color: var(--accent);">View Document</span></a>
+    <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; overflow: hidden; box-shadow: 0 10px 20px rgba(0,0,0,0.2); display: flex; flex-direction: column;">
+        
+        <div style="height: 200px; background: #000; position: relative; display: flex; justify-content: center; align-items: center; overflow: hidden;">
+            {% if item.category == 'Photo' %}
+                <img src="{{ item.filename }}" style="width: 100%; height: 100%; object-fit: cover;">
+            {% elif item.category == 'Video' %}
+                <video src="{{ item.filename }}" controls style="width: 100%; height: 100%; object-fit: cover;"></video>
+            {% elif item.category == 'Music' %}
+                <div style="width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: linear-gradient(135deg, rgba(8,17,31,1), rgba(15,23,42,1)); padding: 20px; box-sizing: border-box;">
+                    <span style="font-size: 3rem; margin-bottom: 10px; filter: drop-shadow(0 0 10px var(--accent));">🎵</span>
+                    <audio src="{{ item.filename }}" controls style="width: 100%; outline: none;"></audio>
+                </div>
+            {% else %}
+                <span style="font-size: 4rem;">📁</span>
             {% endif %}
+            
+            <a href="{{ url_for('agent_profile', username=item.uploaded_by) }}" style="position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.7); color: white; padding: 5px 10px; border-radius: 8px; font-size: 0.8rem; text-decoration: none; border: 1px solid var(--border-color);">
+                @{{ item.uploaded_by }}
+            </a>
+            <a href="{{ item.filename }}" download target="_blank" style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7); color: white; padding: 5px 10px; border-radius: 8px; font-size: 0.8rem; text-decoration: none; border: 1px solid var(--border-color);">
+                ⬇️ Download
+            </a>
         </div>
         
-        <div class="media-details">
-            <h3 class="media-title">{{ item.title }}</h3>
-            <p class="media-meta">Uploader: <span>{{ item.uploaded_by }}</span></p>
-            {% if category != 'Shayari' and item.prompt %}
-                <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 15px; font-style: italic;">"{{ item.prompt }}"</p>
-            {% endif %}
+        <div style="padding: 15px; flex: 1; display: flex; flex-direction: column;">
+            <h3 style="margin: 0 0 10px 0; color: var(--text-main); font-size: 1.1rem; line-height: 1.4;">{{ item.title | format_text | safe }}</h3>
             
-            <!-- ADDED SHARE BUTTON HERE -->
-            <div class="action-bar">
-                <button class="btn-like" id="like-btn-{{ item.id }}" onclick="toggleLike({{ item.id }})">❤️ <span id="like-count-{{ item.id }}">{{ item.likes }}</span></button>
-                <div style="display: flex; gap: 10px; align-items: center;">
-                    <span style="font-size: 0.85rem; color: var(--text-muted);">#{{ item.id }}</span>
-                    {% if category in ['Photo', 'Video'] %}
-                    <button class="btn-share" onclick="shareAsset('{{ item.filename }}')">🔗 Share</button>
-                    {% endif %}
-                </div>
+            <div style="display: flex; gap: 10px; align-items: center; margin-top: auto; padding-top: 10px; border-top: 1px solid var(--border-color);">
+                <button class="btn" id="like-btn-{{ item.id }}" onclick="toggleLike({{ item.id }})" style="background: transparent; border: 1px solid var(--danger); color: var(--danger); padding: 5px 10px; font-size: 0.9rem;">
+                    ❤️ <span id="like-count-{{ item.id }}">{{ item.likes }}</span>
+                </button>
+                <button class="btn" id="bookmark-btn-{{ item.id }}" onclick="toggleBookmark({{ item.id }})" style="background: transparent; border: 1px solid var(--warning); color: var(--warning); padding: 5px 10px; font-size: 0.9rem;">
+                    {% if item.id in saved_ids %}📌 Saved{% else %}📍 Save{% endif %}
+                </button>
             </div>
             
-            <div class="comments-section">
-                <div class="comments-list">
+            <div style="margin-top: 15px;">
+                <div style="max-height: 80px; overflow-y: auto; margin-bottom: 10px; font-size: 0.85rem; padding: 10px; background: rgba(8,17,31,0.5); border-radius: 8px;">
                     {% if comments and comments[item.id] %}
                         {% for c in comments[item.id] %}
-                            <div class="comment-item"><strong>{{ c.username }}:</strong> {{ c.comment_text }}</div>
+                            <div style="margin-bottom: 5px;">
+                                <strong style="color: var(--accent);">{{ c.username }}</strong>: {{ c.comment_text | format_text | safe }}
+                            </div>
                         {% endfor %}
                     {% else %}
                         <div style="color: var(--text-muted); font-style: italic;">No comments yet.</div>
                     {% endif %}
                 </div>
-                <form class="comment-form" method="POST" action="{{ url_for('add_comment', media_id=item.id) }}">
+                <form method="POST" action="{{ url_for('add_comment', media_id=item.id) }}" style="display: flex; gap: 5px;">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <input type="text" name="comment_text" placeholder="Write a comment..." required>
-                    <button type="submit">Post</button>
+                    <input type="text" name="comment_text" placeholder="Add comment..." required style="flex: 1; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(8, 17, 31, 0.8); color: white; outline: none; font-size: 0.85rem;">
+                    <button type="submit" class="btn" style="padding: 8px; font-size: 0.85rem;">Post</button>
                 </form>
             </div>
+            
         </div>
     </div>
     {% else %}
-    <p style="color: var(--text-muted); font-size: 1.1rem; grid-column: 1 / -1; text-align: center; padding: 40px; background: var(--bg-card); border-radius: 16px; border: 1px solid var(--border-color);">No assets found in the {{ category }} vault.</p>
+    <div style="grid-column: 1 / -1; text-align: center; padding: 50px; background: var(--bg-card); border-radius: 16px; border: 1px solid var(--border-color);">
+        <span style="font-size: 4rem;">📭</span>
+        <h2 style="color: var(--text-muted); margin-top: 15px;">Empty Vault</h2>
+        <p style="color: var(--text-muted);">Be the first agent to upload something here!</p>
+    </div>
     {% endfor %}
 </div>
 
-<!-- Lightbox Modal -->
-<div id="lightbox">
-    <span class="close-btn" onclick="closeLightbox()">&times;</span>
-    <img id="lightbox-img" src="" alt="Zoomed Image">
-    <a id="lightbox-download" href="" target="_blank" download class="btn" style="margin-top: 25px; font-size: 1.1rem; background: var(--success); color: white;">
-        ⬇️ Download Original
-    </a>
-</div>
-
-<!-- Toast Notification -->
-<div id="toast">✅ Link Copied! Ready to share.</div>
-
 <script>
-// Like Script
 async function toggleLike(mediaId) {
     try {
         const response = await fetch(`/like/${mediaId}`, { method: 'POST', headers: { 'X-CSRF-Token': '{{ csrf_token() }}' } });
         const data = await response.json();
-        if (response.ok) {
-            document.getElementById(`like-count-${mediaId}`).innerText = data.likes;
-            const btn = document.getElementById(`like-btn-${mediaId}`);
-            if (data.liked) { btn.classList.add('liked'); }
-        } else { alert(data.error || "Error liking asset."); }
+        if (response.ok) { document.getElementById(`like-count-${mediaId}`).innerText = data.likes; }
     } catch (e) { console.error("Like error:", e); }
 }
 
-// Lightbox Scripts
-function openLightbox(imageSrc) {
-    document.getElementById('lightbox').style.display = 'flex';
-    document.getElementById('lightbox-img').src = imageSrc;
-    document.getElementById('lightbox-download').href = imageSrc;
-}
-function closeLightbox() {
-    document.getElementById('lightbox').style.display = 'none';
-}
-document.getElementById('lightbox').addEventListener('click', function(e) {
-    if (e.target === this) { closeLightbox(); }
-});
-
-// Share Feature (Copy to Clipboard)
-function shareAsset(url) {
-    navigator.clipboard.writeText(url).then(() => {
-        var toast = document.getElementById("toast");
-        toast.className = "show";
-        setTimeout(function(){ toast.className = toast.className.replace("show", ""); }, 3000);
-    }).catch(err => {
-        console.error('Failed to copy: ', err);
-    });
+async function toggleBookmark(mediaId) {
+    try {
+        const response = await fetch(`/bookmark/${mediaId}`, { method: 'POST', headers: { 'X-CSRF-Token': '{{ csrf_token() }}' } });
+        const data = await response.json();
+        if (response.ok) {
+            const btn = document.getElementById(`bookmark-btn-${mediaId}`);
+            btn.innerHTML = data.bookmarked ? '📌 Saved' : '📍 Save';
+        }
+    } catch (e) { console.error("Bookmark error:", e); }
 }
 </script>
 {% endblock %}
