@@ -14,16 +14,21 @@
         <a href="{{ url_for('chat', username=contact.username) }}" style="text-decoration: none; color: inherit;">
             <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 5px 15px rgba(0,0,0,0.2); transition: transform 0.2s;">
                 
-                <div style="display: flex; align-items: center; gap: 15px;">
+                <div style="display: flex; align-items: center; gap: 15px; position: relative;">
                     {% if contact.profile_pic %}
                         <img src="{{ contact.profile_pic }}" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid var(--accent);">
                     {% else %}
                         <div style="width: 50px; height: 50px; border-radius: 50%; background: #1e293b; border: 2px solid var(--accent); display: grid; place-items: center; font-size: 1.5rem;">👤</div>
                     {% endif %}
                     
+                    <!-- NEW: ONLINE STATUS DOT -->
+                    {% if contact.last_active | is_online %}
+                        <div style="position: absolute; bottom: 0; left: 35px; width: 14px; height: 14px; background: #22c55e; border-radius: 50%; border: 2px solid var(--bg-card); box-shadow: 0 0 5px #22c55e;" title="Online Now"></div>
+                    {% endif %}
+
                     <h3 style="margin: 0; display: flex; align-items: center; gap: 5px;">
                         {{ contact.username }}
-                        {% if contact.role in ['pro', 'admin'] %}
+                        {% if contact.role == 'admin' %}
                             <span style="color: #38bdf8; font-size: 1.1rem;">☑️</span>
                         {% endif %}
                     </h3>
@@ -41,10 +46,9 @@
         <div style="text-align: center; padding: 50px; background: var(--bg-card); border-radius: 16px; border: 1px solid var(--border-color);">
             <span style="font-size: 4rem;">📭</span>
             <h2 style="color: var(--text-muted); margin-top: 15px;">Your inbox is empty.</h2>
-            <p style="color: var(--text-muted);">Go to a user's profile and click "Message" to start chatting!</p>
+            <p style="color: var(--text-muted);">Go to an agent's profile and click "Message" to start chatting!</p>
         </div>
         {% endfor %}
     </div>
-
 </div>
 {% endblock %}
