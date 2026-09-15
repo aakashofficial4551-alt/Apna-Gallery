@@ -2,28 +2,20 @@
 {% block title %}Agent Profile | Apna Gallery{% endblock %}
 
 {% block content %}
-
-<!-- COVER PHOTO BANNER -->
-<div style="height: 250px; border-radius: 20px 20px 0 0; background: #1e293b url('{{ user.cover_pic or '' }}') center/cover; position: relative; border: 1px solid var(--border-color); border-bottom: none;">
-    <button onclick="document.getElementById('coverInput').click()" style="position: absolute; top: 20px; right: 20px; background: rgba(0,0,0,0.6); color: white; border: 1px solid rgba(255,255,255,0.3); padding: 8px 15px; border-radius: 8px; cursor: pointer; backdrop-filter: blur(5px);">✏️ Edit Cover</button>
-    <form id="coverForm" method="POST" enctype="multipart/form-data" style="display: none;">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <input type="hidden" name="action" value="cover">
-        <input type="file" id="coverInput" name="cover_pic" accept="image/*" onchange="document.getElementById('coverForm').submit()">
-    </form>
-</div>
-
-<!-- PROFILE INFO CONTAINER -->
-<div style="background: var(--bg-card); padding: 20px 30px 30px 30px; border-radius: 0 0 20px 20px; border: 1px solid var(--border-color); border-top: none; margin-bottom: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); display: flex; gap: 30px; flex-wrap: wrap;">
+<div style="display: flex; gap: 30px; align-items: center; flex-wrap: wrap; background: var(--bg-card); padding: 30px; border-radius: 20px; border: 1px solid var(--border-color); margin-bottom: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); position: relative;">
     
-    <!-- AVATAR OVERLAPPING COVER -->
-    <div style="position: relative; cursor: pointer; margin-top: -60px;" onclick="document.getElementById('avatarInput').click()">
+    <div style="position: absolute; top: 20px; right: 20px; display: flex; gap: 10px;">
+        <button onclick="shareProfile()" class="btn" style="background: rgba(34, 197, 94, 0.2); border: 1px solid var(--success); color: var(--success);">🔗 Share</button>
+        <button onclick="document.getElementById('idCardModal').style.display='flex'" class="btn" style="background: rgba(56, 189, 248, 0.2); border: 1px solid var(--accent); color: var(--accent);">💳 ID Card</button>
+    </div>
+
+    <div style="position: relative; cursor: pointer;" onclick="document.getElementById('avatarInput').click()">
         {% if user.profile_pic %}
-            <img src="{{ user.profile_pic }}" style="width: 140px; height: 140px; border-radius: 50%; object-fit: cover; border: 6px solid var(--bg-main);">
+            <img src="{{ user.profile_pic }}" style="width: 130px; height: 130px; border-radius: 50%; object-fit: cover; border: 4px solid var(--accent);">
         {% else %}
-            <div style="width: 140px; height: 140px; border-radius: 50%; background: #1e293b; border: 6px solid var(--bg-main); display: grid; place-items: center; font-size: 4rem;">👤</div>
+            <div style="width: 130px; height: 130px; border-radius: 50%; background: #1e293b; border: 4px solid var(--accent); display: grid; place-items: center; font-size: 4rem;">👤</div>
         {% endif %}
-        <div style="position: absolute; bottom: 10px; right: 10px; background: var(--accent); color: #000; border-radius: 50%; width: 35px; height: 35px; display: grid; place-items: center; font-size: 1.2rem; font-weight: bold;">+</div>
+        <div style="position: absolute; bottom: 0; right: 0; background: var(--accent); color: #000; border-radius: 50%; width: 35px; height: 35px; display: grid; place-items: center; font-size: 1.2rem; font-weight: bold;">+</div>
     </div>
     
     <form id="avatarForm" method="POST" enctype="multipart/form-data" style="display: none;">
@@ -32,51 +24,30 @@
         <input type="file" id="avatarInput" name="profile_pic" accept="image/*" onchange="document.getElementById('avatarForm').submit()">
     </form>
 
-    <!-- INFO -->
-    <div style="flex: 1; padding-top: 10px;">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap;">
-            <div>
-                <h1 style="color: var(--accent); margin: 0 0 10px 0; display: flex; align-items: center; gap: 8px;">
-                    {{ user.username }}
-                    {% if user.role == 'admin' %}
-                        <span style="color: #38bdf8; font-size: 1.5rem;" title="Admin / Verified">☑️</span>
-                    {% endif %}
-                </h1>
-                
-                <div style="display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap;">
-                    {% if post_count >= 1 %}<span style="background: rgba(168, 85, 247, 0.2); border: 1px solid #a855f7; color: #a855f7; padding: 3px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: bold;">🌱 Starter</span>{% endif %}
-                    {% if post_count >= 10 %}<span style="background: rgba(244, 63, 94, 0.2); border: 1px solid var(--danger); color: var(--danger); padding: 3px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: bold;">🔥 Veteran</span>{% endif %}
-                    {% if followers_count >= 5 %}<span style="background: rgba(251, 191, 36, 0.2); border: 1px solid var(--warning); color: var(--warning); padding: 3px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: bold;">🌟 Rising Star</span>{% endif %}
-                </div>
+    <div style="flex: 1;">
+        <h1 style="color: var(--accent); margin: 0 0 10px 0; display: flex; align-items: center; gap: 8px;">
+            {{ user.username }}
+            {% if user.role == 'admin' %}
+                <span style="color: #38bdf8; font-size: 1.5rem;" title="Verified Admin">☑️</span>
+            {% endif %}
+        </h1>
+        
+        <div style="display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap;">
+            {% if post_count >= 1 %}<span style="background: rgba(168, 85, 247, 0.2); border: 1px solid #a855f7; color: #a855f7; padding: 3px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: bold;">🌱 Starter</span>{% endif %}
+            {% if post_count >= 10 %}<span style="background: rgba(244, 63, 94, 0.2); border: 1px solid var(--danger); color: var(--danger); padding: 3px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: bold;">🔥 Veteran</span>{% endif %}
+            {% if followers_count >= 5 %}<span style="background: rgba(251, 191, 36, 0.2); border: 1px solid var(--warning); color: var(--warning); padding: 3px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: bold;">🌟 Rising Star</span>{% endif %}
+        </div>
 
-                <p style="color: var(--text-muted); margin: 0 0 15px 0; font-size: 1.1rem;">{{ user.bio or 'Hello! I am an agent at Apna Gallery.' }}</p>
-                
-                <div style="display: flex; gap: 15px; margin-bottom: 15px;">
-                    <span style="color: var(--text-main);"><strong>{{ followers_count }}</strong> <span style="color: var(--text-muted);">Followers</span></span>
-                    <span style="color: var(--text-main);"><strong>{{ following_count }}</strong> <span style="color: var(--text-muted);">Following</span></span>
-                </div>
-            </div>
-
-            <!-- BUTTONS -->
-            <div style="display: flex; gap: 10px; flex-direction: column; align-items: flex-end;">
-                <button onclick="shareProfile()" class="btn" style="background: rgba(34, 197, 94, 0.2); border: 1px solid var(--success); color: var(--success); width: 100%;">🔗 Share Profile</button>
-                <button onclick="document.getElementById('idCardModal').style.display='flex'" class="btn" style="background: rgba(56, 189, 248, 0.2); border: 1px solid var(--accent); color: var(--accent); width: 100%;">💳 ID Card</button>
-                
-                <!-- THEME SELECTOR (100% FREE NOW) -->
-                <form method="POST" style="margin-top: 10px;">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <input type="hidden" name="action" value="theme">
-                    <select name="theme" onchange="this.form.submit()" style="background: rgba(8,17,31,0.8); color: white; border: 1px solid var(--border-color); padding: 8px; border-radius: 6px; outline: none; cursor: pointer;">
-                        <option value="cyan" {% if user.theme == 'cyan' %}selected{% endif %}>🎨 Theme: Cyan</option>
-                        <option value="gold" {% if user.theme == 'gold' %}selected{% endif %}>🎨 Theme: Gold</option>
-                        <option value="rose" {% if user.theme == 'rose' %}selected{% endif %}>🎨 Theme: Rose</option>
-                        <option value="matrix" {% if user.theme == 'matrix' %}selected{% endif %}>🎨 Theme: Matrix</option>
-                    </select>
-                </form>
-            </div>
+        <p style="color: var(--text-muted); margin: 0 0 15px 0;">{{ user.bio }}</p>
+        
+        <!-- NEW: CLICKABLE NETWORK STATS -->
+        <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+            <span onclick="openNetworkModal('followers', '{{ user.username }}')" style="background: rgba(8,17,31,0.6); padding: 5px 10px; border-radius: 6px; font-size: 0.9rem; color: var(--success); cursor: pointer; transition: 0.2s;" onmouseover="this.style.background='rgba(8,17,31,0.9)'" onmouseout="this.style.background='rgba(8,17,31,0.6)'">👥 {{ followers_count }} Followers</span>
+            
+            <span onclick="openNetworkModal('following', '{{ user.username }}')" style="background: rgba(8,17,31,0.6); padding: 5px 10px; border-radius: 6px; font-size: 0.9rem; color: var(--accent); cursor: pointer; transition: 0.2s;" onmouseover="this.style.background='rgba(8,17,31,0.9)'" onmouseout="this.style.background='rgba(8,17,31,0.6)'">🫂 {{ following_count }} Following</span>
         </div>
         
-        <div style="display: flex; gap: 10px; align-items: center; border-top: 1px solid var(--border-color); padding-top: 15px;">
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
             <form id="storyForm" method="POST" enctype="multipart/form-data">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="action" value="story">
@@ -86,10 +57,22 @@
                 </label>
             </form>
         </div>
+
+        <form method="POST" style="margin-top: 15px; display: inline-flex; gap: 10px; align-items: center;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="action" value="theme">
+            <span style="color: var(--text-muted); font-size: 0.9rem;">🎨 Theme:</span>
+            <select name="theme" onchange="this.form.submit()" style="background: rgba(8,17,31,0.8); color: white; border: 1px solid var(--border-color); padding: 8px; border-radius: 6px; outline: none;">
+                <option value="cyan" {% if user.theme == 'cyan' %}selected{% endif %}>Cyan</option>
+                <option value="gold" {% if user.theme == 'gold' %}selected{% endif %}>Gold</option>
+                <option value="rose" {% if user.theme == 'rose' %}selected{% endif %}>Rose Pink</option>
+                <option value="matrix" {% if user.theme == 'matrix' %}selected{% endif %}>Matrix</option>
+            </select>
+        </form>
     </div>
 </div>
 
-<h2 style="color: var(--accent); border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">My Uploads</h2>
+<h2 style="color: var(--accent); border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">My Assets</h2>
 <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; margin-bottom: 50px;">
     {% for item in my_uploads %}
     <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px; position: relative;">
@@ -109,7 +92,7 @@
 <h2 style="color: var(--warning); border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">📌 Saved Vault (Private)</h2>
 <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px;">
     {% for item in saved_uploads %}
-    <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px; position: relative;">
+    <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px;">
         <div style="height: 160px; background: #000; border-radius: 8px; margin-bottom: 10px; overflow: hidden; display: grid; place-items: center;">
             {% if item.category == 'Photo' %}<img src="{{ item.filename }}" style="width: 100%; height: 100%; object-fit: cover;">
             {% elif item.category == 'Video' %}<video src="{{ item.filename }}" style="width: 100%; height: 100%; object-fit: cover;"></video>
@@ -119,10 +102,11 @@
         <p style="margin: 5px 0 0 0; font-size: 0.85rem; color: var(--text-muted);">From: {{ item.uploaded_by }}</p>
     </div>
     {% else %}
-    <p style="color: var(--text-muted); grid-column: 1/-1; text-align: center; padding: 20px; font-style: italic;">No saved assets yet. Click the 📌 icon on the Feed to save items!</p>
+    <p style="color: var(--text-muted); grid-column: 1/-1; text-align: center; padding: 20px; font-style: italic;">No saved assets yet.</p>
     {% endfor %}
 </div>
 
+<!-- ID CARD MODAL -->
 <div id="idCardModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 9999; justify-content: center; align-items: center;">
     <div style="background: linear-gradient(135deg, #101b2d, #08111f); padding: 40px; border-radius: 20px; border: 2px solid var(--accent); text-align: center; max-width: 400px; width: 100%; position: relative;">
         <span onclick="document.getElementById('idCardModal').style.display='none'" style="position: absolute; top: 15px; right: 20px; font-size: 2rem; color: white; cursor: pointer;">&times;</span>
@@ -136,7 +120,19 @@
     </div>
 </div>
 
+<!-- NEW: NETWORK EXPLORER MODAL (FOLLOWERS / FOLLOWING) -->
+<div id="networkModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
+    <div style="background: var(--bg-card); padding: 30px; border-radius: 20px; border: 1px solid var(--border-color); width: 90%; max-width: 400px; position: relative; box-shadow: 0 10px 40px rgba(0,0,0,0.5); max-height: 80vh; display: flex; flex-direction: column;">
+        <span onclick="document.getElementById('networkModal').style.display='none'" style="position: absolute; top: 15px; right: 20px; font-size: 2rem; color: white; cursor: pointer;">&times;</span>
+        <h2 id="networkTitle" style="color: var(--accent); margin-top: 0; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">Network</h2>
+        <div id="networkList" style="overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 15px; padding-right: 10px;">
+            <!-- JS inserts data here -->
+        </div>
+    </div>
+</div>
+
 <div id="toast" style="visibility: hidden; min-width: 250px; background-color: var(--success); color: white; text-align: center; border-radius: 8px; padding: 16px; position: fixed; z-index: 10000; left: 50%; bottom: 30px; transform: translateX(-50%); font-weight: bold;">✅ Profile Link Copied!</div>
+
 <script>
 function shareProfile() {
     const profileUrl = window.location.origin + "/agent/{{ user.username }}";
@@ -145,6 +141,33 @@ function shareProfile() {
         toast.style.visibility = "visible";
         setTimeout(function(){ toast.style.visibility = "hidden"; }, 3000);
     });
+}
+
+// NEW: JS TO FETCH NETWORK DATA IN MODAL
+async function openNetworkModal(type, username) {
+    document.getElementById('networkModal').style.display = 'flex';
+    document.getElementById('networkTitle').innerText = type === 'followers' ? 'Followers' : 'Following';
+    const listDiv = document.getElementById('networkList');
+    listDiv.innerHTML = '<p style="text-align:center; color: var(--text-muted);">Loading...</p>';
+    
+    try {
+        const res = await fetch(`/api/network/${type}/${username}`);
+        const data = await res.json();
+        let html = '';
+        data.forEach(user => {
+            const pic = user.profile_pic ? `<img src="${user.profile_pic}" style="width:40px; height:40px; border-radius:50%; object-fit:cover; border:2px solid var(--accent);">` : `<div style="width:40px; height:40px; border-radius:50%; background:#1e293b; border:2px solid var(--accent); display:grid; place-items:center; font-size: 1.2rem;">👤</div>`;
+            const badge = user.role === 'admin' ? '<span style="color:#38bdf8; font-size:0.9rem;" title="Verified">☑️</span>' : '';
+            html += `
+            <a href="/agent/${user.username}" style="display:flex; align-items:center; gap:15px; text-decoration:none; color:inherit; padding:10px; background:rgba(8,17,31,0.5); border-radius:10px; border:1px solid rgba(255,255,255,0.05); transition: 0.2s;" onmouseover="this.style.background='rgba(8,17,31,0.9)'" onmouseout="this.style.background='rgba(8,17,31,0.5)'">
+                ${pic}
+                <div style="font-weight:bold; font-size:1.1rem; display:flex; align-items:center; gap:5px;">${user.username} ${badge}</div>
+            </a>`;
+        });
+        if(data.length === 0) { html = `<p style="text-align:center; color: var(--text-muted); font-style: italic;">No users found.</p>`; }
+        listDiv.innerHTML = html;
+    } catch(e) {
+        listDiv.innerHTML = `<p style="text-align:center; color: var(--danger);">Failed to load data.</p>`;
+    }
 }
 </script>
 {% endblock %}
