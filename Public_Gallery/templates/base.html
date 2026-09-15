@@ -61,19 +61,12 @@
         
         <div class="nav-links">
             {% if session.get('username') %}
-                
-                <!-- COIN WALLET (WITH ID FOR JS) -->
-                <div style="background: rgba(0,0,0,0.4); padding: 5px 12px; border-radius: 20px; border: 1px solid var(--warning); color: var(--warning); font-weight: bold; display: flex; align-items: center; gap: 5px; margin-right: 10px;" title="Apna Coins">
-                    🪙 <span id="wallet-balance">{{ my_coins }}</span>
-                </div>
-
                 <form action="{{ url_for('search') }}" method="GET" class="search-form">
                     <input type="text" name="q" placeholder="Search #tags or users...">
                     <button type="submit">🔍</button>
                 </form>
                 
                 <a href="{{ url_for('feed') }}">📰 Feed</a>
-                
                 <a href="{{ url_for('global_chat') }}" style="color: var(--success);">🌐 Chatroom</a>
                 
                 <a href="{{ url_for('inbox') }}" style="font-size: 1.3rem; margin-left: 5px;">
@@ -86,11 +79,12 @@
                 <a href="{{ url_for('dashboard') }}">HQ</a>
                 <a href="{{ url_for('profile') }}" style="color: var(--accent);">Profile</a>
                 
+                <!-- NEW: SETTINGS BUTTON -->
+                <span onclick="document.getElementById('settingsModal').style.display='flex'" style="font-size: 1.3rem; cursor: pointer;" title="Settings">⚙️</span>
+                
                 {% if session.get('role') == 'admin' %}
                     <a href="{{ url_for('admin') }}" style="color: var(--danger);">Admin</a>
                 {% endif %}
-                
-                <a href="{{ url_for('logout') }}" class="btn" style="padding: 8px 16px; background: #334155; color: white;">Logout</a>
             {% else %}
                 <a href="{{ url_for('login') }}" class="btn">Login</a>
             {% endif %}
@@ -111,12 +105,13 @@
         {% block content %}{% endblock %}
     </div>
 
-    <!-- FLOATING ACTION BUTTON -->
     {% if session.get('username') %}
+    <!-- FLOATING ACTION BUTTON -->
     <button onclick="document.getElementById('uploadModal').style.display='flex'" style="position: fixed; bottom: 30px; right: 30px; width: 65px; height: 65px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), #0ea5e9); color: #000; border: none; font-size: 2.5rem; box-shadow: 0 5px 15px rgba(56, 189, 248, 0.4); cursor: pointer; z-index: 9999; display: grid; place-items: center; transition: transform 0.3s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
         +
     </button>
 
+    <!-- UPLOAD MODAL -->
     <div id="uploadModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
         <div style="background: var(--bg-card); padding: 30px; border-radius: 20px; border: 1px solid var(--border-color); width: 90%; max-width: 450px; position: relative; box-shadow: 0 10px 40px rgba(0,0,0,0.5);">
             <span onclick="document.getElementById('uploadModal').style.display='none'" style="position: absolute; top: 15px; right: 20px; font-size: 2rem; color: white; cursor: pointer;">&times;</span>
@@ -138,6 +133,46 @@
                 <input type="file" name="media" style="padding: 12px; border-radius: 8px; background: rgba(8,17,31,0.8); color: white; border: 1px solid var(--border-color); outline: none;">
                 <button type="submit" class="btn" style="width: 100%; font-size: 1.1rem; padding: 12px; margin-top: 10px;">Upload to Network</button>
             </form>
+        </div>
+    </div>
+
+    <!-- NEW: UNIVERSAL SETTINGS MODAL -->
+    <div id="settingsModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
+        <div style="background: var(--bg-card); padding: 30px; border-radius: 20px; border: 1px solid var(--border-color); width: 90%; max-width: 450px; position: relative; box-shadow: 0 10px 40px rgba(0,0,0,0.5); max-height: 85vh; overflow-y: auto;">
+            <span onclick="document.getElementById('settingsModal').style.display='none'" style="position: absolute; top: 15px; right: 20px; font-size: 2rem; color: white; cursor: pointer;">&times;</span>
+            <h2 style="color: var(--accent); margin-top: 0; margin-bottom: 25px;">⚙️ Settings Hub</h2>
+            
+            <form method="POST" action="/settings" style="display: flex; flex-direction: column; gap: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 20px;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="action" value="update_profile">
+                <h3 style="margin: 0; font-size: 1.1rem; color: var(--text-main);">Profile Settings</h3>
+                <label style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: -10px;">Bio</label>
+                <input type="text" name="bio" value="{{ my_bio }}" placeholder="Write something about yourself..." style="padding: 12px; border-radius: 8px; background: rgba(8,17,31,0.8); color: white; border: 1px solid var(--border-color); outline: none;">
+                <label style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: -10px;">Theme</label>
+                <select name="theme" style="padding: 12px; border-radius: 8px; background: rgba(8,17,31,0.8); color: white; border: 1px solid var(--border-color); outline: none;">
+                    <option value="cyan" {% if my_theme == 'cyan' %}selected{% endif %}>Cyan (Default)</option>
+                    <option value="gold" {% if my_theme == 'gold' %}selected{% endif %}>Gold</option>
+                    <option value="rose" {% if my_theme == 'rose' %}selected{% endif %}>Rose Pink</option>
+                    <option value="matrix" {% if my_theme == 'matrix' %}selected{% endif %}>Matrix Green</option>
+                </select>
+                <button type="submit" class="btn" style="width: 100%;">Save Profile</button>
+            </form>
+
+            <form method="POST" action="/settings" style="display: flex; flex-direction: column; gap: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 20px; margin-top: 20px;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="action" value="change_password">
+                <h3 style="margin: 0; font-size: 1.1rem; color: var(--text-main);">Security</h3>
+                <input type="password" name="new_password" placeholder="Enter new password" required style="padding: 12px; border-radius: 8px; background: rgba(8,17,31,0.8); color: white; border: 1px solid var(--border-color); outline: none;">
+                <button type="submit" class="btn" style="width: 100%; background: #334155; color: white;">Change Password</button>
+            </form>
+
+            <form method="POST" action="/settings" onsubmit="return confirm('Account will be deleted in 7 days. Proceed?');" style="margin-top: 20px;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="action" value="delete_account">
+                <button type="submit" class="btn" style="width: 100%; background: rgba(239, 68, 68, 0.1); border: 1px solid var(--danger); color: var(--danger);">⚠️ Request Account Deletion</button>
+            </form>
+            
+            <a href="{{ url_for('logout') }}" class="btn" style="width: 100%; text-align: center; display: block; margin-top: 15px; box-sizing: border-box; background: var(--danger); color: white;">Logout</a>
         </div>
     </div>
     {% endif %}
