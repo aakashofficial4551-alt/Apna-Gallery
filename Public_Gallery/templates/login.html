@@ -1,99 +1,61 @@
 {% extends "base.html" %}
 
-{% block title %}Access Port | Apna Gallery{% endblock %}
-
-{% block head %}
-<style>
-    .auth-container {
-        max-width: 400px;
-        margin: 40px auto;
-        background: var(--bg-card);
-        padding: 40px;
-        border-radius: 20px;
-        border: 1px solid var(--border-color);
-        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-        text-align: center;
-    }
-    .auth-container h2 { color: var(--accent); margin-top: 0; margin-bottom: 30px; font-size: 1.8rem; }
-    .input-group { margin-bottom: 20px; text-align: left; }
-    .input-group label { display: block; margin-bottom: 8px; color: var(--text-muted); font-size: 0.9rem; font-weight: 600; }
-    .input-group input {
-        width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color);
-        background: rgba(8, 17, 31, 0.6); color: white; box-sizing: border-box; outline: none; transition: 0.3s;
-    }
-    .input-group input:focus { border-color: var(--accent); }
-    .toggle-text { margin-top: 20px; color: var(--text-muted); font-size: 0.95rem; }
-    .toggle-text a { color: var(--accent); text-decoration: none; font-weight: bold; cursor: pointer; }
-    .toggle-text a:hover { text-decoration: underline; }
-    .hidden { display: none; }
-</style>
-{% endblock %}
+{% block title %}Authentication | Apna Gallery{% endblock %}
 
 {% block content %}
-<div class="auth-container">
+<div style="max-width: 450px; margin: 40px auto; background: var(--bg-card); padding: 40px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); text-align: center;">
+    
+    <h1 style="color: var(--accent); margin-top: 0;">Vault Access</h1>
     
     <!-- LOGIN FORM -->
-    <div id="login-box">
-        <h2>Agent Login</h2>
-        <form method="POST" action="{{ url_for('login') }}">
-            <input type="hidden" name="action" value="login">
-            <div class="input-group">
-                <label>Username</label>
-                <input type="text" name="username" required autofocus>
-            </div>
-            <div class="input-group">
-                <label>Password</label>
-                <input type="password" name="password" required>
-            </div>
-            <button type="submit" class="btn" style="width: 100%; font-size: 1.1rem; padding: 12px;">Authorize Access</button>
-        </form>
-        <div class="toggle-text">
-            New Recruit? <a onclick="toggleForms()">Request Access</a>
-        </div>
+    <form method="POST" id="loginForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="action" value="login" id="authAction">
         
-        <hr style="border:0; border-top: 1px solid var(--border-color); margin: 25px 0;">
+        <input type="text" name="username" placeholder="Username or Email" required style="width: 100%; padding: 12px; margin-bottom: 15px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(8,17,31,0.6); color: white; outline: none; box-sizing: border-box;">
         
-        <form method="POST" action="{{ url_for('login') }}">
-            <input type="hidden" name="action" value="guest">
-            <button type="submit" class="btn" style="width: 100%; background: #334155; color: white;">Continue as Guest</button>
-        </form>
-    </div>
+        <input type="email" name="email" id="emailField" placeholder="Email Address (Required for Recovery)" style="display: none; width: 100%; padding: 12px; margin-bottom: 15px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(8,17,31,0.6); color: white; outline: none; box-sizing: border-box;">
+        
+        <input type="password" name="password" id="passField" placeholder="Password" required style="width: 100%; padding: 12px; margin-bottom: 15px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(8,17,31,0.6); color: white; outline: none; box-sizing: border-box;">
+        
+        <input type="password" name="confirm_password" id="confirmField" placeholder="Confirm Password" style="display: none; width: 100%; padding: 12px; margin-bottom: 15px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(8,17,31,0.6); color: white; outline: none; box-sizing: border-box;">
+        
+        <button type="submit" id="mainBtn" class="btn" style="width: 100%; font-size: 1.1rem; padding: 12px; margin-bottom: 15px;">Login</button>
+    </form>
 
-    <!-- REGISTER FORM -->
-    <div id="register-box" class="hidden">
-        <h2>Request Access</h2>
-        <form method="POST" action="{{ url_for('login') }}">
-            <input type="hidden" name="action" value="register">
-            <div class="input-group">
-                <label>Username</label>
-                <input type="text" name="username" required>
-            </div>
-            <div class="input-group">
-                <label>Password</label>
-                <input type="password" name="password" required>
-            </div>
-            <div class="input-group">
-                <label>Confirm Password</label>
-                <input type="password" name="confirm_password" required>
-            </div>
-            <button type="submit" class="btn" style="width: 100%; font-size: 1.1rem; padding: 12px;">Create Account</button>
-        </form>
-        <div class="toggle-text">
-            Already authorized? <a onclick="toggleForms()">Login here</a>
-        </div>
+    <div style="display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 20px;">
+        <a href="#" onclick="toggleMode('register')" style="color: var(--text-muted);">New? Register</a>
+        <a href="#" onclick="toggleMode('forgot')" style="color: var(--warning);">Forgot Password?</a>
     </div>
+    
+    <hr style="border: 0; border-top: 1px solid var(--border-color); margin-bottom: 20px;">
+    
+    <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="action" value="guest">
+        <button type="submit" class="btn" style="width: 100%; background: #334155; color: white;">Continue as Guest</button>
+        <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 10px;">Guest accounts auto-delete after 30 days of inactivity.</p>
+    </form>
 </div>
 
 <script>
-    function toggleForms() {
-        const loginBox = document.getElementById('login-box');
-        const regBox = document.getElementById('register-box');
-        if (loginBox.classList.contains('hidden')) {
-            loginBox.classList.remove('hidden');
-            regBox.classList.add('hidden');
-        } else {
-            loginBox.classList.add('hidden');
-            regBox.classList.remove('hidden');
+    function toggleMode(mode) {
+        document.getElementById('authAction').value = mode;
+        if(mode === 'register') {
+            document.getElementById('emailField').style.display = 'block';
+            document.getElementById('emailField').required = true;
+            document.getElementById('confirmField').style.display = 'block';
+            document.getElementById('confirmField').required = true;
+            document.getElementById('passField').style.display = 'block';
+            document.getElementById('mainBtn').innerText = 'Register Now';
+        } else if (mode === 'forgot') {
+            document.getElementById('emailField').style.display = 'block';
+            document.getElementById('emailField').required = true;
+            document.getElementById('confirmField').style.display = 'none';
+            document.getElementById('passField').style.display = 'none';
+            document.getElementById('passField').required = false;
+            document.getElementById('mainBtn').innerText = 'Send OTP';
+            document.getElementById('mainBtn').style.background = 'var(--warning)';
         }
     }
 </script>
