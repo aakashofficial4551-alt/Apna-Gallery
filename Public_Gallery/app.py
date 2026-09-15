@@ -44,7 +44,7 @@ app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "development-only-secret
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
 
 # =========================================================
-# TEXT & TIME FILTERS (PHASE 36)
+# TEXT & TIME FILTERS
 # =========================================================
 @app.template_filter('format_text')
 def format_text(text):
@@ -70,7 +70,7 @@ def timeago(dt):
     else: return f"{int(seconds/86400)}d ago"
 
 # =========================================================
-# DATABASE AUTO-HEALER
+# DATABASE AUTO-HEALER (PHASE 37)
 # =========================================================
 def upgrade_db():
     conn = get_db_connection()
@@ -80,9 +80,11 @@ def upgrade_db():
     c.execute("CREATE TABLE IF NOT EXISTS followers (id SERIAL PRIMARY KEY, follower VARCHAR(100) NOT NULL, following VARCHAR(100) NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE(follower, following))")
     c.execute("CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, sender VARCHAR(100) NOT NULL, receiver VARCHAR(100) NOT NULL, message TEXT NOT NULL, is_read BOOLEAN DEFAULT FALSE, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
     c.execute("CREATE TABLE IF NOT EXISTS bookmarks (id SERIAL PRIMARY KEY, username VARCHAR(100) NOT NULL, media_id INTEGER NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE(username, media_id))")
+    
+    # NEW: GLOBAL CHAT ROOM TABLE
+    c.execute("CREATE TABLE IF NOT EXISTS global_chat (id SERIAL PRIMARY KEY, sender VARCHAR(100) NOT NULL, message TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
     conn.commit()
 
-    # PHASE 36: Make sure media and comments have created_at
     try:
         c.execute("ALTER TABLE media ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
         c.execute("ALTER TABLE comments ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
@@ -141,6 +143,8 @@ def cleanup_database():
         c.execute("DELETE FROM stories WHERE created_at < NOW() - INTERVAL '12 hours'")
         c.execute("DELETE FROM notifications WHERE id NOT IN (SELECT id FROM notifications ORDER BY id DESC LIMIT 500)")
         c.execute("DELETE FROM messages WHERE created_at < NOW() - INTERVAL '30 days'")
+        # Keep only the last 200 messages in Global Chat to save DB space
+        c.execute("DELETE FROM global_chat WHERE id NOT IN (SELECT id FROM global_chat ORDER BY id DESC LIMIT 200)")
         conn.commit()
     except: pass
     finally: conn.close()
@@ -348,7 +352,7 @@ def request_delete():
     return redirect(url_for("login"))
 
 # =========================================================
-# UNIVERSAL UPLOAD ROUTE
+# UNIVERSAL UPLOAD ROUTE WITH MENTIONS
 # =========================================================
 @app.route("/upload_asset", methods=["POST"])
 def upload_asset():
@@ -413,16 +417,10 @@ def feed():
     conn = get_db_connection()
     c = conn.cursor()
     
-    # PHASE 36: Dual Feed Tab Logic
     tab = request.args.get("tab", "foryou")
     
     if tab == "global":
-        c.execute("""
-            SELECT m.*, u.profile_pic, u.role 
-            FROM media m JOIN users u ON m.uploaded_by = u.username 
-            WHERE m.approved = 1 AND m.filename != 'SHAYARI_TEXT' 
-            ORDER BY m.id DESC LIMIT 50
-        """)
+        c.execute("SELECT m.*, u.profile_pic, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.approved = 1 AND m.filename != 'SHAYARI_TEXT' ORDER BY m.id DESC LIMIT 50")
         feed_posts = c.fetchall()
     else:
         c.execute("""
@@ -434,7 +432,6 @@ def feed():
             ORDER BY m.id DESC LIMIT 50
         """, (session["username"],))
         feed_posts = c.fetchall()
-        # Fallback if no friends
         if not feed_posts:
             c.execute("SELECT m.*, u.profile_pic, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.approved = 1 AND m.filename != 'SHAYARI_TEXT' ORDER BY m.id DESC LIMIT 10")
             feed_posts = c.fetchall()
@@ -604,7 +601,7 @@ def follow(username):
     return jsonify({"followers": followers_count, "following_now": following_now})
 
 # =========================================================
-# DIRECT MESSAGING (INBOX & CHAT)
+# DIRECT MESSAGING (INBOX & CHAT) & GLOBAL CHAT
 # =========================================================
 @app.route("/inbox")
 def inbox():
@@ -652,13 +649,49 @@ def api_chat_history(username):
     me = session["username"]
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("SELECT sender, message, TO_CHAR(created_at, 'HH24:MI') as time FROM messages WHERE (sender = %s AND receiver = %s) OR (sender = %s AND receiver = %s) ORDER BY created_at ASC", (me, username, username, me))
+    c.execute("SELECT id, sender, message, TO_CHAR(created_at, 'HH24:MI') as time FROM messages WHERE (sender = %s AND receiver = %s) OR (sender = %s AND receiver = %s) ORDER BY created_at ASC", (me, username, username, me))
     history = c.fetchall()
     c.execute("UPDATE messages SET is_read = TRUE WHERE sender = %s AND receiver = %s AND is_read = FALSE", (username, me))
     conn.commit()
     conn.close()
-    formatted_history = [{"sender": r['sender'], "message": r['message'], "time": r['time']} for r in history]
+    formatted_history = [{"id": r['id'], "sender": r['sender'], "message": r['message'], "time": r['time']} for r in history]
     return jsonify(formatted_history)
+
+@app.route("/unsend_message/<int:msg_id>", methods=["POST"])
+def unsend_message(msg_id):
+    if "username" not in session: return jsonify({"success": False})
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("DELETE FROM messages WHERE id = %s AND sender = %s", (msg_id, session["username"]))
+    conn.commit()
+    conn.close()
+    return jsonify({"success": True})
+
+# NEW: GLOBAL CHATROOM ROUTE
+@app.route("/global_chat", methods=["GET", "POST"])
+def global_chat():
+    if "username" not in session: return redirect(url_for("login"))
+    conn = get_db_connection()
+    c = conn.cursor()
+    if request.method == "POST":
+        msg = request.form.get("message", "").strip()
+        if msg:
+            c.execute("INSERT INTO global_chat (sender, message) VALUES (%s, %s)", (session["username"], msg[:500]))
+            conn.commit()
+        return redirect(url_for("global_chat"))
+    conn.close()
+    return render_template("global_chat.html")
+
+@app.route("/api/global_chat_history")
+def api_global_chat_history():
+    if "username" not in session: return jsonify([])
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT gc.id, gc.sender, gc.message, TO_CHAR(gc.created_at, 'HH24:MI') as time, u.role FROM global_chat gc JOIN users u ON gc.sender = u.username ORDER BY gc.created_at ASC")
+    history = c.fetchall()
+    conn.close()
+    formatted = [{"id": r['id'], "sender": r['sender'], "message": r['message'], "time": r['time'], "role": r['role']} for r in history]
+    return jsonify(formatted)
 
 # =========================================================
 # GALLERY, SEARCH, AI STUDIO
@@ -844,7 +877,7 @@ def delete_own(media_id):
     return redirect(request.referrer or url_for("profile"))
 
 # =========================================================
-# ADMIN ROUTE
+# ROUTES: ADMIN GOD MODE & MYSTERY
 # =========================================================
 @app.route("/admin", methods=["GET", "POST"])
 def admin():
