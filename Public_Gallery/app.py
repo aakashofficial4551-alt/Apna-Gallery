@@ -274,7 +274,15 @@ def logout():
 def dashboard():
     if "username" not in session: return redirect(url_for("login"))
     sync_admin_session()
-    return render_template("dashboard.html")
+    
+    # Naya Code: Fetching Trending Assets
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT * FROM media WHERE approved = 1 ORDER BY likes DESC LIMIT 3")
+    trending = c.fetchall()
+    conn.close()
+    
+    return render_template("dashboard.html", trending=trending)
 
 @app.route("/games")
 def games():
