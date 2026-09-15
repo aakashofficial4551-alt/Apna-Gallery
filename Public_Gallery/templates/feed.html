@@ -56,7 +56,6 @@
                 {% elif post.category == 'Video' %}
                     <video src="{{ post.filename }}" controls style="width: 100%; max-height: 500px;"></video>
                 {% elif post.category == 'Music' %}
-                    <!-- NEW: AUDIO PLAYER UI -->
                     <div style="width: 100%; padding: 60px 20px; text-align: center; background: linear-gradient(135deg, rgba(8,17,31,1), rgba(15,23,42,1)); box-sizing: border-box;">
                         <span style="font-size: 5rem; display: block; margin-bottom: 25px; filter: drop-shadow(0 0 10px var(--accent));">🎵</span>
                         <audio src="{{ post.filename }}" controls style="width: 100%; outline: none; border-radius: 30px;"></audio>
@@ -95,16 +94,28 @@
                     </button>
                 </div>
 
+                <!-- NEW: ADVANCED COMMENTS ENGINE -->
                 <div style="background: rgba(8, 17, 31, 0.4); border-radius: 8px; padding: 15px;">
-                    <div style="max-height: 120px; overflow-y: auto; margin-bottom: 10px; font-size: 0.9rem;">
+                    <div style="max-height: 150px; overflow-y: auto; margin-bottom: 10px; font-size: 0.9rem; padding-right: 5px;">
                         {% if comments and comments[post.id] %}
                             {% for c in comments[post.id] %}
-                                <div style="margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 5px;">
+                                <div style="margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
                                     <strong style="color: var(--accent);">
                                         {{ c.username }}
                                         {% if c.role == 'admin' %} <span style="font-size: 0.9rem;">☑️</span> {% endif %}
-                                    </strong>: {{ c.comment_text | format_text | safe }}
-                                    <span style="font-size: 0.7rem; color: var(--text-muted); float: right;">{{ c.created_at | timeago }}</span>
+                                    </strong>: <span style="color: var(--text-main);">{{ c.comment_text | format_text | safe }}</span>
+                                    
+                                    <div style="margin-top: 5px; display: flex; justify-content: space-between; align-items: center;">
+                                        <div style="display: flex; gap: 15px;">
+                                            <span style="font-size: 0.8rem; color: var(--text-muted); cursor: pointer; transition: 0.2s;" onclick="likeComment({{ c.id }})" onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--text-muted)'">
+                                                ❤️ <span id="clike-count-{{ c.id }}">{{ c.likes or 0 }}</span>
+                                            </span>
+                                            <span style="font-size: 0.8rem; color: var(--text-muted); cursor: pointer; transition: 0.2s;" onclick="replyTo('{{ c.username }}', {{ post.id }})" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text-muted)'">
+                                                ↩️ Reply
+                                            </span>
+                                        </div>
+                                        <span style="font-size: 0.75rem; color: var(--text-muted);">{{ c.created_at | timeago }}</span>
+                                    </div>
                                 </div>
                             {% endfor %}
                         {% else %}
@@ -113,7 +124,7 @@
                     </div>
                     <form method="POST" action="{{ url_for('add_comment', media_id=post.id) }}" style="display: flex; gap: 10px;">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <input type="text" name="comment_text" placeholder="Add a comment... use @ to tag." required style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(8, 17, 31, 0.8); color: white; outline: none;">
+                        <input type="text" name="comment_text" id="comment-input-{{ post.id }}" placeholder="Add a comment... use @ to tag." required style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(8, 17, 31, 0.8); color: white; outline: none;">
                         <button type="submit" class="btn">Post</button>
                     </form>
                 </div>
@@ -202,6 +213,21 @@ function sharePost(title, url) {
         navigator.clipboard.writeText(url);
         alert("Link copied to clipboard! Share it anywhere.");
     }
+}
+
+// NEW: JS FOR COMMENT LIKES & REPLIES
+function replyTo(username, postId) {
+    const input = document.getElementById(`comment-input-${postId}`);
+    input.value = `@${username} ` + input.value;
+    input.focus();
+}
+
+async function likeComment(commentId) {
+    try {
+        const response = await fetch(`/like_comment/${commentId}`, { method: 'POST', headers: { 'X-CSRF-Token': '{{ csrf_token() }}' } });
+        const data = await response.json();
+        if (response.ok) { document.getElementById(`clike-count-${commentId}`).innerText = data.likes; }
+    } catch (e) { console.error("Comment Like error:", e); }
 }
 </script>
 {% endblock %}
