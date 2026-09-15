@@ -96,6 +96,31 @@
     <p style="color: var(--text-muted); font-size: 1.1rem;">Select a secure vault or access advanced modules.</p>
 </div>
 
+<!-- NEW: Trending Assets Section -->
+{% if trending and trending|length > 0 %}
+<div style="margin-top: 20px; margin-bottom: 40px;">
+    <h3 style="color: var(--warning); margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">🔥 Trending Assets</h3>
+    <div style="display: flex; gap: 15px; overflow-x: auto; padding-bottom: 15px;">
+        {% for item in trending %}
+        <div style="min-width: 200px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.3);">
+            <div style="height: 120px; background: #000; border-radius: 8px; margin-bottom: 10px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+                {% if item.category == 'Photo' %}
+                    <img src="{{ item.filename }}" style="width: 100%; height: 100%; object-fit: cover;">
+                {% elif item.category == 'Video' %}
+                    <video src="{{ item.filename }}" style="width: 100%; height: 100%; object-fit: cover;"></video>
+                {% else %}
+                    <span style="font-size: 2.5rem;">📁</span>
+                {% endif %}
+            </div>
+            <p style="margin: 0; font-weight: bold; font-size: 0.9rem; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ item.title }}</p>
+            <p style="margin: 5px 0 0 0; font-size: 0.8rem; color: var(--accent);">❤️ {{ item.likes }} Likes</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+<!-- End Trending -->
+
 <!-- Vault Grid -->
 <div class="vault-grid">
     <a href="{{ url_for('gallery', category='Photo') }}" class="vault-card"><span class="vault-icon">📸</span><h3>Photo Vault</h3></a>
