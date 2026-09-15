@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Top Agents | Apna Gallery{% endblock %}
+
+{% block head %}
+<style>
+    .rank-table { width: 100%; border-collapse: collapse; margin-top: 20px; background: var(--bg-card); border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+    .rank-table th, .rank-table td { padding: 18px; text-align: left; border-bottom: 1px solid var(--border-color); }
+    .rank-table th { background: rgba(8, 17, 31, 0.8); color: var(--accent); text-transform: uppercase; letter-spacing: 1px; font-size: 0.9rem; }
+    .rank-table tr:hover { background: rgba(255,255,255,0.02); }
+    .rank-1 { color: #fbbf24; font-weight: 900; font-size: 1.2rem; text-shadow: 0 0 10px rgba(251, 191, 36, 0.5); }
+    .rank-2 { color: #94a3b8; font-weight: bold; font-size: 1.1rem; }
+    .rank-3 { color: #b45309; font-weight: bold; font-size: 1.1rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="text-align: center; margin-bottom: 40px;">
+    <span style="font-size: 4rem;">🏆</span>
+    <h1 style="color: var(--success); margin: 10px 0;">Global Leaderboard</h1>
+    <p style="color: var(--text-muted);">Top agents ranked by total engagement (Likes).</p>
+</div>
+
+<table class="rank-table">
+    <thead>
+        <tr>
+            <th>Rank</th>
+            <th>Agent Name</th>
+            <th>Assets Uploaded</th>
+            <th>Total Engagement (Likes)</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for leader in leaders %}
+        <tr>
+            <td class="
+                {% if loop.index == 1 %}rank-1{% elif loop.index == 2 %}rank-2{% elif loop.index == 3 %}rank-3{% else %}style='color: white;'{% endif %}
+            ">
+                #{{ loop.index }}
+            </td>
+            <td style="font-weight: bold; color: white; font-size: 1.1rem;">{{ leader.username }}</td>
+            <td style="color: var(--text-muted);">{{ leader.total_uploads }}</td>
+            <td style="color: var(--danger); font-weight: bold;">❤️ {{ leader.total_likes }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 30px;">No agents found.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
