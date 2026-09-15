@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}AI Studio | Apna Gallery{% endblock %}
+
+{% block head %}
+<style>
+    .ai-container {
+        max-width: 600px;
+        margin: 40px auto;
+        background: rgba(16, 27, 45, 0.8);
+        border: 1px solid #a855f7;
+        border-radius: 20px;
+        padding: 40px;
+        text-align: center;
+        box-shadow: 0 0 40px rgba(168, 85, 247, 0.15);
+    }
+    .ai-title {
+        color: #a855f7;
+        font-size: 2.2rem;
+        margin-top: 0;
+        margin-bottom: 10px;
+    }
+    .prompt-box {
+        width: 100%;
+        background: rgba(8, 17, 31, 0.8);
+        border: 1px solid var(--border-color);
+        color: white;
+        padding: 20px;
+        border-radius: 12px;
+        font-size: 1.1rem;
+        outline: none;
+        box-sizing: border-box;
+        margin-bottom: 25px;
+        resize: vertical;
+        min-height: 120px;
+        transition: 0.3s;
+    }
+    .prompt-box:focus {
+        border-color: #a855f7;
+        box-shadow: 0 0 15px rgba(168, 85, 247, 0.2);
+    }
+    .btn-generate {
+        background: linear-gradient(135deg, #a855f7, #7e22ce);
+        color: white;
+        width: 100%;
+        font-size: 1.2rem;
+        padding: 15px;
+        border: none;
+        border-radius: 12px;
+        cursor: pointer;
+        font-weight: bold;
+        transition: transform 0.2s;
+    }
+    .btn-generate:hover { transform: translateY(-3px); }
+    
+    /* Loading Animation */
+    #loading-overlay { display: none; margin-top: 20px; }
+    .spinner {
+        width: 40px; height: 40px;
+        border: 4px solid rgba(168, 85, 247, 0.3);
+        border-top-color: #a855f7;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 15px auto;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ai-container">
+    <span style="font-size: 4rem; display: block; margin-bottom: 10px;">🧠✨</span>
+    <h1 class="ai-title">AI Vision Studio</h1>
+    <p style="color: var(--text-muted); margin-bottom: 30px;">Describe what you want to see. Our AI will generate it and securely store it in your Photo Vault.</p>
+    
+    <form method="POST" id="ai-form" onsubmit="showLoading()">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <textarea name="prompt" class="prompt-box" placeholder="e.g. A cyberpunk city at night with flying cars, neon lights, 4k ultra realistic..." required></textarea>
+        
+        <button type="submit" class="btn-generate" id="gen-btn">✨ Generate Masterpiece</button>
+    </form>
+
+    <div id="loading-overlay">
+        <div class="spinner"></div>
+        <p style="color: #a855f7; font-weight: bold; animation: pulse 1.5s infinite;">Synthesizing Image... Please wait.</p>
+    </div>
+</div>
+
+<script>
+    function showLoading() {
+        document.getElementById('gen-btn').style.display = 'none';
+        document.getElementById('loading-overlay').style.display = 'block';
+    }
+</script>
+{% endblock %}
