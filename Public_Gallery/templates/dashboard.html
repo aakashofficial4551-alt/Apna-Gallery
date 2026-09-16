@@ -1,13 +1,15 @@
 {% extends "base.html" %}
-{% block title %}Dashboard | Apna Gallery{% endblock %}
+{% block title %}HQ Dashboard | Apna Gallery{% endblock %}
 
 {% block content %}
-<div style="margin-bottom: 30px;">
-    <h1 style="color: var(--accent); margin: 0;">Welcome back, {{ session.username }}! 🚀</h1>
-    <p style="color: var(--text-muted); margin-top: 5px;">Access your secure vaults and agent tools below.</p>
+<div style="margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+    <div>
+        <h1 style="color: var(--accent); margin: 0;">HQ Dashboard 🚀</h1>
+        <p style="color: var(--text-muted); margin-top: 5px;">Welcome back, {{ session.username }}!</p>
+    </div>
+    <a href="{{ url_for('analytics') }}" class="btn" style="background: linear-gradient(135deg, #a855f7, var(--accent)); color: white;">📊 Creator Studio</a>
 </div>
 
-<!-- INSTAGRAM STYLE LIVE STORIES -->
 {% if stories %}
 <div style="margin-bottom: 30px;">
     <h3 style="color: var(--warning); margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">⏱️ Live Agent Stories</h3>
@@ -28,7 +30,6 @@
 </div>
 {% endif %}
 
-<!-- TRENDING ASSETS -->
 {% if trending and trending|length > 0 %}
 <div style="margin-bottom: 40px;">
     <h3 style="color: #f43f5e; margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">🔥 Trending Now</h3>
@@ -49,46 +50,39 @@
 </div>
 {% endif %}
 
-<!-- MAIN VAULT GRID -->
 <h3 style="color: var(--accent); margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">🛡️ Secure Vaults</h3>
-<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
-    <a href="{{ url_for('gallery', category='Photo') }}" class="btn" style="background: var(--bg-card); border: 1px solid var(--border-color); padding: 30px; border-radius: 16px; font-size: 1.2rem; text-align: center; display: block; text-decoration: none;">
-        <span style="font-size: 3rem; display: block; margin-bottom: 10px;">📸</span> Photo Vault
+<!-- 💥 COMPACT & BEAUTIFUL GRID FOR VAULTS 💥 -->
+<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px;">
+    <a href="{{ url_for('gallery', category='Photo') }}" style="background: linear-gradient(135deg, rgba(30,41,59,0.8), rgba(15,23,42,0.9)); border: 1px solid var(--border-color); border-radius: 16px; padding: 25px 10px; text-align: center; text-decoration: none; color: var(--text-main); display: block; transition: 0.3s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+        <span style="font-size: 2.5rem; display: block; margin-bottom: 8px;">📸</span><strong style="font-size: 0.95rem;">Photos</strong>
     </a>
-    <a href="{{ url_for('gallery', category='Video') }}" class="btn" style="background: var(--bg-card); border: 1px solid var(--border-color); padding: 30px; border-radius: 16px; font-size: 1.2rem; text-align: center; display: block; text-decoration: none;">
-        <span style="font-size: 3rem; display: block; margin-bottom: 10px;">🎥</span> Video Vault
+    <a href="{{ url_for('gallery', category='Video') }}" style="background: linear-gradient(135deg, rgba(30,41,59,0.8), rgba(15,23,42,0.9)); border: 1px solid var(--border-color); border-radius: 16px; padding: 25px 10px; text-align: center; text-decoration: none; color: var(--text-main); display: block; transition: 0.3s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+        <span style="font-size: 2.5rem; display: block; margin-bottom: 8px;">🎥</span><strong style="font-size: 0.95rem;">Videos</strong>
     </a>
-    <a href="{{ url_for('gallery', category='Music') }}" class="btn" style="background: var(--bg-card); border: 1px solid var(--border-color); padding: 30px; border-radius: 16px; font-size: 1.2rem; text-align: center; display: block; text-decoration: none;">
-        <span style="font-size: 3rem; display: block; margin-bottom: 10px;">🎵</span> Music Vault
+    <a href="{{ url_for('gallery', category='Music') }}" style="background: linear-gradient(135deg, rgba(30,41,59,0.8), rgba(15,23,42,0.9)); border: 1px solid var(--border-color); border-radius: 16px; padding: 25px 10px; text-align: center; text-decoration: none; color: var(--text-main); display: block; transition: 0.3s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+        <span style="font-size: 2.5rem; display: block; margin-bottom: 8px;">🎵</span><strong style="font-size: 0.95rem;">Music</strong>
     </a>
-    <a href="{{ url_for('gallery', category='Document') }}" class="btn" style="background: var(--bg-card); border: 1px solid var(--border-color); padding: 30px; border-radius: 16px; font-size: 1.2rem; text-align: center; display: block; text-decoration: none;">
-        <span style="font-size: 3rem; display: block; margin-bottom: 10px;">📁</span> Doc Vault
+    <a href="{{ url_for('gallery', category='Document') }}" style="background: linear-gradient(135deg, rgba(30,41,59,0.8), rgba(15,23,42,0.9)); border: 1px solid var(--border-color); border-radius: 16px; padding: 25px 10px; text-align: center; text-decoration: none; color: var(--text-main); display: block; transition: 0.3s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+        <span style="font-size: 2.5rem; display: block; margin-bottom: 8px;">📁</span><strong style="font-size: 0.95rem;">Docs</strong>
     </a>
-    <a href="{{ url_for('gallery', category='Shayari') }}" class="btn" style="background: var(--bg-card); border: 1px solid var(--border-color); padding: 30px; border-radius: 16px; font-size: 1.2rem; text-align: center; display: block; text-decoration: none;">
-        <span style="font-size: 3rem; display: block; margin-bottom: 10px;">✍️</span> Shayari Vault
+    <a href="{{ url_for('gallery', category='Shayari') }}" style="background: linear-gradient(135deg, rgba(30,41,59,0.8), rgba(15,23,42,0.9)); border: 1px solid var(--border-color); border-radius: 16px; padding: 25px 10px; text-align: center; text-decoration: none; color: var(--text-main); display: block; transition: 0.3s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+        <span style="font-size: 2.5rem; display: block; margin-bottom: 8px;">✍️</span><strong style="font-size: 0.95rem;">Shayari</strong>
     </a>
-    <a href="{{ url_for('ai_studio') }}" class="btn" style="background: var(--bg-card); border: 1px solid #a855f7; padding: 30px; border-radius: 16px; font-size: 1.2rem; text-align: center; display: block; text-decoration: none;">
-        <span style="font-size: 3rem; display: block; margin-bottom: 10px;">🎨</span> AI Studio
+    <a href="{{ url_for('ai_studio') }}" style="background: linear-gradient(135deg, rgba(168,85,247,0.2), rgba(15,23,42,0.9)); border: 1px solid #a855f7; border-radius: 16px; padding: 25px 10px; text-align: center; text-decoration: none; color: var(--text-main); display: block; transition: 0.3s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+        <span style="font-size: 2.5rem; display: block; margin-bottom: 8px;">🎨</span><strong style="font-size: 0.95rem;">AI Studio</strong>
     </a>
 </div>
 
-<!-- INSTAGRAM STYLE STORY VIEWER WITH DIRECT MESSAGE REPLY -->
 <div id="storyViewer" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 10000; flex-direction: column;">
     <div style="position: absolute; top: 15px; left: 15px; right: 15px; display: flex; gap: 5px;">
-        <div style="flex: 1; height: 3px; background: rgba(255,255,255,0.3); border-radius: 2px; overflow: hidden;">
-            <div id="storyProgress" style="height: 100%; width: 0%; background: white;"></div>
-        </div>
+        <div style="flex: 1; height: 3px; background: rgba(255,255,255,0.3); border-radius: 2px; overflow: hidden;"><div id="storyProgress" style="height: 100%; width: 0%; background: white;"></div></div>
     </div>
-    
     <div style="position: absolute; top: 30px; left: 15px; display: flex; align-items: center; gap: 10px; z-index: 10001;">
         <img id="storyProfile" src="" style="width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--accent); object-fit: cover;">
         <span id="storyUser" style="color: white; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.8); font-size: 1.1rem;"></span>
     </div>
     <span onclick="closeStory()" style="position: absolute; top: 25px; right: 20px; font-size: 2.5rem; color: white; cursor: pointer; text-shadow: 0 2px 4px rgba(0,0,0,0.8); z-index: 10001;">&times;</span>
-    
     <img id="storyImg" src="" style="width: 100%; height: 100%; object-fit: contain;">
-
-    <!-- NEW: STORY REPLY BOX -->
     <div style="position: absolute; bottom: 20px; left: 20px; right: 20px; display: flex; gap: 10px; z-index: 10001;">
         <input type="text" id="storyReplyInput" placeholder="Reply to story..." autocomplete="off" style="flex: 1; padding: 12px 20px; border-radius: 25px; border: 1px solid rgba(255,255,255,0.3); background: rgba(0,0,0,0.5); color: white; outline: none; backdrop-filter: blur(5px);">
         <button onclick="sendStoryReply()" style="background: var(--accent); color: #000; border: none; width: 45px; height: 45px; border-radius: 50%; font-size: 1.2rem; cursor: pointer; display: grid; place-items: center;">➤</button>
@@ -101,48 +95,21 @@
         document.getElementById('storyViewer').style.display = 'flex';
         document.getElementById('storyImg').src = imgSrc;
         document.getElementById('storyUser').innerText = username;
-        if (profilePic && profilePic !== '') {
-            document.getElementById('storyProfile').src = profilePic;
-            document.getElementById('storyProfile').style.display = 'block';
-        } else {
-            document.getElementById('storyProfile').src = 'https://placehold.co/100x100/1e293b/ffffff.png?text=' + username.charAt(0).toUpperCase();
-        }
-        
-        document.getElementById('storyReplyInput').value = ''; // Reset input
-        
+        if (profilePic && profilePic !== '') { document.getElementById('storyProfile').src = profilePic; document.getElementById('storyProfile').style.display = 'block'; } 
+        else { document.getElementById('storyProfile').src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}&backgroundColor=1e293b`; }
+        document.getElementById('storyReplyInput').value = ''; 
         const progress = document.getElementById('storyProgress');
-        progress.style.transition = 'none';
-        progress.style.width = '0%';
-        setTimeout(() => {
-            progress.style.transition = 'width 5s linear';
-            progress.style.width = '100%';
-        }, 50);
+        progress.style.transition = 'none'; progress.style.width = '0%';
+        setTimeout(() => { progress.style.transition = 'width 5s linear'; progress.style.width = '100%'; }, 50);
         storyTimer = setTimeout(closeStory, 5000);
     }
-    
-    function closeStory() {
-        document.getElementById('storyViewer').style.display = 'none';
-        clearTimeout(storyTimer);
-    }
-
-    // NEW: SEND DM FROM STORY API CALL
+    function closeStory() { document.getElementById('storyViewer').style.display = 'none'; clearTimeout(storyTimer); }
     async function sendStoryReply() {
         const msg = document.getElementById('storyReplyInput').value.trim();
         const user = document.getElementById('storyUser').innerText;
         if(!msg) return;
-        
-        const formData = new FormData();
-        formData.append('message', msg);
-        
-        try {
-            await fetch(`/reply_story/${user}`, {
-                method: 'POST',
-                headers: { 'X-CSRF-Token': '{{ csrf_token() }}' },
-                body: formData
-            });
-            alert(`Reply sent to ${user}'s Inbox! 📩`);
-            closeStory();
-        } catch(e) { console.error(e); }
+        const formData = new FormData(); formData.append('message', msg);
+        try { await fetch(`/reply_story/${user}`, { method: 'POST', headers: { 'X-CSRF-Token': '{{ csrf_token() }}' }, body: formData }); alert(`Reply sent to ${user}'s Inbox! 📩`); closeStory(); } catch(e) { console.error(e); }
     }
 </script>
 {% endblock %}
