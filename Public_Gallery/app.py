@@ -119,8 +119,6 @@ def upgrade_db():
     c.execute("CREATE TABLE IF NOT EXISTS global_chat (id SERIAL PRIMARY KEY, sender VARCHAR(100) NOT NULL, message TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
     c.execute("CREATE TABLE IF NOT EXISTS reports (id SERIAL PRIMARY KEY, media_id INTEGER NOT NULL, reported_by VARCHAR(100) NOT NULL, reason TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE(media_id, reported_by))")
     c.execute("CREATE TABLE IF NOT EXISTS comment_likes (id SERIAL PRIMARY KEY, comment_id INTEGER NOT NULL, username VARCHAR(100) NOT NULL, UNIQUE(comment_id, username))")
-    
-    # 💥 NEW: BLOCKS TABLE FOR PRIVACY SHIELD 💥
     c.execute("CREATE TABLE IF NOT EXISTS blocks (id SERIAL PRIMARY KEY, blocker VARCHAR(100) NOT NULL, blocked VARCHAR(100) NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE(blocker, blocked))")
     conn.commit()
 
@@ -132,6 +130,7 @@ def upgrade_db():
     safe_alter(c, conn, "ALTER TABLE media ADD COLUMN IF NOT EXISTS views INTEGER DEFAULT 0")
     safe_alter(c, conn, "ALTER TABLE media ADD COLUMN IF NOT EXISTS is_pinned BOOLEAN DEFAULT FALSE")
     safe_alter(c, conn, "ALTER TABLE comments ADD COLUMN IF NOT EXISTS likes INTEGER DEFAULT 0")
+    
     safe_alter(c, conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(120) UNIQUE")
     safe_alter(c, conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS user_code VARCHAR(10) UNIQUE")
     safe_alter(c, conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
@@ -156,6 +155,14 @@ def upgrade_db():
         c.execute("UPDATE media SET views = 0 WHERE views IS NULL")
         c.execute("UPDATE media SET is_pinned = FALSE WHERE is_pinned IS NULL")
         c.execute("UPDATE comments SET likes = 0 WHERE likes IS NULL")
+        conn.commit()
+    except: conn.rollback()
+
+    try:
+        c.execute("SELECT id FROM users WHERE user_code IS NULL")
+        for row in c.fetchall():
+            code = ''.join(secrets.choice("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ") for _ in range(10))
+            c.execute("UPDATE users SET user_code = %s WHERE id = %s", (code, row['id']))
         conn.commit()
     except: conn.rollback()
         
@@ -452,7 +459,7 @@ def settings():
     return redirect(request.referrer or url_for("dashboard"))
 
 # =========================================================
-# ASSET MANAGEMENT
+# ASSET MANAGEMENT (UPLOAD, EDIT, PIN, VIEWS)
 # =========================================================
 @app.route("/upload_asset", methods=["POST"])
 def upload_asset():
@@ -530,9 +537,6 @@ def add_view(media_id):
     conn.close()
     return jsonify({"success": True})
 
-# =========================================================
-# NEW: PRIVACY SHIELD - BLOCK & UNBLOCK SYSTEM 💥
-# =========================================================
 @app.route("/block/<username>", methods=["POST"])
 def block_user(username):
     if "username" not in session: return jsonify({"error": "Login required"}), 401
@@ -541,11 +545,7 @@ def block_user(username):
     
     conn = get_db_connection()
     c = conn.cursor()
-    
-    # Remove Follows when blocked
     c.execute("DELETE FROM followers WHERE (follower = %s AND following = %s) OR (follower = %s AND following = %s)", (current_user, username, username, current_user))
-    
-    # Insert Block
     try:
         c.execute("INSERT INTO blocks (blocker, blocked) VALUES (%s, %s)", (current_user, username))
         conn.commit()
@@ -553,23 +553,21 @@ def block_user(username):
     except:
         conn.rollback()
         success = False
-    
     conn.close()
     return jsonify({"success": success})
 
 @app.route("/unblock/<username>", methods=["POST"])
 def unblock_user(username):
     if "username" not in session: return jsonify({"error": "Login required"}), 401
-    current_user = session["username"]
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("DELETE FROM blocks WHERE blocker = %s AND blocked = %s", (current_user, username))
+    c.execute("DELETE FROM blocks WHERE blocker = %s AND blocked = %s", (session["username"], username))
     conn.commit()
     conn.close()
     return jsonify({"success": True})
 
 # =========================================================
-# CORE ROUTES (FEED WITH INFINITE SCROLL & BLOCK FILTERS)
+# CORE ROUTES (FEED & DASHBOARD)
 # =========================================================
 @app.route("/")
 def index():
@@ -580,65 +578,36 @@ def index():
 def feed():
     if "username" not in session: return redirect(url_for("login"))
     tab = request.args.get("tab", "foryou")
-    # Rendering only the initial HTML, Javascript will lazy-load the actual posts!
     return render_template("feed.html", current_tab=tab)
 
-# 💥 NEW: INFINITE SCROLL / LAZY LOAD API 💥
 @app.route("/api/feed_data")
 def api_feed_data():
     if "username" not in session: return jsonify([])
     
     tab = request.args.get("tab", "foryou")
     offset = int(request.args.get("offset", 0))
-    limit = 10  # Load 10 posts at a time for performance!
+    limit = 10 
     
     conn = get_db_connection()
     c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     
-    # We must filter out blocked users!
-    block_filter = """
-        m.uploaded_by NOT IN (SELECT blocked FROM blocks WHERE blocker = %s)
-        AND m.uploaded_by NOT IN (SELECT blocker FROM blocks WHERE blocked = %s)
-    """
+    block_filter = "m.uploaded_by NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) AND m.uploaded_by NOT IN (SELECT blocker FROM blocks WHERE blocked = %s)"
     
     if tab == "global":
-        c.execute(f"""
-            SELECT m.*, u.profile_pic, u.role, u.is_verified 
-            FROM media m JOIN users u ON m.uploaded_by = u.username 
-            WHERE m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' 
-            AND {block_filter}
-            ORDER BY m.id DESC LIMIT %s OFFSET %s
-        """, (session["username"], session["username"], limit, offset))
+        c.execute(f"SELECT m.*, u.profile_pic, u.role, u.is_verified FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' AND {block_filter} ORDER BY m.id DESC LIMIT %s OFFSET %s", (session["username"], session["username"], limit, offset))
         feed_posts = [dict(row) for row in c.fetchall()]
     else:
-        c.execute(f"""
-            SELECT m.*, u.profile_pic, u.role, u.is_verified 
-            FROM media m JOIN users u ON m.uploaded_by = u.username 
-            JOIN followers f ON f.following = m.uploaded_by 
-            WHERE f.follower = %s AND m.approved = 1 AND m.visibility IN ('public', 'followers') AND m.filename != 'SHAYARI_TEXT' 
-            AND {block_filter}
-            ORDER BY m.id DESC LIMIT %s OFFSET %s
-        """, (session["username"], session["username"], session["username"], limit, offset))
+        c.execute(f"SELECT m.*, u.profile_pic, u.role, u.is_verified FROM media m JOIN users u ON m.uploaded_by = u.username JOIN followers f ON f.following = m.uploaded_by WHERE f.follower = %s AND m.approved = 1 AND m.visibility IN ('public', 'followers') AND m.filename != 'SHAYARI_TEXT' AND {block_filter} ORDER BY m.id DESC LIMIT %s OFFSET %s", (session["username"], session["username"], session["username"], limit, offset))
         feed_posts = [dict(row) for row in c.fetchall()]
-        
-        # Fallback if no friends
         if not feed_posts and offset == 0:
             c.execute(f"SELECT m.*, u.profile_pic, u.role, u.is_verified FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' AND {block_filter} ORDER BY m.id DESC LIMIT 10", (session["username"], session["username"]))
             feed_posts = [dict(row) for row in c.fetchall()]
 
-    # Get comments for these specific posts
     post_ids = [p['id'] for p in feed_posts]
     comments = defaultdict(list)
     
     if post_ids:
-        c.execute(f"""
-            SELECT c.*, u.role, u.is_verified 
-            FROM comments c JOIN users u ON c.username = u.username 
-            WHERE c.media_id = ANY(%s) 
-            AND c.username NOT IN (SELECT blocked FROM blocks WHERE blocker = %s)
-            AND c.username NOT IN (SELECT blocker FROM blocks WHERE blocked = %s)
-            ORDER BY c.id ASC
-        """, (post_ids, session["username"], session["username"]))
+        c.execute("SELECT c.*, u.role, u.is_verified FROM comments c JOIN users u ON c.username = u.username WHERE c.media_id = ANY(%s) AND c.username NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) AND c.username NOT IN (SELECT blocker FROM blocks WHERE blocked = %s) ORDER BY c.id ASC", (post_ids, session["username"], session["username"]))
         for comment in c.fetchall(): comments[comment["media_id"]].append(dict(comment))
     
     c.execute("SELECT media_id FROM bookmarks WHERE username = %s", (session["username"],))
@@ -668,7 +637,6 @@ def explore():
     if "username" not in session: return redirect(url_for("login"))
     conn = get_db_connection()
     c = conn.cursor()
-    
     c.execute("SELECT m.id, m.filename, m.title, m.category, m.likes, m.views, m.uploaded_by FROM media m WHERE m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' AND m.uploaded_by NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) ORDER BY RANDOM() LIMIT 40", (session["username"],))
     explore_posts = c.fetchall()
     
@@ -683,7 +651,6 @@ def explore():
             for t in tags: tag_counts[t.lower()] += 1
             
     trending_tags = [tag for tag, count in sorted(tag_counts.items(), key=lambda x: x[1], reverse=True)[:6]]
-    
     return render_template("explore.html", posts=explore_posts, trending_tags=trending_tags)
 
 @app.route("/dashboard")
@@ -693,21 +660,9 @@ def dashboard():
     try:
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute("""
-            SELECT id, title, filename, category, likes, views 
-            FROM media 
-            WHERE approved = 1 AND visibility = 'public' AND filename != 'SHAYARI_TEXT' 
-            ORDER BY likes DESC LIMIT 3
-        """)
+        c.execute("SELECT id, title, filename, category, likes, views FROM media WHERE approved = 1 AND visibility = 'public' AND filename != 'SHAYARI_TEXT' ORDER BY likes DESC LIMIT 3")
         trending = c.fetchall()
-        c.execute("""
-            SELECT s.id, s.username, s.filename, s.created_at, u.profile_pic, u.role, u.is_verified 
-            FROM stories s 
-            JOIN users u ON s.username = u.username 
-            WHERE s.created_at >= NOW() - INTERVAL '12 hours' 
-            AND s.username NOT IN (SELECT blocked FROM blocks WHERE blocker = %s)
-            ORDER BY s.id DESC
-        """, (session["username"],))
+        c.execute("SELECT s.id, s.username, s.filename, s.created_at, u.profile_pic, u.role, u.is_verified FROM stories s JOIN users u ON s.username = u.username WHERE s.created_at >= NOW() - INTERVAL '12 hours' AND s.username NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) ORDER BY s.id DESC", (session["username"],))
         stories = c.fetchall()
         conn.close()
         return render_template("dashboard.html", trending=trending, stories=stories)
@@ -761,12 +716,10 @@ def profile():
     user = c.fetchone()
     c.execute("SELECT * FROM media WHERE uploaded_by = %s ORDER BY is_pinned DESC, id DESC", (session["username"],))
     my_uploads = c.fetchall()
-    
     c.execute("SELECT COUNT(*) as cnt FROM followers WHERE following = %s", (session["username"],))
     followers_count = c.fetchone()['cnt']
     c.execute("SELECT COUNT(*) as cnt FROM followers WHERE follower = %s", (session["username"],))
     following_count = c.fetchone()['cnt']
-    
     c.execute("SELECT m.* FROM media m JOIN bookmarks b ON m.id = b.media_id WHERE b.username = %s ORDER BY b.id DESC", (session["username"],))
     saved_uploads = c.fetchall()
     conn.close()
@@ -779,8 +732,6 @@ def profile():
 @app.route("/agent/<username>")
 def agent_profile(username):
     if "username" not in session: return redirect(url_for("login"))
-    
-    # 💥 Block System Check
     conn = get_db_connection()
     c = conn.cursor()
     c.execute("SELECT * FROM blocks WHERE (blocker = %s AND blocked = %s) OR (blocker = %s AND blocked = %s)", (session["username"], username, username, session["username"]))
@@ -805,7 +756,6 @@ def agent_profile(username):
         c.execute("SELECT m.*, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.uploaded_by = %s AND m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' ORDER BY m.is_pinned DESC, m.id DESC", (username,))
         
     agent_uploads = c.fetchall()
-    
     c.execute("SELECT COUNT(*) as cnt FROM followers WHERE following = %s", (username,))
     followers_count = c.fetchone()['cnt']
     c.execute("SELECT COUNT(*) as cnt FROM followers WHERE follower = %s", (username,))
@@ -819,15 +769,12 @@ def follow(username):
     if "username" not in session: return jsonify({"error": "Login required"}), 401
     current_user = session["username"]
     if current_user == username: return jsonify({"error": "Cannot follow yourself"}), 400
-    
     conn = get_db_connection()
     c = conn.cursor()
     c.execute("SELECT id FROM users WHERE username = %s", (username,))
     if not c.fetchone(): return jsonify({"error": "User not found"}), 404
-    
     c.execute("SELECT id FROM followers WHERE follower = %s AND following = %s", (current_user, username))
     is_following = c.fetchone()
-    
     if is_following:
         c.execute("DELETE FROM followers WHERE follower = %s AND following = %s", (current_user, username))
         following_now = False
@@ -835,7 +782,6 @@ def follow(username):
         c.execute("INSERT INTO followers (follower, following) VALUES (%s, %s)", (current_user, username))
         c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (username, f"👤 {current_user} started following you!", f"/agent/{current_user}"))
         following_now = True
-        
     conn.commit()
     c.execute("SELECT COUNT(*) as cnt FROM followers WHERE following = %s", (username,))
     followers_count = c.fetchone()['cnt']
@@ -856,7 +802,7 @@ def api_network(action_type, username):
     return jsonify(results)
 
 # =========================================================
-# DIRECT MESSAGING & STORY DM
+# DIRECT MESSAGING & STORY DM (WITH READ RECEIPTS 👀)
 # =========================================================
 @app.route("/inbox")
 def inbox():
@@ -881,7 +827,6 @@ def inbox():
 def chat(username):
     if "username" not in session: return redirect(url_for("login"))
     me = session["username"]
-    
     conn = get_db_connection()
     c = conn.cursor()
     c.execute("SELECT * FROM blocks WHERE (blocker = %s AND blocked = %s) OR (blocker = %s AND blocked = %s)", (me, username, username, me))
@@ -913,12 +858,13 @@ def api_chat_history(username):
     me = session["username"]
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("SELECT id, sender, message, TO_CHAR(created_at, 'HH24:MI') as time FROM messages WHERE (sender = %s AND receiver = %s) OR (sender = %s AND receiver = %s) ORDER BY created_at ASC", (me, username, username, me))
+    # Fetch is_read to display blue ticks!
+    c.execute("SELECT id, sender, message, TO_CHAR(created_at, 'HH24:MI') as time, is_read FROM messages WHERE (sender = %s AND receiver = %s) OR (sender = %s AND receiver = %s) ORDER BY created_at ASC", (me, username, username, me))
     history = c.fetchall()
     c.execute("UPDATE messages SET is_read = TRUE WHERE sender = %s AND receiver = %s AND is_read = FALSE", (username, me))
     conn.commit()
     conn.close()
-    formatted_history = [{"id": r['id'], "sender": r['sender'], "message": r['message'], "time": r['time']} for r in history]
+    formatted_history = [{"id": r['id'], "sender": r['sender'], "message": r['message'], "time": r['time'], "is_read": r['is_read']} for r in history]
     return jsonify(formatted_history)
 
 @app.route("/unsend_message/<int:msg_id>", methods=["POST"])
@@ -963,7 +909,6 @@ def api_global_chat_history():
     if "username" not in session: return jsonify([])
     conn = get_db_connection()
     c = conn.cursor()
-    # 💥 BLOCKED USERS DON'T SHOW IN CHAT 💥
     c.execute(f"""
         SELECT gc.id, gc.sender, gc.message, TO_CHAR(gc.created_at, 'HH12:MI AM') as time, u.role, u.is_verified 
         FROM global_chat gc JOIN users u ON gc.sender = u.username 
@@ -976,7 +921,7 @@ def api_global_chat_history():
     return jsonify(formatted)
 
 # =========================================================
-# LIKES, COMMENTS, SEARCH, & GALLERY
+# LIKES, COMMENTS, SEARCH, GALLERY & AI STUDIO (💥 THE FIX 💥)
 # =========================================================
 @app.route("/search")
 def search():
@@ -1048,6 +993,47 @@ def bookmark(media_id):
     conn.close()
     return jsonify({"bookmarked": bookmarked})
 
+# 💥 AI ENDPOINTS RESTORED TO FIX DASHBOARD ERROR 💥
+@app.route("/api/ai", methods=["POST"])
+def ai_endpoint():
+    if "username" not in session: return jsonify({"reply": "Login first."}), 401
+    query = request.get_json(silent=True).get("query", "")[:1000]
+    try: 
+        reply = get_ai_response(query).replace('"', '').replace("'", "")
+    except: 
+        reply = "Beautiful day! #vibes #nature"
+    return jsonify({"reply": reply})
+
+@app.route("/ai-studio", methods=["GET", "POST"])
+def ai_studio():
+    if "username" not in session: return redirect(url_for("login"))
+    if request.method == "POST":
+        prompt = request.form.get("prompt", "").strip()
+        if not prompt: return redirect(url_for("ai_studio"))
+        trigger_words = ["create", "generate", "draw", "make an image", "paint"]
+        wants_image = any(word in prompt.lower() for word in trigger_words)
+        
+        if wants_image:
+            encoded_prompt = urllib.parse.quote(prompt)
+            image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?nologo=true"
+            try:
+                r = requests.get(image_url, timeout=15)
+                secure_url = cloudinary.uploader.upload(r.content, resource_type="image")["secure_url"] if r.status_code == 200 else image_url
+                conn = get_db_connection()
+                c = conn.cursor()
+                c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved, visibility, views, is_pinned) VALUES (%s, %s, %s, %s, %s, 1, 'public', 0, FALSE)",
+                          (secure_url, f"AI: {prompt[:20]}...", "Photo", prompt, session["username"]))
+                conn.commit()
+                conn.close()
+                flash("Image created successfully! (100% Free)", "success")
+                return redirect(url_for("gallery", category="Photo"))
+            except: flash("Image generation failed.", "error")
+        else:
+            try: reply = get_ai_response(prompt)
+            except: reply = "I am currently offline."
+            return render_template("ai_studio.html", chat_reply=reply, user_prompt=prompt)
+    return render_template("ai_studio.html")
+
 @app.route("/like/<int:media_id>", methods=["POST"])
 def like(media_id):
     if "username" not in session: return jsonify({"error": "Login required."}), 401
@@ -1064,7 +1050,6 @@ def like(media_id):
         conn.commit()
         liked_now = True
     else: liked_now = False
-    
     c.execute("SELECT likes FROM media WHERE id = %s", (media_id,))
     likes = c.fetchone()["likes"]
     conn.close()
