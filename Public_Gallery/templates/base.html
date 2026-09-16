@@ -128,9 +128,7 @@
         {% block content %}{% endblock %}
     </div>
 
-    <!-- 💥 FIX: UPLOAD BUTTON WILL NOT SHOW IN INBOX/CHAT NOW 💥 -->
     {% if session.get('username') and not hide_navbar %}
-    
     <button onclick="document.getElementById('uploadModal').style.display='flex'" style="position: fixed; bottom: 30px; right: 30px; width: 65px; height: 65px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), #0ea5e9); color: #000; border: none; font-size: 2.5rem; box-shadow: 0 5px 15px rgba(56, 189, 248, 0.4); cursor: pointer; z-index: 9000; display: grid; place-items: center;">+</button>
 
     <div id="uploadModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
@@ -162,7 +160,6 @@
     {% endif %}
 
     {% if session.get('username') %}
-    <!-- SETTINGS MODAL -->
     <div id="settingsModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
         <div style="background: var(--bg-card); padding: 30px; border-radius: 20px; border: 1px solid var(--border-color); width: 90%; max-width: 450px; position: relative; box-shadow: 0 10px 40px rgba(0,0,0,0.5); max-height: 85vh; overflow-y: auto;">
             <span onclick="document.getElementById('settingsModal').style.display='none'" style="position: absolute; top: 15px; right: 20px; font-size: 2rem; color: white; cursor: pointer;">&times;</span>
@@ -186,7 +183,7 @@
                 <input type="text" name="bio" value="{{ my_bio }}" placeholder="Bio..." style="padding: 12px; border-radius: 8px; background: rgba(8,17,31,0.8); color: white; outline: none;">
                 <input type="url" name="website" value="{{ my_website }}" placeholder="https://your-link.com" style="padding: 12px; border-radius: 8px; background: rgba(8,17,31,0.8); color: white; outline: none;">
                 <select name="theme" style="padding: 12px; border-radius: 8px; background: rgba(8,17,31,0.8); color: white; outline: none;">
-                    <option value="cyan" {% if my_theme == 'cyan' %}selected{% endif %}>Cyan (Default)</option>
+                    <option value="cyan" {% if my_theme == 'cyan' %}selected{% endif %}>Cyan</option>
                     <option value="gold" {% if my_theme == 'gold' %}selected{% endif %}>Gold</option>
                     <option value="rose" {% if my_theme == 'rose' %}selected{% endif %}>Rose Pink</option>
                     <option value="matrix" {% if my_theme == 'matrix' %}selected{% endif %}>Matrix Green</option>
@@ -237,7 +234,6 @@
                 <input type="hidden" name="action" value="delete_account">
                 <button type="submit" class="btn" style="width: 100%; background: rgba(239, 68, 68, 0.1); border: 1px solid var(--danger); color: var(--danger);">⚠️ Request Account Deletion</button>
             </form>
-            
             <a href="{{ url_for('logout') }}" class="btn" style="width: 100%; text-align: center; display: block; margin-top: 15px; background: var(--danger); color: white;">Logout</a>
         </div>
     </div>
@@ -271,6 +267,13 @@
                 navigator.serviceWorker.register("{{ url_for('static', filename='js/service-worker.js') }}").catch(()=>{});
             });
         }
+
+        // 💥 PHASE 83: OS LEVEL PUSH NOTIFICATION REQUEST 💥
+        if ("Notification" in window) {
+            if (Notification.permission !== "granted" && Notification.permission !== "denied") {
+                Notification.requestPermission();
+            }
+        }
         
         async function generateAICaption() {
             const cat = document.getElementById('vaultCategory').value;
@@ -278,6 +281,7 @@
             input.value = "Generating ✨...";
             try {
                 const res = await fetch('/api/ai', { method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': '{{ csrf_token() }}'}, body: JSON.stringify({query: `Write a short social media caption for a ${cat} post.`}) });
+                if(res.status === 401) { window.location.href = '/login'; return; } // Session Killer intercept
                 const data = await res.json();
                 input.value = data.reply;
             } catch(e) { input.value = "Epic moment! 🔥"; }
@@ -288,6 +292,7 @@
             if(query.length < 2) { dropdown.style.display = 'none'; return; }
             try {
                 const res = await fetch(`/api/search_suggest?q=${encodeURIComponent(query)}`);
+                if(res.status === 401) { window.location.href = '/login'; return; }
                 const data = await res.json();
                 if(data.length === 0) { dropdown.style.display = 'none'; return; }
                 let html = '';
@@ -308,13 +313,32 @@
             if (dropdown && !dropdown.contains(event.target) && event.target !== searchInput) { dropdown.style.display = 'none'; }
         });
 
+        // 💥 PHASE 83: HYBRID TOAST & OS NOTIFICATIONS ENGINE 💥
         {% if session.get('username') %}
         let currentUnread = {{ unread_notifications }};
         setInterval(async () => {
             try {
                 const res = await fetch('/api/unread_notifs');
+                // The Guillotine Session Kick Intercept
+                if (res.status === 401) { window.location.href = '/login'; return; } 
+                
                 const data = await res.json();
                 if(data.unread > currentUnread) {
+                    // Trigger Native OS Notification if allowed
+                    if (Notification.permission === "granted") {
+                        if ('serviceWorker' in navigator) {
+                            navigator.serviceWorker.ready.then(function(registration) {
+                                registration.showNotification("Apna Gallery", {
+                                    body: "🔔 You have a new message or tip!",
+                                    vibrate: [200, 100, 200]
+                                });
+                            });
+                        } else {
+                            new Notification("Apna Gallery", { body: "🔔 You have a new message or tip!" });
+                        }
+                    }
+
+                    // Trigger Web Toast
                     const toast = document.getElementById("liveToast");
                     toast.classList.add("show");
                     setTimeout(() => { toast.classList.remove("show"); }, 4000);
