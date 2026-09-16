@@ -49,39 +49,72 @@ app.config.update(
     MAX_CONTENT_LENGTH=50 * 1024 * 1024,
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='Lax',
-    SESSION_COOKIE_SECURE=True, # Requires HTTPS (Render provides this)
+    SESSION_COOKIE_SECURE=True, 
+    PERMANENT_SESSION_LIFETIME=datetime.timedelta(days=30)
 )
 
 # =========================================================
-# 🛡️ THE TITANIUM FIREWALL (ANTI-DDOS, CSRF & CSP) 🛡️
+# 🛡️ THE TITANIUM FIREWALL (ANTI-DDOS, CSRF, CSP & SESSION KILLER) 🛡️
 # =========================================================
 request_tracker = defaultdict(list)
 BANNED_IPS = set()
 
 @app.before_request
-def security_firewall():
+def security_firewall_and_session_check():
+    # 1. Anti-DDoS
     ip = request.remote_addr or "127.0.0.1"
     now = time.time()
-    
     request_tracker[ip] = [t for t in request_tracker[ip] if now - t < 60]
     if len(request_tracker[ip]) > 200:
         BANNED_IPS.add(ip)
-        
     if ip in BANNED_IPS:
         return "Your IP has been permanently blocked by Apna Gallery Security System for malicious activity. (Error 429)", 429
-        
     request_tracker[ip].append(now)
 
+    # Allow static and auth routes to bypass strict checks
+    if request.endpoint in ['login', 'verify_otp', 'logout', 'static', 'api_search_suggest'] or (request.path and request.path.startswith('/static/')):
+        return
+
+    # 2. Strict CSRF Verification
     if request.method in ["POST", "PUT", "DELETE"]:
-        if request.endpoint not in ['login', 'verify_otp', 'logout', 'api_search_suggest']:
-            token = request.form.get("csrf_token") or request.headers.get("X-CSRF-Token")
-            session_token = session.get("csrf_token")
+        token = request.form.get("csrf_token") or request.headers.get("X-CSRF-Token")
+        session_token = session.get("csrf_token")
+        if not token or not session_token or not hmac.compare_digest(token, session_token):
+            if request.path.startswith('/api/'): return jsonify({"error": "Security Firewall: Invalid CSRF Token"}), 403
+            else:
+                flash("Security Firewall Blocked Your Request: Invalid Validation Token.", "error")
+                return redirect(request.referrer or url_for('feed'))
+
+    # 3. 💥 THE GUILLOTINE ENGINE: ABSOLUTE SESSION TERMINATION 💥
+    if "username" in session:
+        conn = get_db_connection()
+        c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        c.execute("SELECT status FROM users WHERE username = %s", (session["username"],))
+        user = c.fetchone()
+        
+        # Update Last Active
+        if user:
+            c.execute("UPDATE users SET last_active = CURRENT_TIMESTAMP WHERE username = %s", (session["username"],))
+            conn.commit()
+        conn.close()
+
+        # If user is deleted from DB
+        if not user:
+            session.clear()
+            if request.path.startswith('/api/'): return jsonify({"error": "Account deleted", "redirect": True}), 401
+            flash("Your account has been deleted.", "error")
+            return redirect(url_for('login'))
             
-            if not token or not session_token or not hmac.compare_digest(token, session_token):
-                if request.path.startswith('/api/'): return jsonify({"error": "Security Firewall: Invalid CSRF Token"}), 403
-                else:
-                    flash("Security Firewall Blocked Your Request: Invalid Validation Token.", "error")
-                    return redirect(request.referrer or url_for('feed'))
+        # If user is Banned
+        if user['status'] == 'BANNED':
+            session.clear()
+            if request.path.startswith('/api/'): return jsonify({"error": "Account suspended", "redirect": True}), 401
+            flash("Your account has been suspended by the Admin.", "error")
+            return redirect(url_for('login'))
+            
+    # Random Database Cleanup Trigger
+    if random.random() < 0.05: cleanup_database()
+    if random.random() < 0.20: run_bot_engine() 
 
 @app.after_request
 def set_security_headers(response):
@@ -89,7 +122,6 @@ def set_security_headers(response):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-    # 💥 NEW: Content Security Policy (Blocks external malicious scripts) 💥
     response.headers["Content-Security-Policy"] = "default-src 'self' https: data: 'unsafe-inline' 'unsafe-eval';"
     return response
 
@@ -250,7 +282,8 @@ def run_bot_engine():
             "Hey everyone! Kya haal hain? 👋", "Koi online hai kya is waqt? 🤔", 
             "Bhai yeh app ekdum mast chal rahi hai! 🔥", "Good morning dosto! Have a great day ☀️", 
             "Hello world! Just joined this awesome gallery.", "Koi badhiya photo upload karo yaar! 😎",
-            "Speed kaafi fast hai is website ki 🚀", "Mausam bohot badiya hai aaj 🌧️"
+            "Speed kaafi fast hai is website ki 🚀", "Mausam bohot badiya hai aaj 🌧️",
+            "Are yaar, kya chal raha hai aajkal? 🧐"
         ]
         
         c.execute("SELECT COUNT(id) as count FROM users WHERE role = 'bot'")
@@ -316,22 +349,6 @@ def get_csrf_token():
         token = secrets.token_urlsafe(32)
         session["csrf_token"] = token
     return token
-
-@app.before_request
-def update_activity():
-    if random.random() < 0.05: 
-        cleanup_database()
-        create_database_backup()
-    if random.random() < 0.20: run_bot_engine() 
-        
-    if "username" in session:
-        try:
-            conn = get_db_connection()
-            c = conn.cursor()
-            c.execute("UPDATE users SET last_active = CURRENT_TIMESTAMP WHERE username = %s", (session["username"],))
-            conn.commit()
-            conn.close()
-        except: pass
 
 @app.context_processor
 def inject_global_vars():
@@ -415,6 +432,7 @@ def login():
             c.execute("INSERT INTO users (username, password, user_code, role, wallet_balance) VALUES (%s, %s, %s, 'user', 100)", (guest_name, "guest", code))
             conn.commit()
             conn.close()
+            session.permanent = True
             session.update({"username": guest_name, "is_registered": False, "is_admin": False, "role": "user"})
             flash("Welcome! You've received 100 Free Coins 🪙", "success")
             return redirect(url_for("feed"))
@@ -428,6 +446,7 @@ def login():
                 c.execute("INSERT INTO users (username, email, password, user_code, role, wallet_balance) VALUES (%s, %s, %s, %s, 'user', 100)", 
                           (username, email, generate_password_hash(password), code))
                 conn.commit()
+                session.permanent = True
                 session.update({"username": username, "is_registered": True, "is_admin": False, "role": "user"})
                 flash("Account created! You got 100 Welcome Coins 🪙", "success")
                 return redirect(url_for("feed"))
@@ -452,6 +471,7 @@ def login():
                     flash("Account deletion cancelled.", "success")
                     
                 is_guest = user["username"].startswith("Guest-")
+                session.permanent = True
                 session.update({"username": user["username"], "is_registered": not is_guest, "is_admin": (user["role"] == "admin"), "role": user["role"]})
                 conn.close()
                 return redirect(url_for("feed"))
@@ -756,7 +776,7 @@ def report_asset(media_id):
     finally: conn.close()
 
 # =========================================================
-# CORE ROUTES (FEED & LEADERBOARD)
+# CORE ROUTES
 # =========================================================
 @app.route("/")
 def index():
@@ -858,44 +878,6 @@ def explore():
     trending_tags = [tag for tag, count in sorted(tag_counts.items(), key=lambda x: x[1], reverse=True)[:6]]
     conn.close()
     return render_template("explore.html", posts=explore_posts, trending_tags=trending_tags, spotlight=spotlight)
-
-# 💥 RESTORED FULLY: GALLERY ROUTE 💥
-@app.route("/gallery/<category>", methods=["GET", "POST"])
-def gallery(category):
-    if "username" not in session: return redirect(url_for("login"))
-    conn = get_db_connection()
-    c = conn.cursor()
-    if request.method == "POST":
-        try:
-            filename = "SHAYARI_TEXT"
-            if category != 'Shayari':
-                file = request.files.get("media")
-                if file and file.filename != "":
-                    filename = save_uploaded_file(file, category)
-                    if not filename:
-                        flash("Upload Failed! Check API keys.", "error")
-                        return redirect(url_for("gallery", category=category))
-            
-            is_approved = 1 if current_user_is_admin() else 0
-            visibility = request.form.get("visibility", "public")
-            c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved, visibility, views, is_pinned) VALUES (%s, %s, %s, %s, %s, %s, %s, 0, FALSE)",
-                      (filename, html.escape(request.form.get("title", "Untitled")), category, "", session.get("username"), is_approved, visibility))
-            conn.commit()
-            flash("File live!" if is_approved else "Sent to Admin for approval.", "success")
-        except Exception as e:
-            conn.rollback()
-            flash(f"Upload System Fault: {str(e)[:100]}", "error")
-        return redirect(url_for("gallery", category=category))
-
-    c.execute("SELECT m.*, u.profile_pic, u.role, u.is_verified FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.category = %s AND m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' AND m.uploaded_by NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) ORDER BY m.id DESC", (category, session["username"]))
-    if category == 'Shayari': c.execute("SELECT m.*, u.role, u.is_verified FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.category = %s AND m.approved = 1 AND m.visibility = 'public' AND m.uploaded_by NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) ORDER BY m.id DESC", (category, session["username"]))
-    media_files = c.fetchall()
-    c.execute("SELECT c.*, u.role, u.is_verified FROM comments c JOIN users u ON c.username = u.username ORDER BY c.id ASC")
-    comments_db = c.fetchall()
-    conn.close()
-    comments = defaultdict(list)
-    for comment in comments_db: comments[comment["media_id"]].append(comment)
-    return render_template("gallery.html", media_files=media_files, category=category, comments=comments)
 
 @app.route("/dashboard")
 def dashboard():
@@ -1211,6 +1193,7 @@ def ai_studio():
                 conn.commit()
                 conn.close()
                 flash("Image created successfully! (100% Free)", "success")
+                # 💥 BUG FIX: Category parameter passed correctly! 💥
                 return redirect(url_for("gallery", category="Photo"))
             except: flash("Image generation failed.", "error")
         else:
