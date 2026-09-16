@@ -2,27 +2,26 @@
 {% block title %}Global Chat | Apna Gallery{% endblock %}
 
 {% block content %}
-<div style="max-width: 900px; margin: 0 auto; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; display: flex; flex-direction: column; height: 80vh; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
+<div style="display: flex; flex-direction: column; height: 100vh; width: 100%; background: #0f172a; position: absolute; top: 0; left: 0;">
     
-    <div style="background: rgba(15,23,42,0.9); padding: 15px 20px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between;">
+    <!-- 💥 FIX: NATIVE APP HEADER WITH BACK BUTTON 💥 -->
+    <div style="background: rgba(15,23,42,0.95); padding: 15px 20px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; z-index: 100; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
         <div style="display: flex; align-items: center; gap: 15px;">
-            <span style="font-size: 2rem;">🌐</span>
-            <div>
-                <h2 style="margin: 0; color: var(--success); font-size: 1.3rem;">Global Chatroom</h2>
-                <span style="font-size: 0.8rem; color: var(--text-muted);">Everyone on Apna Gallery is here!</span>
-            </div>
+            <a href="{{ url_for('feed') }}" style="color: white; text-decoration: none; font-size: 1.5rem; font-weight: bold;">&larr;</a>
+            <h1 style="color: var(--success); margin: 0; font-size: 1.3rem;">🌐 Global Chatroom</h1>
         </div>
+        <span style="font-size: 0.8rem; color: var(--text-muted); background: rgba(255,255,255,0.1); padding: 2px 8px; border-radius: 10px;">Live</span>
     </div>
 
-    <!-- GLOBAL CHAT BOX -->
-    <div id="global-chat-box" style="flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; background: rgba(8,17,31,0.4);">
-        <!-- Messages loaded via JS -->
+    <!-- CHAT BOX -->
+    <div id="global-chat-box" style="flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; background: url('https://www.transparenttextures.com/patterns/cubes.png') rgba(8,17,31,0.9);">
+        <!-- Messages will load here -->
     </div>
 
-    <form method="POST" style="background: rgba(15,23,42,0.9); padding: 15px; border-top: 1px solid var(--border-color); display: flex; gap: 10px;">
+    <form method="POST" style="background: rgba(15,23,42,0.95); padding: 15px 20px; border-top: 1px solid var(--border-color); display: flex; gap: 10px; padding-bottom: env(safe-area-inset-bottom, 15px);">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <input type="text" name="message" placeholder="Broadcast a message to the world..." required autocomplete="off" style="flex: 1; padding: 15px 20px; border-radius: 25px; border: 1px solid var(--border-color); background: #1e293b; color: white; outline: none; font-size: 1rem;">
-        <button type="submit" class="btn" style="background: var(--success); color: #fff; border: none; padding: 0 25px; border-radius: 25px; font-size: 1.1rem; font-weight: bold; cursor: pointer; transition: 0.2s;">Send 🚀</button>
+        <input type="text" name="message" placeholder="Type a message to the world..." required autocomplete="off" style="flex: 1; padding: 14px 20px; border-radius: 25px; border: 1px solid rgba(255,255,255,0.1); background: #1e293b; color: white; outline: none; font-size: 1rem;">
+        <button type="submit" style="background: var(--success); color: white; border: none; width: 50px; height: 50px; border-radius: 50%; font-size: 1.3rem; cursor: pointer; display: grid; place-items: center; box-shadow: 0 4px 10px rgba(34, 197, 94, 0.3);">➤</button>
     </form>
 </div>
 
@@ -38,35 +37,39 @@
             let html = "";
             messages.forEach(msg => {
                 const isMe = (msg.sender === myUsername);
-                const badge = msg.role === 'admin' ? '<span style="color:#38bdf8; font-size:0.9rem;" title="Verified">☑️</span>' : '';
+                const badge = msg.is_verified ? '<span style="color:#38bdf8; font-size:0.8rem;">✅</span>' : '';
+                const adminBadge = msg.role === 'admin' ? '<span style="color:#f43f5e; font-size:0.8rem;">🛡️</span>' : '';
                 
                 if(isMe) {
                     html += `
-                    <div style="align-self: flex-end; background: var(--success); color: #fff; padding: 10px 15px; border-radius: 15px 15px 0 15px; max-width: 75%; word-wrap: break-word; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
-                        <span style="font-size: 0.8rem; font-weight: bold; display: block; margin-bottom: 5px; color: rgba(255,255,255,0.7);">You ${badge}</span>
-                        <p style="margin: 0; font-size: 1rem;">${msg.message}</p>
-                        <span style="font-size: 0.7rem; color: rgba(255,255,255,0.6); display: block; text-align: right; margin-top: 5px;">${msg.time}</span>
+                    <div style="align-self: flex-end; display: flex; flex-direction: column; align-items: flex-end; max-width: 80%;">
+                        <div style="background: var(--success); color: #000; padding: 10px 15px; border-radius: 15px 15px 0 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
+                            <p style="margin: 0; font-size: 1rem; font-weight: 500;">${msg.message}</p>
+                            <span style="font-size: 0.7rem; color: rgba(0,0,0,0.6); display: block; text-align: right; margin-top: 4px;">${msg.time}</span>
+                        </div>
                     </div>`;
                 } else {
                     html += `
-                    <div style="align-self: flex-start; background: #334155; color: white; padding: 10px 15px; border-radius: 15px 15px 15px 0; max-width: 75%; word-wrap: break-word; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
-                        <a href="/agent/${msg.sender}" style="font-size: 0.8rem; font-weight: bold; display: block; margin-bottom: 5px; color: var(--accent); text-decoration: none;">@${msg.sender} ${badge}</a>
-                        <p style="margin: 0; font-size: 1rem;">${msg.message}</p>
-                        <span style="font-size: 0.7rem; color: var(--text-muted); display: block; text-align: right; margin-top: 5px;">${msg.time}</span>
+                    <div style="align-self: flex-start; max-width: 80%; margin-bottom: 5px;">
+                        <a href="/agent/${msg.sender}" style="font-size: 0.8rem; color: var(--text-muted); text-decoration: none; margin-bottom: 3px; display: block; margin-left: 5px;">${msg.sender} ${badge} ${adminBadge}</a>
+                        <div style="background: #334155; color: white; padding: 10px 15px; border-radius: 15px 15px 15px 0; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
+                            <p style="margin: 0; font-size: 1rem;">${msg.message}</p>
+                            <span style="font-size: 0.7rem; color: var(--text-muted); display: block; text-align: right; margin-top: 4px;">${msg.time}</span>
+                        </div>
                     </div>`;
                 }
             });
             
-            if(html === "") html = `<p style="text-align: center; color: var(--text-muted); font-size: 0.9rem; margin-top: auto; margin-bottom: auto;">The room is quiet. Say hi to the world! 🌍</p>`;
+            if(html === "") html = `<p style="text-align: center; color: var(--text-muted); font-size: 0.9rem; margin-top: auto; margin-bottom: auto;">Be the first to say hi to the world! 🌍</p>`;
             
             if(chatBox.innerHTML !== html) {
                 chatBox.innerHTML = html;
                 chatBox.scrollTop = chatBox.scrollHeight;
             }
-        } catch(e) { console.error("Global chat sync error", e); }
+        } catch(e) { console.error("Chat sync error", e); }
     }
 
     fetchGlobalMessages();
-    setInterval(fetchGlobalMessages, 3000);
+    setInterval(fetchGlobalMessages, 2000); // 2 second refresh for fast chat!
 </script>
 {% endblock %}
