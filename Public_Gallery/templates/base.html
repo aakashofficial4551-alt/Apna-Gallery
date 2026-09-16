@@ -55,7 +55,6 @@
         #splash-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-main); z-index: 999999; display: flex; flex-direction: column; justify-content: center; align-items: center; transition: opacity 0.5s ease-out; }
         #splash-screen.hidden { opacity: 0; pointer-events: none; }
         
-        /* 💥 PHASE 74: LIVE TOAST UI 💥 */
         #liveToast { visibility: hidden; min-width: 250px; background: linear-gradient(135deg, var(--accent), var(--success)); color: #000; text-align: center; border-radius: 8px; padding: 16px; position: fixed; z-index: 10000; right: 20px; bottom: 80px; transform: translateX(120%); transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); font-weight: bold; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
         #liveToast.show { visibility: visible; transform: translateX(0); }
     </style>
@@ -68,7 +67,6 @@
         <p style="color: var(--text-muted); margin-top: 10px;">Connecting You...</p>
     </div>
 
-    <!-- 💥 LIVE NOTIFICATION TOAST 💥 -->
     <a href="{{ url_for('notifications') }}" id="liveToast" style="text-decoration: none;">
         🔔 You have a new notification!
     </a>
@@ -90,7 +88,6 @@
                 <div style="background: rgba(251, 191, 36, 0.2); color: var(--warning); padding: 5px 10px; border-radius: 20px; font-size: 0.9rem; font-weight: bold; display: flex; align-items: center; gap: 5px; border: 1px solid var(--warning);" title="Your Wallet Balance">
                     🪙 {{ my_wallet }}
                 </div>
-                
                 <a href="{{ url_for('inbox') }}" style="color: white; text-decoration: none; position: relative; font-size: 1.3rem;">✉️ <span class="notif-badge" id="badge-msg" style="{% if unread_messages == 0 %}display:none;{% endif %}">{{ unread_messages }}</span></a>
                 <a href="{{ url_for('notifications') }}" style="color: white; text-decoration: none; position: relative; font-size: 1.3rem;">🔔 <span class="notif-badge" id="badge-notif" style="{% if unread_notifications == 0 %}display:none;{% endif %}">{{ unread_notifications }}</span></a>
                 <span onclick="document.getElementById('settingsModal').style.display='flex'" style="font-size: 1.3rem; cursor: pointer; margin-left: 5px;">⚙️</span>
@@ -131,7 +128,8 @@
         {% block content %}{% endblock %}
     </div>
 
-    {% if session.get('username') %}
+    <!-- 💥 FIX: UPLOAD BUTTON WILL NOT SHOW IN INBOX/CHAT NOW 💥 -->
+    {% if session.get('username') and not hide_navbar %}
     
     <button onclick="document.getElementById('uploadModal').style.display='flex'" style="position: fixed; bottom: 30px; right: 30px; width: 65px; height: 65px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), #0ea5e9); color: #000; border: none; font-size: 2.5rem; box-shadow: 0 5px 15px rgba(56, 189, 248, 0.4); cursor: pointer; z-index: 9000; display: grid; place-items: center;">+</button>
 
@@ -161,7 +159,10 @@
             </form>
         </div>
     </div>
+    {% endif %}
 
+    {% if session.get('username') %}
+    <!-- SETTINGS MODAL -->
     <div id="settingsModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
         <div style="background: var(--bg-card); padding: 30px; border-radius: 20px; border: 1px solid var(--border-color); width: 90%; max-width: 450px; position: relative; box-shadow: 0 10px 40px rgba(0,0,0,0.5); max-height: 85vh; overflow-y: auto;">
             <span onclick="document.getElementById('settingsModal').style.display='none'" style="position: absolute; top: 15px; right: 20px; font-size: 2rem; color: white; cursor: pointer;">&times;</span>
@@ -185,7 +186,7 @@
                 <input type="text" name="bio" value="{{ my_bio }}" placeholder="Bio..." style="padding: 12px; border-radius: 8px; background: rgba(8,17,31,0.8); color: white; outline: none;">
                 <input type="url" name="website" value="{{ my_website }}" placeholder="https://your-link.com" style="padding: 12px; border-radius: 8px; background: rgba(8,17,31,0.8); color: white; outline: none;">
                 <select name="theme" style="padding: 12px; border-radius: 8px; background: rgba(8,17,31,0.8); color: white; outline: none;">
-                    <option value="cyan" {% if my_theme == 'cyan' %}selected{% endif %}>Cyan</option>
+                    <option value="cyan" {% if my_theme == 'cyan' %}selected{% endif %}>Cyan (Default)</option>
                     <option value="gold" {% if my_theme == 'gold' %}selected{% endif %}>Gold</option>
                     <option value="rose" {% if my_theme == 'rose' %}selected{% endif %}>Rose Pink</option>
                     <option value="matrix" {% if my_theme == 'matrix' %}selected{% endif %}>Matrix Green</option>
@@ -236,6 +237,7 @@
                 <input type="hidden" name="action" value="delete_account">
                 <button type="submit" class="btn" style="width: 100%; background: rgba(239, 68, 68, 0.1); border: 1px solid var(--danger); color: var(--danger);">⚠️ Request Account Deletion</button>
             </form>
+            
             <a href="{{ url_for('logout') }}" class="btn" style="width: 100%; text-align: center; display: block; margin-top: 15px; background: var(--danger); color: white;">Logout</a>
         </div>
     </div>
@@ -243,6 +245,32 @@
 
     <script>
         window.addEventListener('load', () => { setTimeout(() => { const splash = document.getElementById('splash-screen'); if(splash) splash.classList.add('hidden'); }, 600); });
+        
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            const installBtn = document.getElementById('installAppBtn');
+            if(installBtn) installBtn.style.display = 'inline-block';
+        });
+
+        const installBtnElement = document.getElementById('installAppBtn');
+        if (installBtnElement) {
+            installBtnElement.addEventListener('click', async () => {
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    const { outcome } = await deferredPrompt.userChoice;
+                    if (outcome === 'accepted') { installBtnElement.style.display = 'none'; }
+                    deferredPrompt = null;
+                }
+            });
+        }
+
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register("{{ url_for('static', filename='js/service-worker.js') }}").catch(()=>{});
+            });
+        }
         
         async function generateAICaption() {
             const cat = document.getElementById('vaultCategory').value;
@@ -280,7 +308,6 @@
             if (dropdown && !dropdown.contains(event.target) && event.target !== searchInput) { dropdown.style.display = 'none'; }
         });
 
-        // 💥 PHASE 74: LIVE IN-APP NOTIFICATIONS ENGINE 💥
         {% if session.get('username') %}
         let currentUnread = {{ unread_notifications }};
         setInterval(async () => {
@@ -302,7 +329,7 @@
                     currentUnread = data.unread;
                 }
             } catch(e) {}
-        }, 10000); // Polling every 10 seconds silently
+        }, 10000);
         {% endif %}
     </script>
 </body>
