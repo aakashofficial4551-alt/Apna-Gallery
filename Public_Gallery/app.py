@@ -64,7 +64,6 @@ def security_firewall_and_session_check():
     ip = request.remote_addr or "127.0.0.1"
     now = time.time()
     
-    # 1. Anti-DDoS
     request_tracker[ip] = [t for t in request_tracker[ip] if now - t < 60]
     if len(request_tracker[ip]) > 200:
         BANNED_IPS.add(ip)
@@ -75,7 +74,6 @@ def security_firewall_and_session_check():
     if request.endpoint in ['index', 'login', 'verify_otp', 'logout', 'static', 'api_search_suggest', 'privacy_policy', 'terms', 'about'] or (request.path and request.path.startswith('/static/')):
         return
 
-    # 2. Strict CSRF Verification
     if request.method in ["POST", "PUT", "DELETE"]:
         token = request.form.get("csrf_token") or request.headers.get("X-CSRF-Token")
         session_token = session.get("csrf_token")
@@ -85,7 +83,6 @@ def security_firewall_and_session_check():
                 flash("Security Firewall Blocked Your Request: Invalid Validation Token.", "error")
                 return redirect(request.referrer or url_for('feed'))
 
-    # 3. GUILLOTINE ENGINE: SESSION TERMINATION
     if "username" in session:
         conn = get_db_connection()
         c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
@@ -216,7 +213,7 @@ def upgrade_db():
         c.execute("UPDATE comments SET likes = 0 WHERE likes IS NULL")
         conn.commit()
     except: conn.rollback()
-    
+
     try:
         c.execute("SELECT id FROM users WHERE user_code IS NULL")
         for row in c.fetchall():
@@ -387,12 +384,10 @@ def sync_admin_session():
             session["is_admin"] = (user["role"] == "admin")
 
 # =========================================================
-# 💥 PHASE 86 & 87: PUBLIC ROUTES & LANDING PAGE 💥
+# PUBLIC ROUTES & LANDING PAGE
 # =========================================================
 @app.route("/")
 def index():
-    # If already logged in, they can still see the beautiful landing page
-    # and the button will say "Go to Dashboard" instead of Login.
     return render_template("index.html")
 
 @app.route("/terms")
@@ -566,7 +561,7 @@ def buy_verification():
     return redirect(request.referrer or url_for("dashboard"))
 
 # =========================================================
-# ASSET MANAGEMENT & POSTING
+# ASSET MANAGEMENT, POST VIEW & TIPPING 
 # =========================================================
 @app.route("/upload_asset", methods=["POST"])
 def upload_asset():
@@ -613,16 +608,21 @@ def view_post(media_id):
     block_filter = "m.uploaded_by NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) AND m.uploaded_by NOT IN (SELECT blocker FROM blocks WHERE blocked = %s)"
     c.execute(f"SELECT m.*, u.profile_pic, u.role, u.is_verified FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.id = %s AND {block_filter}", (media_id, session["username"], session["username"]))
     post = c.fetchone()
+    
     if not post:
         conn.close()
         return render_template("404.html")
+        
     post_dict = dict(post)
     c.execute("SELECT c.*, u.role, u.is_verified FROM comments c JOIN users u ON c.username = u.username WHERE c.media_id = %s ORDER BY c.id ASC", (media_id,))
     post_dict['comments'] = [dict(row) for row in c.fetchall()]
+    
     c.execute("SELECT id FROM bookmarks WHERE username = %s AND media_id = %s", (session["username"], media_id))
     post_dict['is_saved'] = bool(c.fetchone())
+    
     post_dict['created_at'] = timeago(post_dict['created_at'])
     for comm in post_dict['comments']: comm['created_at'] = timeago(comm['created_at'])
+    
     conn.close()
     return render_template("single_post.html", post=post_dict, hide_navbar=True)
 
@@ -735,7 +735,6 @@ def like_comment(comment_id):
         comment_info = c.fetchone()
         if comment_info and comment_info['username'] != username:
             c.execute("SELECT category FROM media WHERE id = %s", (comment_info['media_id'],))
-            media_cat = c.fetchone()
             c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (comment_info['username'], f"❤️ {username} liked your comment!", f"/post/{comment_info['media_id']}"))
         conn.commit()
     c.execute("SELECT likes FROM comments WHERE id = %s", (comment_id,))
@@ -1213,17 +1212,42 @@ def ai_studio():
             return render_template("ai_studio.html", chat_reply=reply, user_prompt=prompt, hide_navbar=True)
     return render_template("ai_studio.html", hide_navbar=True)
 
-@app.route("/analytics")
-def analytics():
+@app.route("/gallery/<category>", methods=["GET", "POST"])
+def gallery(category):
     if "username" not in session: return redirect(url_for("login"))
     conn = get_db_connection()
-    c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    c.execute("SELECT COUNT(id) as total_posts, SUM(views) as total_views, SUM(likes) as total_likes, SUM(tips_received) as total_tips FROM media WHERE uploaded_by = %s", (session["username"],))
-    stats = c.fetchone()
-    c.execute("SELECT title, views, likes, tips_received, category, filename FROM media WHERE uploaded_by = %s ORDER BY views DESC LIMIT 5", (session["username"],))
-    top_posts = c.fetchall()
+    c = conn.cursor()
+    if request.method == "POST":
+        try:
+            filename = "SHAYARI_TEXT"
+            if category != 'Shayari':
+                file = request.files.get("media")
+                if file and file.filename != "":
+                    filename = save_uploaded_file(file, category)
+                    if not filename:
+                        flash("Upload Failed! Check API keys.", "error")
+                        return redirect(url_for("gallery", category=category))
+            
+            is_approved = 1 if current_user_is_admin() else 0
+            visibility = request.form.get("visibility", "public")
+            c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved, visibility, views, is_pinned) VALUES (%s, %s, %s, %s, %s, %s, %s, 0, FALSE)",
+                      (filename, html.escape(request.form.get("title", "Untitled")), category, "", session.get("username"), is_approved, visibility))
+            conn.commit()
+            flash("File live!" if is_approved else "Sent to Admin for approval.", "success")
+        except Exception as e:
+            conn.rollback()
+            flash(f"Upload System Fault: {str(e)[:100]}", "error")
+        return redirect(url_for("gallery", category=category))
+
+    c.execute("SELECT m.*, u.profile_pic, u.role, u.is_verified FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.category = %s AND m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' AND m.uploaded_by NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) ORDER BY m.id DESC", (category, session["username"]))
+    if category == 'Shayari': c.execute("SELECT m.*, u.role, u.is_verified FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.category = %s AND m.approved = 1 AND m.visibility = 'public' AND m.uploaded_by NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) ORDER BY m.id DESC", (category, session["username"]))
+    media_files = c.fetchall()
+    c.execute("SELECT c.*, u.role, u.is_verified FROM comments c JOIN users u ON c.username = u.username ORDER BY c.id ASC")
+    comments_db = c.fetchall()
     conn.close()
-    return render_template("analytics.html", stats=stats, top_posts=top_posts, hide_navbar=True)
+    comments = defaultdict(list)
+    for comment in comments_db: comments[comment["media_id"]].append(comment)
+    return render_template("gallery.html", media_files=media_files, category=category, comments=comments)
 
 # =========================================================
 # ADMIN CONTROLS
@@ -1380,33 +1404,6 @@ def mystery():
     if hmac.compare_digest(request.form.get("passcode", ""), os.environ.get("MYSTERY_CODE", "SOCHO")): return render_template("mystery.html")
     flash("Incorrect code.", "error")
     return redirect(url_for("dashboard"))
-
-@app.route("/privacy")
-def privacy_policy():
-    return render_template("privacy.html", hide_navbar=True)
-
-@app.route("/terms")
-def terms():
-    return render_template("terms.html", hide_navbar=True)
-
-@app.route("/about")
-def about():
-    return render_template("about.html", hide_navbar=True)
-
-@app.route("/manifest.json")
-def dynamic_manifest():
-    app_name = "VibeX"
-    manifest_data = {
-        "name": app_name,
-        "short_name": app_name,
-        "description": "The ultimate creator ecosystem and social vault.",
-        "start_url": "/",
-        "display": "standalone",
-        "background_color": "#0f172a",
-        "theme_color": "#0f172a",
-        "icons": [{"src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png"}, {"src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png"}]
-    }
-    return jsonify(manifest_data)
 
 @app.errorhandler(404)
 def not_found_error(error): return render_template("404.html"), 404
