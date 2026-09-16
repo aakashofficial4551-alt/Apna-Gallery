@@ -130,7 +130,6 @@ def upgrade_db():
     safe_alter(c, conn, "ALTER TABLE media ADD COLUMN IF NOT EXISTS views INTEGER DEFAULT 0")
     safe_alter(c, conn, "ALTER TABLE media ADD COLUMN IF NOT EXISTS is_pinned BOOLEAN DEFAULT FALSE")
     safe_alter(c, conn, "ALTER TABLE comments ADD COLUMN IF NOT EXISTS likes INTEGER DEFAULT 0")
-    
     safe_alter(c, conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(120) UNIQUE")
     safe_alter(c, conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS user_code VARCHAR(10) UNIQUE")
     safe_alter(c, conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
@@ -157,43 +156,43 @@ def upgrade_db():
         c.execute("UPDATE comments SET likes = 0 WHERE likes IS NULL")
         conn.commit()
     except: conn.rollback()
+
+    try:
+        c.execute("SELECT id FROM users WHERE user_code IS NULL")
+        for row in c.fetchall():
+            code = ''.join(secrets.choice("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ") for _ in range(10))
+            c.execute("UPDATE users SET user_code = %s WHERE id = %s", (code, row['id']))
+        conn.commit()
+    except: conn.rollback()
         
     conn.close()
 
 upgrade_db()
 
 # =========================================================
-# 💥 THE GRIM REAPER (NEW: STRICT AUTO-CLEANUP POLICIES) 💥
+# THE GRIM REAPER (AUTO-CLEANUP)
 # =========================================================
 def cleanup_database():
     conn = get_db_connection()
     c = conn.cursor()
     try:
-        # 1. BOTS: 7 Days Lifecycle
         c.execute("DELETE FROM users WHERE role = 'bot' AND created_at < NOW() - INTERVAL '7 days'")
-        
-        # 2. GUESTS: 3 Days Inactive Lifecycle (Strict)
         c.execute("DELETE FROM users WHERE username LIKE 'Guest-%%' AND last_active < NOW() - INTERVAL '3 days'")
-        
-        # 3. REAL USERS: 3 Months Inactive Lifecycle
         c.execute("DELETE FROM users WHERE role = 'user' AND username NOT LIKE 'Guest-%%' AND last_active < NOW() - INTERVAL '90 days'")
         c.execute("DELETE FROM users WHERE deletion_requested IS NOT NULL AND deletion_requested < NOW() - INTERVAL '7 days'")
-        
-        # 4. BOT POSTS: 24-Hour Cycle (Keep feed fresh)
         c.execute("DELETE FROM media WHERE uploaded_by IN (SELECT username FROM users WHERE role = 'bot') AND created_at < NOW() - INTERVAL '24 hours'")
         
-        # 5. VANISH MODE CHATS: Global (5 Mins) & Personal DMs (24 Hours)
-        c.execute("DELETE FROM global_chat WHERE created_at < NOW() - INTERVAL '5 minutes'")
-        c.execute("DELETE FROM messages WHERE created_at < NOW() - INTERVAL '24 hours'")
-        
-        # 6. ORPHAN DATA PURGE (Save Storage)
         c.execute("DELETE FROM media WHERE uploaded_by NOT IN (SELECT username FROM users)")
         c.execute("DELETE FROM comments WHERE username NOT IN (SELECT username FROM users)")
         c.execute("DELETE FROM likes WHERE username NOT IN (SELECT username FROM users)")
         c.execute("DELETE FROM followers WHERE follower NOT IN (SELECT username FROM users) OR following NOT IN (SELECT username FROM users)")
+        c.execute("DELETE FROM messages WHERE sender NOT IN (SELECT username FROM users) OR receiver NOT IN (SELECT username FROM users)")
         c.execute("DELETE FROM blocks WHERE blocker NOT IN (SELECT username FROM users) OR blocked NOT IN (SELECT username FROM users)")
-        c.execute("DELETE FROM stories WHERE created_at < NOW() - INTERVAL '12 hours'")
         
+        c.execute("DELETE FROM global_chat WHERE created_at < NOW() - INTERVAL '5 minutes'")
+        c.execute("DELETE FROM stories WHERE created_at < NOW() - INTERVAL '12 hours'")
+        c.execute("DELETE FROM messages WHERE created_at < NOW() - INTERVAL '24 hours'")
+        c.execute("DELETE FROM notifications WHERE id NOT IN (SELECT id FROM notifications ORDER BY id DESC LIMIT 500)")
         conn.commit()
     except Exception as e: print("Cleanup Error:", e)
     finally: conn.close()
@@ -229,7 +228,7 @@ def run_bot_engine():
             
         action = random.randint(1, 100)
         
-        if action <= 35:  # Uploads
+        if action <= 35: 
             cat = random.choice(["Photo", "Photo", "Photo", "Shayari"])
             if cat == "Photo":
                 img_url = f"https://picsum.photos/800/1000?random={random.randint(1, 100000)}"
@@ -240,15 +239,15 @@ def run_bot_engine():
             
             c.execute("INSERT INTO media (filename, title, category, uploaded_by, approved, visibility, views) VALUES (%s, %s, %s, %s, 1, 'public', %s)",
                       (img_url, caption, cat, bot_username, random.randint(5, 50)))
-        elif 35 < action <= 70: # Global Chat
+        elif 35 < action <= 70:
             c.execute("INSERT INTO global_chat (sender, message) VALUES (%s, %s)", (bot_username, random.choice(bot_chats)))
-        elif 70 < action <= 85: # Follow Bots Only
+        elif 70 < action <= 85:
             c.execute("SELECT username FROM users WHERE role = 'bot' AND username != %s ORDER BY RANDOM() LIMIT 1", (bot_username,))
             target = c.fetchone()
             if target:
                 try: c.execute("INSERT INTO followers (follower, following) VALUES (%s, %s)", (bot_username, target['username']))
                 except: pass
-        elif action > 85: # Like Any Media
+        elif action > 85: 
             c.execute("SELECT id FROM media ORDER BY RANDOM() LIMIT 1")
             media = c.fetchone()
             if media:
@@ -256,7 +255,6 @@ def run_bot_engine():
                     c.execute("INSERT INTO likes (media_id, username) VALUES (%s, %s) ON CONFLICT DO NOTHING", (media['id'], bot_username))
                     if c.rowcount == 1: c.execute("UPDATE media SET likes = likes + 1 WHERE id = %s", (media['id'],))
                 except: pass
-
         conn.commit()
     except Exception as e: print("Bot Engine Error:", e)
     finally: conn.close()
@@ -273,7 +271,7 @@ def update_activity():
     if random.random() < 0.05: 
         cleanup_database()
         create_database_backup()
-    if random.random() < 0.20: run_bot_engine() # 20% Chance for more activity
+    if random.random() < 0.20: run_bot_engine() 
         
     if "username" in session:
         try:
@@ -409,25 +407,6 @@ def login():
             
     return render_template("login.html")
 
-@app.route("/verify_otp", methods=["GET", "POST"])
-def verify_otp():
-    if 'reset_email' not in session: return redirect(url_for("login"))
-    if request.method == "POST":
-        otp = request.form.get("otp")
-        new_pass = request.form.get("new_password")
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute("SELECT * FROM users WHERE email = %s AND otp = %s", (session['reset_email'], otp))
-        if c.fetchone():
-            c.execute("UPDATE users SET password = %s, otp = NULL WHERE email = %s", (generate_password_hash(new_pass), session['reset_email']))
-            conn.commit()
-            session.pop('reset_email', None)
-            flash("Password updated successfully!", "success")
-            return redirect(url_for("login"))
-        flash("Invalid OTP.", "error")
-        conn.close()
-    return render_template("verify_otp.html")
-
 @app.route("/logout")
 def logout():
     session.clear()
@@ -450,7 +429,6 @@ def settings():
         c.execute("UPDATE users SET password = %s WHERE username = %s", (generate_password_hash(new_pass), session["username"]))
         flash("Password Changed Successfully!", "success")
         
-    # 💥 NEW: GUEST UPGRADE TO PERMANENT ACCOUNT 💥
     elif action == "upgrade_guest":
         new_username = request.form.get("new_username", "").strip()
         email = request.form.get("email", "").strip()
@@ -463,7 +441,6 @@ def settings():
         else:
             try:
                 c.execute("UPDATE users SET username = %s, email = %s, password = %s WHERE username = %s", (new_username, email, generate_password_hash(password), old_username))
-                # Cascading Username Updates for safety
                 tables_to_update = [
                     ("media", "uploaded_by"), ("comments", "username"), ("likes", "username"),
                     ("followers", "follower"), ("followers", "following"), ("messages", "sender"),
@@ -473,13 +450,10 @@ def settings():
                 ]
                 for table, col in tables_to_update:
                     c.execute(f"UPDATE {table} SET {col} = %s WHERE {col} = %s", (new_username, old_username))
-                
                 session.update({"username": new_username, "is_registered": True})
                 flash("Account Upgraded Permanently! 🎉", "success")
-            except Exception as e:
-                flash("Error upgrading account.", "error")
+            except Exception: flash("Error upgrading account.", "error")
 
-    # 💥 NEW: UNBLOCK USER FROM SETTINGS 💥
     elif action == "unblock_user":
         target = request.form.get("blocked_username")
         c.execute("DELETE FROM blocks WHERE blocker = %s AND blocked = %s", (session["username"], target))
@@ -522,7 +496,6 @@ def upload_asset():
         c = conn.cursor()
         c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved, visibility, views, is_pinned) VALUES (%s, %s, %s, %s, %s, %s, %s, 0, FALSE)",
                   (filename, title, category, "", session.get("username"), is_approved, visibility))
-        
         mentions = set(re.findall(r'@(\w+)', title))
         for m in mentions:
             if m != session["username"]:
@@ -536,31 +509,6 @@ def upload_asset():
         flash(f"Server Alert: {str(e)[:150]}", "error")
     return redirect(request.referrer or url_for("feed"))
 
-@app.route("/edit_post/<int:media_id>", methods=["POST"])
-def edit_post(media_id):
-    if "username" not in session: return redirect(url_for("login"))
-    new_title = request.form.get("title", "").strip()
-    if new_title:
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute("UPDATE media SET title = %s WHERE id = %s AND uploaded_by = %s", (new_title, media_id, session["username"]))
-        conn.commit()
-        conn.close()
-        flash("Post updated!", "success")
-    return redirect(request.referrer or url_for("profile"))
-
-@app.route("/pin_post/<int:media_id>", methods=["POST"])
-def pin_post(media_id):
-    if "username" not in session: return redirect(url_for("login"))
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("UPDATE media SET is_pinned = FALSE WHERE uploaded_by = %s", (session["username"],))
-    c.execute("UPDATE media SET is_pinned = TRUE WHERE id = %s AND uploaded_by = %s", (media_id, session["username"]))
-    conn.commit()
-    conn.close()
-    flash("Post Pinned!", "success")
-    return redirect(request.referrer or url_for("profile"))
-
 @app.route("/api/view/<int:media_id>", methods=["POST"])
 def add_view(media_id):
     conn = get_db_connection()
@@ -569,24 +517,6 @@ def add_view(media_id):
     conn.commit()
     conn.close()
     return jsonify({"success": True})
-
-@app.route("/block/<username>", methods=["POST"])
-def block_user(username):
-    if "username" not in session: return jsonify({"error": "Login required"}), 401
-    current_user = session["username"]
-    if current_user == username: return jsonify({"error": "Cannot block yourself"}), 400
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("DELETE FROM followers WHERE (follower = %s AND following = %s) OR (follower = %s AND following = %s)", (current_user, username, username, current_user))
-    try:
-        c.execute("INSERT INTO blocks (blocker, blocked) VALUES (%s, %s)", (current_user, username))
-        conn.commit()
-        success = True
-    except:
-        conn.rollback()
-        success = False
-    conn.close()
-    return jsonify({"success": success})
 
 # =========================================================
 # CORE ROUTES
@@ -656,35 +586,16 @@ def explore():
     c = conn.cursor()
     c.execute("SELECT m.id, m.filename, m.title, m.category, m.likes, m.views, m.uploaded_by FROM media m WHERE m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' AND m.uploaded_by NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) ORDER BY RANDOM() LIMIT 40", (session["username"],))
     explore_posts = c.fetchall()
-    
-    c.execute("SELECT title FROM media WHERE approved = 1 AND visibility = 'public'")
-    all_titles = c.fetchall()
     conn.close()
-    
-    tag_counts = defaultdict(int)
-    for row in all_titles:
-        if row['title']:
-            tags = re.findall(r'#(\w+)', row['title'])
-            for t in tags: tag_counts[t.lower()] += 1
-    trending_tags = [tag for tag, count in sorted(tag_counts.items(), key=lambda x: x[1], reverse=True)[:6]]
-    return render_template("explore.html", posts=explore_posts, trending_tags=trending_tags)
+    return render_template("explore.html", posts=explore_posts)
 
 @app.route("/dashboard")
 def dashboard():
     if "username" not in session: return redirect(url_for("login"))
     sync_admin_session()
-    try:
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute("SELECT id, title, filename, category, likes, views FROM media WHERE approved = 1 AND visibility = 'public' AND filename != 'SHAYARI_TEXT' ORDER BY likes DESC LIMIT 3")
-        trending = c.fetchall()
-        c.execute("SELECT s.id, s.username, s.filename, s.created_at, u.profile_pic, u.role, u.is_verified FROM stories s JOIN users u ON s.username = u.username WHERE s.created_at >= NOW() - INTERVAL '12 hours' AND s.username NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) ORDER BY s.id DESC", (session["username"],))
-        stories = c.fetchall()
-        conn.close()
-        return render_template("dashboard.html", trending=trending, stories=stories)
-    except Exception as e:
-        return f"<div style='color:#f43f5e; padding:50px; text-align:center;'><h1>Dashboard Engine Error</h1><p>{str(e)}</p><a href='/feed'>Go back to Feed</a></div>"
+    return render_template("dashboard.html")
 
+# 💥 NATIVE APP DEDICATED ROUTES (hide_navbar=True) 💥
 @app.route("/notifications")
 def notifications():
     if "username" not in session: return redirect(url_for("login"))
@@ -695,129 +606,8 @@ def notifications():
     c.execute("UPDATE notifications SET is_read = TRUE WHERE username = %s AND is_read = FALSE", (session["username"],))
     conn.commit()
     conn.close()
-    return render_template("notifications.html", notifications=notifs)
+    return render_template("notifications.html", notifications=notifs, hide_navbar=True)
 
-@app.route("/clear_notifications", methods=["POST"])
-def clear_notifications():
-    if "username" not in session: return redirect(url_for("login"))
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("DELETE FROM notifications WHERE username = %s", (session["username"],))
-    conn.commit()
-    conn.close()
-    flash("Inbox cleared!", "success")
-    return redirect(url_for("notifications"))
-
-@app.route("/profile", methods=["GET", "POST"])
-def profile():
-    if "username" not in session: return redirect(url_for("login"))
-    conn = get_db_connection()
-    c = conn.cursor()
-
-    if request.method == "POST":
-        action = request.form.get("action")
-        if action == "avatar" and "profile_pic" in request.files:
-            url = save_uploaded_file(request.files["profile_pic"], "Photo")
-            if url: c.execute("UPDATE users SET profile_pic = %s WHERE username = %s", (url, session["username"]))
-        elif action == "cover" and "cover_pic" in request.files:
-            url = save_uploaded_file(request.files["cover_pic"], "Photo")
-            if url: c.execute("UPDATE users SET cover_pic = %s WHERE username = %s", (url, session["username"]))
-        elif action == "story" and "story_media" in request.files:
-            url = save_uploaded_file(request.files["story_media"], "Photo")
-            if url: c.execute("INSERT INTO stories (username, filename) VALUES (%s, %s)", (session["username"], url))
-        conn.commit()
-        return redirect(url_for("profile"))
-
-    c.execute("SELECT * FROM users WHERE username = %s", (session["username"],))
-    user = c.fetchone()
-    c.execute("SELECT * FROM media WHERE uploaded_by = %s ORDER BY is_pinned DESC, id DESC", (session["username"],))
-    my_uploads = c.fetchall()
-    c.execute("SELECT COUNT(*) as cnt FROM followers WHERE following = %s", (session["username"],))
-    followers_count = c.fetchone()['cnt']
-    c.execute("SELECT COUNT(*) as cnt FROM followers WHERE follower = %s", (session["username"],))
-    following_count = c.fetchone()['cnt']
-    c.execute("SELECT m.* FROM media m JOIN bookmarks b ON m.id = b.media_id WHERE b.username = %s ORDER BY b.id DESC", (session["username"],))
-    saved_uploads = c.fetchall()
-    conn.close()
-    return render_template("profile.html", user=user, my_uploads=my_uploads, saved_uploads=saved_uploads, post_count=len(my_uploads), followers_count=followers_count, following_count=following_count)
-
-# =========================================================
-# PUBLIC PORTFOLIO & FOLLOW SYSTEM
-# =========================================================
-@app.route("/agent/<username>")
-def agent_profile(username):
-    if "username" not in session: return redirect(url_for("login"))
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("SELECT * FROM blocks WHERE (blocker = %s AND blocked = %s) OR (blocker = %s AND blocked = %s)", (session["username"], username, username, session["username"]))
-    if c.fetchone():
-        flash("You cannot view this profile.", "error")
-        conn.close()
-        return redirect(url_for("feed"))
-        
-    c.execute("SELECT * FROM users WHERE username = %s", (username,))
-    agent = c.fetchone()
-    if not agent:
-        flash("Agent not found.", "error")
-        conn.close()
-        return redirect(url_for("feed"))
-        
-    c.execute("SELECT id FROM followers WHERE follower = %s AND following = %s", (session["username"], username))
-    is_following = bool(c.fetchone())
-    
-    if is_following:
-        c.execute("SELECT m.*, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.uploaded_by = %s AND m.approved = 1 AND m.visibility IN ('public', 'followers') AND m.filename != 'SHAYARI_TEXT' ORDER BY m.is_pinned DESC, m.id DESC", (username,))
-    else:
-        c.execute("SELECT m.*, u.role FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.uploaded_by = %s AND m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' ORDER BY m.is_pinned DESC, m.id DESC", (username,))
-        
-    agent_uploads = c.fetchall()
-    c.execute("SELECT COUNT(*) as cnt FROM followers WHERE following = %s", (username,))
-    followers_count = c.fetchone()['cnt']
-    c.execute("SELECT COUNT(*) as cnt FROM followers WHERE follower = %s", (username,))
-    following_count = c.fetchone()['cnt']
-    conn.close()
-    return render_template("agent.html", agent=agent, uploads=agent_uploads, post_count=len(agent_uploads), followers_count=followers_count, following_count=following_count, is_following=is_following)
-
-@app.route("/follow/<username>", methods=["POST"])
-def follow(username):
-    if "username" not in session: return jsonify({"error": "Login required"}), 401
-    current_user = session["username"]
-    if current_user == username: return jsonify({"error": "Cannot follow yourself"}), 400
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("SELECT id FROM users WHERE username = %s", (username,))
-    if not c.fetchone(): return jsonify({"error": "User not found"}), 404
-    c.execute("SELECT id FROM followers WHERE follower = %s AND following = %s", (current_user, username))
-    is_following = c.fetchone()
-    if is_following:
-        c.execute("DELETE FROM followers WHERE follower = %s AND following = %s", (current_user, username))
-        following_now = False
-    else:
-        c.execute("INSERT INTO followers (follower, following) VALUES (%s, %s)", (current_user, username))
-        c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (username, f"👤 {current_user} started following you!", f"/agent/{current_user}"))
-        following_now = True
-    conn.commit()
-    c.execute("SELECT COUNT(*) as cnt FROM followers WHERE following = %s", (username,))
-    followers_count = c.fetchone()['cnt']
-    conn.close()
-    return jsonify({"followers": followers_count, "following_now": following_now})
-
-@app.route("/api/network/<action_type>/<username>")
-def api_network(action_type, username):
-    if "username" not in session: return jsonify([])
-    conn = get_db_connection()
-    c = conn.cursor()
-    if action_type == "followers":
-        c.execute("SELECT u.username, u.profile_pic, u.role, u.is_verified FROM users u JOIN followers f ON u.username = f.follower WHERE f.following = %s", (username,))
-    else:
-        c.execute("SELECT u.username, u.profile_pic, u.role, u.is_verified FROM users u JOIN followers f ON u.username = f.following WHERE f.follower = %s", (username,))
-    results = c.fetchall()
-    conn.close()
-    return jsonify(results)
-
-# =========================================================
-# DIRECT MESSAGING & STORY DM
-# =========================================================
 @app.route("/inbox")
 def inbox():
     if "username" not in session: return redirect(url_for("login"))
@@ -835,7 +625,7 @@ def inbox():
         c.execute("SELECT COUNT(id) as cnt FROM messages WHERE sender = %s AND receiver = %s AND is_read = FALSE", (contact['username'], me))
         contact['unread'] = c.fetchone()['cnt']
     conn.close()
-    return render_template("inbox.html", contacts=contacts)
+    return render_template("inbox.html", contacts=contacts, hide_navbar=True)
 
 @app.route("/chat/<username>", methods=["GET", "POST"])
 def chat(username):
@@ -858,13 +648,25 @@ def chat(username):
         
     c.execute("UPDATE messages SET is_read = TRUE WHERE sender = %s AND receiver = %s AND is_read = FALSE", (username, me))
     conn.commit()
-    c.execute("SELECT * FROM messages WHERE (sender = %s AND receiver = %s) OR (sender = %s AND receiver = %s) ORDER BY created_at ASC", (me, username, username, me))
-    chat_history = c.fetchall()
     c.execute("SELECT username, profile_pic, role, last_active, is_verified FROM users WHERE username = %s", (username,))
     contact = c.fetchone()
     conn.close()
     if not contact: return redirect(url_for("inbox"))
-    return render_template("chat.html", chat_history=chat_history, contact=contact)
+    return render_template("chat.html", contact=contact, hide_navbar=True)
+
+@app.route("/global_chat", methods=["GET", "POST"])
+def global_chat():
+    if "username" not in session: return redirect(url_for("login"))
+    conn = get_db_connection()
+    c = conn.cursor()
+    if request.method == "POST":
+        msg = request.form.get("message", "").strip()
+        if msg:
+            c.execute("INSERT INTO global_chat (sender, message) VALUES (%s, %s)", (session["username"], msg[:500]))
+            conn.commit()
+        return redirect(url_for("global_chat"))
+    conn.close()
+    return render_template("global_chat.html", hide_navbar=True)
 
 @app.route("/api/chat_history/<username>")
 def api_chat_history(username):
@@ -879,43 +681,6 @@ def api_chat_history(username):
     conn.close()
     formatted_history = [{"id": r['id'], "sender": r['sender'], "message": r['message'], "time": r['time'], "is_read": r['is_read']} for r in history]
     return jsonify(formatted_history)
-
-@app.route("/unsend_message/<int:msg_id>", methods=["POST"])
-def unsend_message(msg_id):
-    if "username" not in session: return jsonify({"success": False})
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("DELETE FROM messages WHERE id = %s AND sender = %s", (msg_id, session["username"]))
-    conn.commit()
-    conn.close()
-    return jsonify({"success": True})
-
-@app.route("/reply_story/<username>", methods=["POST"])
-def reply_story(username):
-    if "username" not in session: return jsonify({"error": "Login required"}), 401
-    msg = request.form.get("message", "").strip()
-    if msg:
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute("INSERT INTO messages (sender, receiver, message) VALUES (%s, %s, %s)", (session["username"], username, f"Replying to your story: {msg}"))
-        conn.commit()
-        conn.close()
-        return jsonify({"success": True})
-    return jsonify({"error": "Empty message"}), 400
-
-@app.route("/global_chat", methods=["GET", "POST"])
-def global_chat():
-    if "username" not in session: return redirect(url_for("login"))
-    conn = get_db_connection()
-    c = conn.cursor()
-    if request.method == "POST":
-        msg = request.form.get("message", "").strip()
-        if msg:
-            c.execute("INSERT INTO global_chat (sender, message) VALUES (%s, %s)", (session["username"], msg[:500]))
-            conn.commit()
-        return redirect(url_for("global_chat"))
-    conn.close()
-    return render_template("global_chat.html")
 
 @app.route("/api/global_chat_history")
 def api_global_chat_history():
@@ -933,347 +698,39 @@ def api_global_chat_history():
     formatted = [{"id": r['id'], "sender": r['sender'], "message": r['message'], "time": r['time'], "role": r['role'], "is_verified": r['is_verified']} for r in history]
     return jsonify(formatted)
 
-# =========================================================
-# LIKES, COMMENTS, SEARCH, GALLERY & AI STUDIO
-# =========================================================
-@app.route("/search")
-def search():
-    if "username" not in session: return redirect(url_for("login"))
-    query = request.args.get("q", "").strip()
-    if not query: return redirect(url_for("dashboard"))
-    conn = get_db_connection()
-    c = conn.cursor()
-    clean_query = query.replace("#", "").replace("@", "")
-    search_term = f"%{clean_query}%"
-    c.execute("SELECT m.*, u.profile_pic, u.role, u.is_verified FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' AND (m.title ILIKE %s OR m.prompt ILIKE %s) AND m.uploaded_by NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) ORDER BY m.id DESC", (search_term, search_term, session["username"]))
-    media_files = c.fetchall()
-    c.execute("SELECT username, profile_pic, role, bio, is_verified FROM users WHERE username ILIKE %s AND username NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) LIMIT 20", (search_term, session["username"]))
-    found_users = c.fetchall()
-    conn.close()
-    return render_template("search.html", media_files=media_files, found_users=found_users, query=query)
-
-@app.route("/gallery/<category>", methods=["GET", "POST"])
-def gallery(category):
+@app.route("/profile", methods=["GET", "POST"])
+def profile():
     if "username" not in session: return redirect(url_for("login"))
     conn = get_db_connection()
     c = conn.cursor()
-    if request.method == "POST":
-        try:
-            filename = "SHAYARI_TEXT"
-            if category != 'Shayari':
-                file = request.files.get("media")
-                if file and file.filename != "":
-                    filename = save_uploaded_file(file, category)
-                    if not filename:
-                        flash("Upload Failed! Check API keys.", "error")
-                        return redirect(url_for("gallery", category=category))
-            
-            is_approved = 1 if current_user_is_admin() else 0
-            visibility = request.form.get("visibility", "public")
-            c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved, visibility, views, is_pinned) VALUES (%s, %s, %s, %s, %s, %s, %s, 0, FALSE)",
-                      (filename, request.form.get("title", "Untitled"), category, "", session.get("username"), is_approved, visibility))
-            conn.commit()
-            flash("File live!" if is_approved else "Sent to Admin for approval.", "success")
-        except Exception as e:
-            conn.rollback()
-            flash(f"Upload System Fault: {str(e)[:100]}", "error")
-        return redirect(url_for("gallery", category=category))
-
-    c.execute("SELECT m.*, u.profile_pic, u.role, u.is_verified FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.category = %s AND m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' AND m.uploaded_by NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) ORDER BY m.id DESC", (category, session["username"]))
-    if category == 'Shayari': c.execute("SELECT m.*, u.role, u.is_verified FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.category = %s AND m.approved = 1 AND m.visibility = 'public' AND m.uploaded_by NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) ORDER BY m.id DESC", (category, session["username"]))
-    media_files = c.fetchall()
-    c.execute("SELECT c.*, u.role, u.is_verified FROM comments c JOIN users u ON c.username = u.username ORDER BY c.id ASC")
-    comments_db = c.fetchall()
+    c.execute("SELECT * FROM users WHERE username = %s", (session["username"],))
+    user = c.fetchone()
+    c.execute("SELECT m.* FROM media m JOIN bookmarks b ON m.id = b.media_id WHERE b.username = %s ORDER BY b.id DESC", (session["username"],))
+    saved_uploads = c.fetchall()
     conn.close()
-    comments = defaultdict(list)
-    for comment in comments_db: comments[comment["media_id"]].append(comment)
-    return render_template("gallery.html", media_files=media_files, category=category, comments=comments)
+    return render_template("profile.html", user=user, saved_uploads=saved_uploads)
 
-@app.route("/bookmark/<int:media_id>", methods=["POST"])
-def bookmark(media_id):
-    if "username" not in session: return jsonify({"error": "Login required."}), 401
-    username = session["username"]
+@app.route("/agent/<username>")
+def agent_profile(username):
+    if "username" not in session: return redirect(url_for("login"))
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("SELECT id FROM bookmarks WHERE username = %s AND media_id = %s", (username, media_id))
-    if c.fetchone():
-        c.execute("DELETE FROM bookmarks WHERE username = %s AND media_id = %s", (username, media_id))
-        bookmarked = False
-    else:
-        c.execute("INSERT INTO bookmarks (username, media_id) VALUES (%s, %s)", (username, media_id))
-        bookmarked = True
-    conn.commit()
+    c.execute("SELECT * FROM users WHERE username = %s", (username,))
+    agent = c.fetchone()
     conn.close()
-    return jsonify({"bookmarked": bookmarked})
+    return render_template("agent.html", agent=agent)
 
 @app.route("/api/ai", methods=["POST"])
 def ai_endpoint():
-    if "username" not in session: return jsonify({"reply": "Login first."}), 401
     query = request.get_json(silent=True).get("query", "")[:1000]
-    try: 
-        reply = get_ai_response(query).replace('"', '').replace("'", "")
-    except: 
-        reply = "Beautiful day! #vibes #nature"
+    try: reply = get_ai_response(query).replace('"', '').replace("'", "")
+    except: reply = "Beautiful day! #vibes #nature"
     return jsonify({"reply": reply})
 
 @app.route("/ai-studio", methods=["GET", "POST"])
 def ai_studio():
     if "username" not in session: return redirect(url_for("login"))
-    if request.method == "POST":
-        prompt = request.form.get("prompt", "").strip()
-        if not prompt: return redirect(url_for("ai_studio"))
-        trigger_words = ["create", "generate", "draw", "make an image", "paint"]
-        wants_image = any(word in prompt.lower() for word in trigger_words)
-        
-        if wants_image:
-            encoded_prompt = urllib.parse.quote(prompt)
-            image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?nologo=true"
-            try:
-                r = requests.get(image_url, timeout=15)
-                secure_url = cloudinary.uploader.upload(r.content, resource_type="image")["secure_url"] if r.status_code == 200 else image_url
-                conn = get_db_connection()
-                c = conn.cursor()
-                c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved, visibility, views, is_pinned) VALUES (%s, %s, %s, %s, %s, 1, 'public', 0, FALSE)",
-                          (secure_url, f"AI: {prompt[:20]}...", "Photo", prompt, session["username"]))
-                conn.commit()
-                conn.close()
-                flash("Image created successfully! (100% Free)", "success")
-                return redirect(url_for("gallery", category="Photo"))
-            except: flash("Image generation failed.", "error")
-        else:
-            try: reply = get_ai_response(prompt)
-            except: reply = "I am currently offline."
-            return render_template("ai_studio.html", chat_reply=reply, user_prompt=prompt)
-    return render_template("ai_studio.html")
-
-@app.route("/like/<int:media_id>", methods=["POST"])
-def like(media_id):
-    if "username" not in session: return jsonify({"error": "Login required."}), 401
-    username = str(session["username"])
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("INSERT INTO likes (media_id, username) VALUES (%s, %s) ON CONFLICT (media_id, username) DO NOTHING", (media_id, username))
-    if c.rowcount == 1:
-        c.execute("UPDATE media SET likes = likes + 1 WHERE id = %s", (media_id,))
-        c.execute("SELECT uploaded_by, title, category FROM media WHERE id = %s", (media_id,))
-        media_info = c.fetchone()
-        if media_info and media_info['uploaded_by'] != username:
-            c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (media_info['uploaded_by'], f"❤️ {username} liked your asset: {media_info['title'][:15]}...", f"/gallery/{media_info['category']}"))
-        conn.commit()
-        liked_now = True
-    else: liked_now = False
-    
-    c.execute("SELECT likes FROM media WHERE id = %s", (media_id,))
-    likes = c.fetchone()["likes"]
-    conn.close()
-    return jsonify({"likes": likes, "liked": liked_now})
-
-@app.route("/like_comment/<int:comment_id>", methods=["POST"])
-def like_comment(comment_id):
-    if "username" not in session: return jsonify({"error": "Login required."}), 401
-    username = session["username"]
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("INSERT INTO comment_likes (comment_id, username) VALUES (%s, %s) ON CONFLICT (comment_id, username) DO NOTHING", (comment_id, username))
-    if c.rowcount == 1:
-        c.execute("UPDATE comments SET likes = COALESCE(likes, 0) + 1 WHERE id = %s", (comment_id,))
-        c.execute("SELECT username, media_id FROM comments WHERE id = %s", (comment_id,))
-        comment_info = c.fetchone()
-        if comment_info and comment_info['username'] != username:
-            c.execute("SELECT category FROM media WHERE id = %s", (comment_info['media_id'],))
-            media_cat = c.fetchone()
-            cat = media_cat['category'] if media_cat else 'Photo'
-            c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (comment_info['username'], f"❤️ {username} liked your comment!", f"/gallery/{cat}"))
-        conn.commit()
-    c.execute("SELECT likes FROM comments WHERE id = %s", (comment_id,))
-    likes = c.fetchone()["likes"]
-    conn.close()
-    return jsonify({"likes": likes or 0})
-
-@app.route("/add_comment/<int:media_id>", methods=["POST"])
-def add_comment(media_id):
-    if "username" not in session: return redirect(url_for("login"))
-    text = request.form.get("comment_text", "").strip()
-    if text:
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute("INSERT INTO comments (media_id, username, comment_text) VALUES (%s, %s, %s)", (media_id, session["username"], text[:200]))
-        c.execute("SELECT uploaded_by, title, category FROM media WHERE id = %s", (media_id,))
-        media_info = c.fetchone()
-        
-        if media_info and media_info['uploaded_by'] != session["username"]:
-            c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (media_info['uploaded_by'], f"💬 {session['username']} commented on {media_info['title'][:15]}...", f"/gallery/{media_info['category']}"))
-            
-        mentions = set(re.findall(r'@(\w+)', text))
-        for m in mentions:
-            if m != session["username"]:
-                c.execute("SELECT id FROM users WHERE username = %s", (m,))
-                if c.fetchone():
-                    c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (m, f"📣 {session['username']} mentioned you in a comment!", f"/gallery/{media_info['category']}"))
-        conn.commit()
-        conn.close()
-        flash("Comment posted!", "success")
-    return redirect(request.referrer or url_for("dashboard"))
-
-@app.route("/delete_own/<int:media_id>", methods=["POST"])
-def delete_own(media_id):
-    if "username" not in session: return redirect(url_for("login"))
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("DELETE FROM media WHERE id = %s AND uploaded_by = %s", (media_id, session["username"]))
-    conn.commit()
-    conn.close()
-    flash("Asset permanently deleted.", "success")
-    return redirect(request.referrer or url_for("profile"))
-
-@app.route("/report/<int:media_id>", methods=["POST"])
-def report_asset(media_id):
-    if "username" not in session: return jsonify({"error": "Login required"}), 401
-    conn = get_db_connection()
-    c = conn.cursor()
-    try:
-        c.execute("INSERT INTO reports (media_id, reported_by, reason) VALUES (%s, %s, 'Inappropriate Content')", (media_id, session["username"]))
-        conn.commit()
-        return jsonify({"success": True})
-    except:
-        return jsonify({"error": "Already reported"}), 400
-    finally: conn.close()
-
-# =========================================================
-# ADMIN CONTROLS
-# =========================================================
-@app.route("/admin", methods=["GET", "POST"])
-def admin():
-    if request.method == "POST":
-        if not session.get("is_registered"): return redirect(url_for("login"))
-        if hmac.compare_digest(request.form.get("passcode", ""), os.environ.get("ADMIN_PASSCODE", "")):
-            conn = get_db_connection()
-            c = conn.cursor()
-            c.execute("UPDATE users SET role = 'admin' WHERE username = %s", (session["username"],))
-            conn.commit()
-            conn.close()
-            session["is_admin"] = True
-            session["role"] = "admin"
-            flash("Admin active!", "success")
-        else: flash("Access Denied!", "error")
-        return redirect(url_for("admin"))
-
-    if not current_user_is_admin(): return render_template("admin.html", auth_required=True)
-    
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("SELECT * FROM media WHERE approved = 0 ORDER BY id DESC")
-    pending_media = c.fetchall()
-    c.execute("SELECT COUNT(*) as count FROM users")
-    user_count = c.fetchone()['count']
-    c.execute("SELECT COUNT(*) as count FROM media WHERE approved = 1")
-    media_count = c.fetchone()['count']
-    c.execute("SELECT SUM(likes) as total FROM media")
-    likes_count = c.fetchone()['total'] or 0
-    c.execute("SELECT * FROM users ORDER BY id DESC")
-    all_users = c.fetchall()
-    c.execute("SELECT r.id as report_id, r.media_id, r.reported_by, r.reason, r.created_at, m.title, m.filename, m.category, m.uploaded_by FROM reports r JOIN media m ON r.media_id = m.id ORDER BY r.id DESC")
-    reports = c.fetchall()
-    
-    c.execute("SELECT COUNT(*) as cnt FROM users WHERE role = 'bot'")
-    bot_count = c.fetchone()['cnt']
-    
-    conn.close()
-    return render_template("admin.html", pending_media=pending_media, user_count=user_count, media_count=media_count, likes_count=likes_count, all_users=all_users, reports=reports, bot_count=bot_count, auth_required=False)
-
-@app.route("/admin/trigger_bots", methods=["POST"])
-def trigger_bots():
-    if not current_user_is_admin(): return redirect(url_for("admin"))
-    run_bot_engine()
-    flash("🤖 Bot Engine Triggered Successfully!", "success")
-    return redirect(url_for("admin"))
-
-@app.route("/admin/user_action/<int:user_id>/<action>", methods=["POST"])
-def admin_user_action(user_id, action):
-    if not current_user_is_admin(): return redirect(url_for("admin"))
-    conn = get_db_connection()
-    c = conn.cursor()
-    if action == "ban":
-        c.execute("UPDATE users SET status = 'BANNED' WHERE id = %s", (user_id,))
-        flash("Agent Suspended!", "success")
-    elif action == "unban":
-        c.execute("UPDATE users SET status = 'ACTIVE' WHERE id = %s", (user_id,))
-        flash("Agent Reactivated!", "success")
-    elif action == "make_admin":
-        c.execute("UPDATE users SET role = 'admin' WHERE id = %s", (user_id,))
-        flash("Promoted to Admin HQ!", "success")
-    elif action == "verify":
-        c.execute("UPDATE users SET is_verified = TRUE WHERE id = %s", (user_id,))
-        flash("Agent Verified ✅!", "success")
-    elif action == "unverify":
-        c.execute("UPDATE users SET is_verified = FALSE WHERE id = %s", (user_id,))
-        flash("Verification Removed.", "success")
-        
-    conn.commit()
-    conn.close()
-    return redirect(url_for("admin"))
-
-@app.route("/admin/audit-logs")
-def admin_audit_logs():
-    if not current_user_is_admin(): return redirect(url_for("admin"))
-    conn = get_db_connection()
-    c = conn.cursor()
-    try:
-        c.execute("SELECT * FROM audit_logs ORDER BY id DESC LIMIT 100")
-        logs = c.fetchall()
-    except: logs = []
-    conn.close()
-    return render_template("audit_logs.html", logs=logs)
-
-@app.route("/approve/<int:id>", methods=["POST"])
-def approve(id):
-    if not current_user_is_admin(): return redirect(url_for("admin"))
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("UPDATE media SET approved = 1 WHERE id = %s", (id,))
-    c.execute("SELECT uploaded_by, title, category FROM media WHERE id = %s", (id,))
-    media_info = c.fetchone()
-    if media_info:
-        c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (media_info['uploaded_by'], f"✅ Approved! '{media_info['title'][:15]}' is now live.", f"/gallery/{media_info['category']}"))
-    conn.commit()
-    conn.close()
-    flash("Approved!", "success")
-    return redirect(url_for("admin"))
-
-@app.route("/delete/<int:id>", methods=["POST"])
-def delete(id):
-    if not current_user_is_admin(): return redirect(url_for("admin"))
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("DELETE FROM reports WHERE media_id = %s", (id,))
-    c.execute("DELETE FROM media WHERE id = %s", (id,))
-    conn.commit()
-    conn.close()
-    flash("Deleted successfully!", "success")
-    return redirect(request.referrer or url_for("admin"))
-
-@app.route("/dismiss_report/<int:report_id>", methods=["POST"])
-def dismiss_report(report_id):
-    if not current_user_is_admin(): return redirect(url_for("admin"))
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("DELETE FROM reports WHERE id = %s", (report_id,))
-    conn.commit()
-    conn.close()
-    flash("Report dismissed.", "success")
-    return redirect(url_for("admin"))
-
-@app.route("/mystery", methods=["POST"])
-def mystery():
-    if hmac.compare_digest(request.form.get("passcode", ""), os.environ.get("MYSTERY_CODE", "SOCHO")): 
-        return render_template("mystery.html")
-    flash("Incorrect code.", "error")
-    return redirect(url_for("dashboard"))
-
-@app.errorhandler(404)
-def not_found_error(error): return render_template("404.html"), 404
-@app.errorhandler(500)
-def internal_error(error): return render_template("500.html"), 500
+    return render_template("ai_studio.html", hide_navbar=True)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=False)
