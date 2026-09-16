@@ -168,7 +168,6 @@ def upgrade_db():
             c.execute("UPDATE users SET user_code = %s WHERE id = %s", (code, row['id']))
         conn.commit()
     except: conn.rollback()
-        
     conn.close()
 
 upgrade_db()
@@ -598,14 +597,14 @@ def add_view(media_id):
     conn.close()
     return jsonify({"success": True})
 
-# 💥 FIX: ADD COMMENT ROUTE 100% RESTORED 💥
+# 💥 RESTORED: ADD COMMENT ROUTE 💥
 @app.route("/add_comment/<int:media_id>", methods=["POST"])
 def add_comment(media_id):
     if "username" not in session: return redirect(url_for("login"))
     text = request.form.get("comment_text", "").strip()
     if text:
         conn = get_db_connection()
-        c = conn.cursor()
+        c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
         c.execute("INSERT INTO comments (media_id, username, comment_text) VALUES (%s, %s, %s)", (media_id, session["username"], text[:200]))
         c.execute("SELECT uploaded_by, title, category FROM media WHERE id = %s", (media_id,))
         media_info = c.fetchone()
@@ -717,7 +716,7 @@ def report_asset(media_id):
     finally: conn.close()
 
 # =========================================================
-# CORE ROUTES
+# CORE ROUTES (FEED & LEADERBOARD)
 # =========================================================
 @app.route("/")
 def index():
@@ -739,6 +738,7 @@ def api_feed_data():
     conn = get_db_connection()
     c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     block_filter = "m.uploaded_by NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) AND m.uploaded_by NOT IN (SELECT blocker FROM blocks WHERE blocked = %s)"
+    
     ai_order_logic = "((m.likes * 5) + m.views + (COALESCE(m.tips_received, 0) * 10)) DESC, m.id DESC"
     
     if tab == "global":
@@ -802,7 +802,6 @@ def explore():
     conn = get_db_connection()
     c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     
-    # 💥 PHASE 75: SPOTLIGHT CREATOR FETCH 💥
     c.execute("SELECT username, profile_pic, bio, is_verified FROM users WHERE role = 'user' AND is_verified = TRUE AND username NOT LIKE 'Guest-%%' ORDER BY wallet_balance DESC LIMIT 1")
     spotlight = c.fetchone()
     
@@ -820,6 +819,7 @@ def explore():
     conn.close()
     return render_template("explore.html", posts=explore_posts, trending_tags=trending_tags, spotlight=spotlight)
 
+# 💥 RESTORED FULLY: DASHBOARD ROUTE 💥
 @app.route("/dashboard")
 def dashboard():
     if "username" not in session: return redirect(url_for("login"))
@@ -848,7 +848,6 @@ def notifications():
     conn.close()
     return render_template("notifications.html", notifications=notifs, hide_navbar=True)
 
-# 💥 PHASE 74: LIVE TOAST NOTIFICATION API 💥
 @app.route("/api/unread_notifs")
 def api_unread_notifs():
     if "username" not in session: return jsonify({"unread": 0})
@@ -1065,6 +1064,45 @@ def api_global_chat_history():
     formatted = [{"id": r['id'], "sender": r['sender'], "message": r['message'], "time": r['time'], "role": r['role'], "is_verified": r['is_verified']} for r in history]
     return jsonify(formatted)
 
+# 💥 RESTORED FULLY: GALLERY ROUTE 💥
+@app.route("/gallery/<category>", methods=["GET", "POST"])
+def gallery(category):
+    if "username" not in session: return redirect(url_for("login"))
+    conn = get_db_connection()
+    c = conn.cursor()
+    if request.method == "POST":
+        try:
+            filename = "SHAYARI_TEXT"
+            if category != 'Shayari':
+                file = request.files.get("media")
+                if file and file.filename != "":
+                    filename = save_uploaded_file(file, category)
+                    if not filename:
+                        flash("Upload Failed! Check API keys.", "error")
+                        return redirect(url_for("gallery", category=category))
+            
+            is_approved = 1 if current_user_is_admin() else 0
+            visibility = request.form.get("visibility", "public")
+            c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved, visibility, views, is_pinned) VALUES (%s, %s, %s, %s, %s, %s, %s, 0, FALSE)",
+                      (filename, request.form.get("title", "Untitled"), category, "", session.get("username"), is_approved, visibility))
+            conn.commit()
+            flash("File live!" if is_approved else "Sent to Admin for approval.", "success")
+        except Exception as e:
+            conn.rollback()
+            flash(f"Upload System Fault: {str(e)[:100]}", "error")
+        return redirect(url_for("gallery", category=category))
+
+    c.execute("SELECT m.*, u.profile_pic, u.role, u.is_verified FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.category = %s AND m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' AND m.uploaded_by NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) ORDER BY m.id DESC", (category, session["username"]))
+    if category == 'Shayari': c.execute("SELECT m.*, u.role, u.is_verified FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.category = %s AND m.approved = 1 AND m.visibility = 'public' AND m.uploaded_by NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) ORDER BY m.id DESC", (category, session["username"]))
+    media_files = c.fetchall()
+    c.execute("SELECT c.*, u.role, u.is_verified FROM comments c JOIN users u ON c.username = u.username ORDER BY c.id ASC")
+    comments_db = c.fetchall()
+    conn.close()
+    comments = defaultdict(list)
+    for comment in comments_db: comments[comment["media_id"]].append(comment)
+    return render_template("gallery.html", media_files=media_files, category=category, comments=comments)
+
+# 💥 RESTORED FULLY: SEARCH ROUTE & SUGGESTIONS 💥
 @app.route("/search")
 def search():
     if "username" not in session: return redirect(url_for("login"))
@@ -1102,6 +1140,36 @@ def api_search_suggest():
     conn.close()
     return jsonify(users + tags_list)
 
+@app.route("/ai-studio", methods=["GET", "POST"])
+def ai_studio():
+    if "username" not in session: return redirect(url_for("login"))
+    if request.method == "POST":
+        prompt = request.form.get("prompt", "").strip()
+        if not prompt: return redirect(url_for("ai_studio"))
+        trigger_words = ["create", "generate", "draw", "make an image", "paint"]
+        wants_image = any(word in prompt.lower() for word in trigger_words)
+        
+        if wants_image:
+            encoded_prompt = urllib.parse.quote(prompt)
+            image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?nologo=true"
+            try:
+                r = requests.get(image_url, timeout=15)
+                secure_url = cloudinary.uploader.upload(r.content, resource_type="image")["secure_url"] if r.status_code == 200 else image_url
+                conn = get_db_connection()
+                c = conn.cursor()
+                c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved, visibility, views, is_pinned) VALUES (%s, %s, %s, %s, %s, 1, 'public', 0, FALSE)",
+                          (secure_url, f"AI: {prompt[:20]}...", "Photo", prompt, session["username"]))
+                conn.commit()
+                conn.close()
+                flash("Image created successfully! (100% Free)", "success")
+                return redirect(url_for("gallery", category="Photo"))
+            except: flash("Image generation failed.", "error")
+        else:
+            try: reply = get_ai_response(prompt)
+            except: reply = "I am currently offline."
+            return render_template("ai_studio.html", chat_reply=reply, user_prompt=prompt, hide_navbar=True)
+    return render_template("ai_studio.html", hide_navbar=True)
+
 @app.route("/analytics")
 def analytics():
     if "username" not in session: return redirect(url_for("login"))
@@ -1114,6 +1182,9 @@ def analytics():
     conn.close()
     return render_template("analytics.html", stats=stats, top_posts=top_posts, hide_navbar=True)
 
+# =========================================================
+# ADMIN CONTROLS
+# =========================================================
 @app.route("/admin", methods=["GET", "POST"])
 def admin():
     if request.method == "POST":
