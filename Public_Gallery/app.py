@@ -46,25 +46,19 @@ app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "development-only-secret
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
 
 # =========================================================
-# SECURITY: MAXIMUM PROTECTION HEADERS (ANTI-HACKER)
+# SECURITY & BACKUP ENGINE
 # =========================================================
 @app.after_request
 def set_security_headers(response):
     response.headers["X-Frame-Options"] = "SAMEORIGIN"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-XSS-Protection"] = "1; mode=block"
-    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response
 
-# =========================================================
-# STORAGE & BACKUP ENGINE (FUTURE PROOF DATA SAFETY)
-# =========================================================
 def create_database_backup():
-    """Automatically exports core database records into a secure local JSON backup file."""
     try:
         conn = get_db_connection()
         c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-        
         backup_data = {"timestamp": str(datetime.datetime.now()), "users": [], "media": [], "notifications": []}
         
         c.execute("SELECT username, email, role, is_verified, created_at FROM users")
@@ -75,15 +69,11 @@ def create_database_backup():
         
         backup_dir = os.path.join(BASE_DIR, "backups")
         os.makedirs(backup_dir, exist_ok=True)
-        
         file_path = os.path.join(backup_dir, f"backup_{datetime.date.today()}.json")
         with open(file_path, "w", encoding="utf-8") as f:
             json.dump(backup_data, f, default=str, indent=4)
-            
         conn.close()
-        print("Database backup created successfully.")
-    except Exception as e:
-        print(f"Backup Error: {e}")
+    except Exception as e: print(f"Backup Error: {e}")
 
 # =========================================================
 # TEXT & TIME FILTERS
@@ -115,11 +105,8 @@ def timeago(dt):
 # DATABASE AUTO-HEALER
 # =========================================================
 def safe_alter(c, conn, query):
-    try:
-        c.execute(query)
-        conn.commit()
-    except Exception as e:
-        conn.rollback()
+    try: c.execute(query); conn.commit()
+    except Exception: conn.rollback()
 
 def upgrade_db():
     conn = get_db_connection()
@@ -135,13 +122,13 @@ def upgrade_db():
     conn.commit()
 
     safe_alter(c, conn, "ALTER TABLE media ALTER COLUMN title TYPE TEXT")
+    safe_alter(c, conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
     safe_alter(c, conn, "ALTER TABLE media ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
     safe_alter(c, conn, "ALTER TABLE comments ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
     safe_alter(c, conn, "ALTER TABLE media ADD COLUMN IF NOT EXISTS visibility VARCHAR(20) DEFAULT 'public'")
     safe_alter(c, conn, "ALTER TABLE media ADD COLUMN IF NOT EXISTS views INTEGER DEFAULT 0")
     safe_alter(c, conn, "ALTER TABLE media ADD COLUMN IF NOT EXISTS is_pinned BOOLEAN DEFAULT FALSE")
     safe_alter(c, conn, "ALTER TABLE comments ADD COLUMN IF NOT EXISTS likes INTEGER DEFAULT 0")
-    
     safe_alter(c, conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(120) UNIQUE")
     safe_alter(c, conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS user_code VARCHAR(10) UNIQUE")
     safe_alter(c, conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
@@ -168,11 +155,22 @@ def upgrade_db():
         c.execute("UPDATE comments SET likes = 0 WHERE likes IS NULL")
         conn.commit()
     except: conn.rollback()
+
+    try:
+        c.execute("SELECT id FROM users WHERE user_code IS NULL")
+        for row in c.fetchall():
+            code = ''.join(secrets.choice("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ") for _ in range(10))
+            c.execute("UPDATE users SET user_code = %s WHERE id = %s", (code, row['id']))
+        conn.commit()
+    except: conn.rollback()
         
     conn.close()
 
 upgrade_db()
 
+# =========================================================
+# THE GRIM REAPER (AUTO-CLEANUP 1-HOUR GLOBAL CHAT)
+# =========================================================
 def cleanup_database():
     conn = get_db_connection()
     c = conn.cursor()
@@ -187,21 +185,37 @@ def cleanup_database():
         c.execute("DELETE FROM likes WHERE username NOT IN (SELECT username FROM users)")
         c.execute("DELETE FROM followers WHERE follower NOT IN (SELECT username FROM users) OR following NOT IN (SELECT username FROM users)")
         c.execute("DELETE FROM messages WHERE sender NOT IN (SELECT username FROM users) OR receiver NOT IN (SELECT username FROM users)")
-        c.execute("DELETE FROM global_chat WHERE sender NOT IN (SELECT username FROM users)")
+        
+        # 💥 NEW: 1-HOUR GLOBAL CHAT PERMANENT WIPE 💥
+        c.execute("DELETE FROM global_chat WHERE created_at < NOW() - INTERVAL '1 hour'")
         
         c.execute("DELETE FROM stories WHERE created_at < NOW() - INTERVAL '12 hours'")
         c.execute("DELETE FROM notifications WHERE id NOT IN (SELECT id FROM notifications ORDER BY id DESC LIMIT 500)")
         conn.commit()
-    except Exception as e: 
-        print("Cleanup Error:", e)
+    except Exception as e: print("Cleanup Error:", e)
     finally: conn.close()
 
+# =========================================================
+# THE SMART PHANTOM ENGINE (HINDI/HINGLISH/ENGLISH BOTS)
+# =========================================================
 def run_bot_engine():
     conn = get_db_connection()
     c = conn.cursor()
     try:
         bot_names = ["Rahul_Vibes", "Priya_007", "Aman_Cool", "Sneha_Arts", "Vikram_Pro", "Kabir_Singh", "Pooja_X", "Anjali_Cute", "Rohan_Tech", "Karan_King"]
-        bot_chats = ["Hey everyone! Welcome to the new gallery 👋", "Is anyone online?", "I just posted a new photo, check my profile! 🔥", "This website is so fast 🚀", "Hello world!", "Good morning guys ☀️"]
+        
+        # HINGLISH, HINDI & ENGLISH CHATS
+        bot_chats = [
+            "Hey everyone! Kya haal hain? 👋", 
+            "Koi online hai kya is waqt? 🤔", 
+            "Bhai yeh app ekdum mast chal rahi hai! 🔥", 
+            "Good morning dosto! Have a great day ☀️", 
+            "Hello world! Just joined this awesome gallery.", 
+            "Koi badhiya photo upload karo yaar! 😎",
+            "Speed kaafi fast hai is website ki 🚀",
+            "Mausam bohot badiya hai aaj 🌧️",
+            "Just testing out the features here. Awesome stuff!"
+        ]
         
         c.execute("SELECT COUNT(id) FROM users WHERE role = 'bot'")
         bot_count = c.fetchone()['count']
@@ -209,7 +223,7 @@ def run_bot_engine():
         if bot_count < 10:
             name = f"{random.choice(bot_names)}_{random.randint(100, 9999)}"
             code = ''.join(secrets.choice("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ") for _ in range(10))
-            c.execute("INSERT INTO users (username, password, user_code, role, is_verified, bio) VALUES (%s, %s, %s, 'bot', TRUE, 'Just an AI wandering in the gallery ✨')", (name, "botpass123", code))
+            c.execute("INSERT INTO users (username, password, user_code, role, is_verified, bio) VALUES (%s, %s, %s, 'bot', TRUE, 'Just roaming around the digital gallery ✨')", (name, "botpass123", code))
             conn.commit()
             bot_username = name
         else:
@@ -217,27 +231,51 @@ def run_bot_engine():
             bot_username = c.fetchone()['username']
             
         action = random.randint(1, 100)
+        
+        # 1. Upload Photo/Shayari (30% chance)
         if action <= 30:
             cat = random.choice(["Photo", "Photo", "Photo", "Shayari"])
             if cat == "Photo":
                 img_url = f"https://picsum.photos/800/1000?random={random.randint(1, 100000)}"
-                caption = random.choice(["Nature is beautiful 🌲 #nature", "Vibes ✨ #chill", "What do you think? 🤔", "Random click 📸 #photography"])
+                caption = random.choice([
+                    "Nature ki khoobsurti 🌲 #nature #peace", 
+                    "Vibes ✨ #chill #mood", 
+                    "Aaj ka din bohot badhiya tha! 😎", 
+                    "Random click 📸 #photography #india",
+                    "Just a beautiful view today. ✈️"
+                ])
             else:
                 img_url = "SHAYARI_TEXT"
-                caption = "Waqt ne sikhaya hai chup rehna... 💔 #sad #shayari"
+                caption = "Waqt ne sikhaya hai chup rehna... 💔 #sad #shayari #hindi"
             
             c.execute("INSERT INTO media (filename, title, category, uploaded_by, approved, visibility, views) VALUES (%s, %s, %s, %s, 1, 'public', %s)",
                       (img_url, caption, cat, bot_username, random.randint(5, 50)))
-        elif 30 < action <= 70:
+                      
+        # 2. Global Chat Message (30% chance)
+        elif 30 < action <= 60:
             c.execute("INSERT INTO global_chat (sender, message) VALUES (%s, %s)", (bot_username, random.choice(bot_chats)))
-        elif action > 70:
-            c.execute("SELECT username FROM users WHERE username != %s ORDER BY RANDOM() LIMIT 1", (bot_username,))
+            
+        # 3. Follow ONLY BOTS (20% chance) 🤖
+        elif 60 < action <= 80:
+            c.execute("SELECT username FROM users WHERE role = 'bot' AND username != %s ORDER BY RANDOM() LIMIT 1", (bot_username,))
             target = c.fetchone()
             if target:
                 try:
                     c.execute("INSERT INTO followers (follower, following) VALUES (%s, %s)", (bot_username, target['username']))
-                    c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (target['username'], f"👤 {bot_username} started following you!", f"/agent/{bot_username}"))
+                    # Bot notification is silent for clean DB, or we can leave it.
                 except: pass
+                
+        # 4. Like a Random Post (20% chance) ❤️
+        elif action > 80:
+            c.execute("SELECT id FROM media ORDER BY RANDOM() LIMIT 1")
+            media = c.fetchone()
+            if media:
+                try:
+                    c.execute("INSERT INTO likes (media_id, username) VALUES (%s, %s) ON CONFLICT DO NOTHING", (media['id'], bot_username))
+                    if c.rowcount == 1:
+                        c.execute("UPDATE media SET likes = likes + 1 WHERE id = %s", (media['id'],))
+                except: pass
+
         conn.commit()
     except Exception as e: print("Bot Engine Error:", e)
     finally: conn.close()
@@ -253,7 +291,7 @@ def get_csrf_token():
 def update_activity():
     if random.random() < 0.05: 
         cleanup_database()
-        create_database_backup() # Trigger automated backup on cleanup cycle
+        create_database_backup()
     if random.random() < 0.15: run_bot_engine()
         
     if "username" in session:
@@ -480,7 +518,6 @@ def upload_asset():
         
     except Exception as e:
         conn.rollback()
-        print(f"UPLOAD CRASH: {e}")
         flash(f"Server Alert: {str(e)[:150]}", "error")
         
     return redirect(request.referrer or url_for("feed"))
@@ -576,6 +613,7 @@ def explore():
     if "username" not in session: return redirect(url_for("login"))
     conn = get_db_connection()
     c = conn.cursor()
+    
     c.execute("SELECT m.id, m.filename, m.title, m.category, m.likes, m.views, m.uploaded_by FROM media m WHERE m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' ORDER BY RANDOM() LIMIT 40")
     explore_posts = c.fetchall()
     
@@ -833,6 +871,7 @@ def reply_story(username):
         return jsonify({"success": True})
     return jsonify({"error": "Empty message"}), 400
 
+# 💥 EXACT 12-HOUR (AM/PM) TIMESTAMPS FOR GLOBAL CHAT 💥
 @app.route("/global_chat", methods=["GET", "POST"])
 def global_chat():
     if "username" not in session: return redirect(url_for("login"))
@@ -852,7 +891,8 @@ def api_global_chat_history():
     if "username" not in session: return jsonify([])
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("SELECT gc.id, gc.sender, gc.message, TO_CHAR(gc.created_at, 'HH24:MI') as time, u.role, u.is_verified FROM global_chat gc JOIN users u ON gc.sender = u.username ORDER BY gc.created_at ASC")
+    # Formatting to nice 10:45 AM style
+    c.execute("SELECT gc.id, gc.sender, gc.message, TO_CHAR(gc.created_at, 'HH12:MI AM') as time, u.role, u.is_verified FROM global_chat gc JOIN users u ON gc.sender = u.username ORDER BY gc.created_at ASC")
     history = c.fetchall()
     conn.close()
     formatted = [{"id": r['id'], "sender": r['sender'], "message": r['message'], "time": r['time'], "role": r['role'], "is_verified": r['is_verified']} for r in history]
@@ -1159,7 +1199,7 @@ def approve(id):
     c.execute("SELECT uploaded_by, title, category FROM media WHERE id = %s", (id,))
     media_info = c.fetchone()
     if media_info:
-        c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (media_info['uploaded_by'], f"✅ Approved! '{media_info['title'][:15]}' is now live.", f"/gallery/{media_info['category']}"))
+        c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (media_info['uploaded_by'], f"✅ Approved! '{media_info['title']}' is now live.", f"/gallery/{media_info['category']}"))
     conn.commit()
     conn.close()
     flash("Approved!", "success")
@@ -1187,6 +1227,13 @@ def dismiss_report(report_id):
     conn.close()
     flash("Report dismissed.", "success")
     return redirect(url_for("admin"))
+
+@app.route("/mystery", methods=["POST"])
+def mystery():
+    if hmac.compare_digest(request.form.get("passcode", ""), os.environ.get("MYSTERY_CODE", "SOCHO")): 
+        return render_template("mystery.html")
+    flash("Incorrect code.", "error")
+    return redirect(url_for("dashboard"))
 
 @app.errorhandler(404)
 def not_found_error(error): return render_template("404.html"), 404
