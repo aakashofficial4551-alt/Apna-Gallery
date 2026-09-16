@@ -27,6 +27,9 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from ai_service import get_ai_response
 from database import init_db, get_db_connection
 
+# =========================================================
+# BASE SETUP & CLOUDINARY
+# =========================================================
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 load_dotenv(os.path.join(BASE_DIR, "..", ".env"))
 
@@ -40,7 +43,7 @@ cloudinary.config(
 app = Flask(__name__)
 init_db()
 
-# 💥 SECURITY CONFIG 💥
+# 💥 MILITARY GRADE COOKIE SECURITY 💥
 app.config.update(
     SECRET_KEY=os.environ.get("SECRET_KEY", "development-only-secret-change-me"),
     MAX_CONTENT_LENGTH=50 * 1024 * 1024,
@@ -50,6 +53,9 @@ app.config.update(
     PERMANENT_SESSION_LIFETIME=datetime.timedelta(days=30)
 )
 
+# =========================================================
+# 🛡️ THE TITANIUM FIREWALL 🛡️
+# =========================================================
 request_tracker = defaultdict(list)
 BANNED_IPS = set()
 
@@ -555,7 +561,7 @@ def buy_verification():
     return redirect(request.referrer or url_for("dashboard"))
 
 # =========================================================
-# ASSET MANAGEMENT & TIPPING 
+# ASSET MANAGEMENT, POST VIEW & TIPPING 
 # =========================================================
 @app.route("/upload_asset", methods=["POST"])
 def upload_asset():
@@ -884,6 +890,44 @@ def explore():
     conn.close()
     return render_template("explore.html", posts=explore_posts, trending_tags=trending_tags, spotlight=spotlight)
 
+# 💥 RESTORED FULLY: GALLERY ROUTE 💥
+@app.route("/gallery/<category>", methods=["GET", "POST"])
+def gallery(category):
+    if "username" not in session: return redirect(url_for("login"))
+    conn = get_db_connection()
+    c = conn.cursor()
+    if request.method == "POST":
+        try:
+            filename = "SHAYARI_TEXT"
+            if category != 'Shayari':
+                file = request.files.get("media")
+                if file and file.filename != "":
+                    filename = save_uploaded_file(file, category)
+                    if not filename:
+                        flash("Upload Failed! Check API keys.", "error")
+                        return redirect(url_for("gallery", category=category))
+            
+            is_approved = 1 if current_user_is_admin() else 0
+            visibility = request.form.get("visibility", "public")
+            c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved, visibility, views, is_pinned) VALUES (%s, %s, %s, %s, %s, %s, %s, 0, FALSE)",
+                      (filename, html.escape(request.form.get("title", "Untitled")), category, "", session.get("username"), is_approved, visibility))
+            conn.commit()
+            flash("File live!" if is_approved else "Sent to Admin for approval.", "success")
+        except Exception as e:
+            conn.rollback()
+            flash(f"Upload System Fault: {str(e)[:100]}", "error")
+        return redirect(url_for("gallery", category=category))
+
+    c.execute("SELECT m.*, u.profile_pic, u.role, u.is_verified FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.category = %s AND m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' AND m.uploaded_by NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) ORDER BY m.id DESC", (category, session["username"]))
+    if category == 'Shayari': c.execute("SELECT m.*, u.role, u.is_verified FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.category = %s AND m.approved = 1 AND m.visibility = 'public' AND m.uploaded_by NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) ORDER BY m.id DESC", (category, session["username"]))
+    media_files = c.fetchall()
+    c.execute("SELECT c.*, u.role, u.is_verified FROM comments c JOIN users u ON c.username = u.username ORDER BY c.id ASC")
+    comments_db = c.fetchall()
+    conn.close()
+    comments = defaultdict(list)
+    for comment in comments_db: comments[comment["media_id"]].append(comment)
+    return render_template("gallery.html", media_files=media_files, category=category, comments=comments)
+
 @app.route("/dashboard")
 def dashboard():
     if "username" not in session: return redirect(url_for("login"))
@@ -1178,19 +1222,6 @@ def api_search_suggest():
     conn.close()
     return jsonify(users + tags_list)
 
-# 💥 FIX: AI STUDIO ANALYTICS ROUTE RESTORED 💥
-@app.route("/analytics")
-def analytics():
-    if "username" not in session: return redirect(url_for("login"))
-    conn = get_db_connection()
-    c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    c.execute("SELECT COUNT(id) as total_posts, SUM(views) as total_views, SUM(likes) as total_likes, SUM(tips_received) as total_tips FROM media WHERE uploaded_by = %s", (session["username"],))
-    stats = c.fetchone()
-    c.execute("SELECT title, views, likes, tips_received, category, filename FROM media WHERE uploaded_by = %s ORDER BY views DESC LIMIT 5", (session["username"],))
-    top_posts = c.fetchall()
-    conn.close()
-    return render_template("analytics.html", stats=stats, top_posts=top_posts, hide_navbar=True)
-
 @app.route("/ai-studio", methods=["GET", "POST"])
 def ai_studio():
     if "username" not in session: return redirect(url_for("login"))
@@ -1374,6 +1405,11 @@ def mystery():
     if hmac.compare_digest(request.form.get("passcode", ""), os.environ.get("MYSTERY_CODE", "SOCHO")): return render_template("mystery.html")
     flash("Incorrect code.", "error")
     return redirect(url_for("dashboard"))
+
+@app.errorhandler(404)
+def not_found_error(error): return render_template("404.html"), 404
+@app.errorhandler(500)
+def internal_error(error): return render_template("500.html"), 500
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=False)
