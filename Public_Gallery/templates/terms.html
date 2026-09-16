@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Terms of Service | Apna Gallery{% endblock %}
+
+{% block content %}
+<div style="max-width: 800px; margin: 0 auto; padding: 40px 20px; color: var(--text-main); background: var(--bg-card); border-radius: 16px; margin-top: 30px; border: 1px solid var(--border-color);">
+    <a href="/" style="color: var(--accent); text-decoration: none; font-weight: bold;">&larr; Back to Home</a>
+    <h1 style="color: var(--accent); margin-top: 20px;">Terms of Service</h1>
+    <p style="color: var(--text-muted);">Effective Date: Today</p>
+    
+    <div style="line-height: 1.6; color: #cbd5e1;">
+        <h3>1. Acceptance of Terms</h3>
+        <p>By accessing or using Apna Gallery, you agree to be bound by these terms. If you disagree, do not use the platform.</p>
+        
+        <h3>2. User Generated Content & Moderation</h3>
+        <p>You are solely responsible for the content you upload. You agree NOT to upload:</p>
+        <ul style="color: #f87171;">
+            <li>Pornography, explicit nudity, or sexual exploitation content.</li>
+            <li>Hate speech, threats, harassment, or violent content.</li>
+            <li>Copyrighted material without permission.</li>
+            <li>Malware, scams, or spam.</li>
+        </ul>
+        <p>We reserve the right to review, remove content, and permanently terminate accounts violating these rules without warning.</p>
+
+        <h3>3. Virtual Currency (Coins)</h3>
+        <p>Coins distributed on this platform have no real-world monetary value at this stage. They are designed for gamification and platform interaction (tipping). Admin reserves the right to modify balances in cases of abuse.</p>
+
+        <h3>4. Security & Access</h3>
+        <p>You are responsible for safeguarding your password. We use extreme security measures (CSRF, XSS filters), but cannot guarantee absolute protection against targeted breaches. We are not liable for compromised accounts.</p>
+        
+        <p style="margin-top: 40px; text-align: center; color: var(--text-muted);">For issues, utilize the "Report" button on posts or contact Administration.</p>
+    </div>
+</div>
+{% endblock %}
