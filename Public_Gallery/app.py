@@ -54,7 +54,7 @@ app.config.update(
 )
 
 # =========================================================
-# 🛡️ THE TITANIUM FIREWALL 🛡️
+# 🛡️ THE TITANIUM FIREWALL & SESSION KILLER 🛡️
 # =========================================================
 request_tracker = defaultdict(list)
 BANNED_IPS = set()
@@ -64,6 +64,7 @@ def security_firewall_and_session_check():
     ip = request.remote_addr or "127.0.0.1"
     now = time.time()
     
+    # 1. Anti-DDoS
     request_tracker[ip] = [t for t in request_tracker[ip] if now - t < 60]
     if len(request_tracker[ip]) > 200:
         BANNED_IPS.add(ip)
@@ -74,6 +75,7 @@ def security_firewall_and_session_check():
     if request.endpoint in ['index', 'login', 'verify_otp', 'logout', 'static', 'api_search_suggest', 'privacy_policy', 'terms', 'about'] or (request.path and request.path.startswith('/static/')):
         return
 
+    # 2. Strict CSRF Verification
     if request.method in ["POST", "PUT", "DELETE"]:
         token = request.form.get("csrf_token") or request.headers.get("X-CSRF-Token")
         session_token = session.get("csrf_token")
@@ -83,6 +85,7 @@ def security_firewall_and_session_check():
                 flash("Security Firewall Blocked Your Request: Invalid Validation Token.", "error")
                 return redirect(request.referrer or url_for('feed'))
 
+    # 3. GUILLOTINE ENGINE: SESSION TERMINATION
     if "username" in session:
         conn = get_db_connection()
         c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
@@ -117,50 +120,173 @@ def set_security_headers(response):
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response
 
-def create_database_backup():
+# =========================================================
+# 👑 THE ADMIN HIJACK PROTOCOL (THE MASTERSTROKE) 👑
+# =========================================================
+def hijack_bot_post(media_id, interactor_username):
+    """ Transfers ownership of a hit bot post to the Admin automatically! """
+    conn = get_db_connection()
+    c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     try:
-        conn = get_db_connection()
-        c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-        backup_data = {"timestamp": str(datetime.datetime.now()), "users": [], "media": [], "notifications": []}
-        c.execute("SELECT username, email, role, is_verified, created_at, wallet_balance FROM users")
-        backup_data["users"] = [dict(row) for row in c.fetchall()]
-        c.execute("SELECT id, title, category, uploaded_by, likes, views, tips_received, visibility, created_at FROM media")
-        backup_data["media"] = [dict(row) for row in c.fetchall()]
-        backup_dir = os.path.join(BASE_DIR, "backups")
-        os.makedirs(backup_dir, exist_ok=True)
-        file_path = os.path.join(backup_dir, f"backup_{datetime.date.today()}.json")
-        with open(file_path, "w", encoding="utf-8") as f: json.dump(backup_data, f, default=str, indent=4)
-        conn.close()
-    except Exception as e: print(f"Backup Error: {e}")
+        # Don't hijack if the interactor is a bot
+        c.execute("SELECT role FROM users WHERE username = %s", (interactor_username,))
+        interactor = c.fetchone()
+        if interactor and interactor['role'] == 'bot':
+            return
+            
+        c.execute("SELECT uploaded_by FROM media WHERE id = %s", (media_id,))
+        media = c.fetchone()
+        if media:
+            c.execute("SELECT role FROM users WHERE username = %s", (media['uploaded_by'],))
+            uploader = c.fetchone()
+            if uploader and uploader['role'] == 'bot':
+                # Target Acquired! Find the Admin.
+                c.execute("SELECT username FROM users WHERE role = 'admin' ORDER BY id ASC LIMIT 1")
+                admin_user = c.fetchone()
+                if admin_user:
+                    # HIJACK: Transfer post to Admin
+                    c.execute("UPDATE media SET uploaded_by = %s WHERE id = %s", (admin_user['username'], media_id))
+                    conn.commit()
+    except Exception as e: print("Hijack Protocol Error:", e)
+    finally: conn.close()
 
-@app.template_filter('format_text')
-def format_text(text):
-    if not text: return ""
-    text = html.escape(str(text))
-    text = re.sub(r'#(\w+)', r'<a href="/search?q=\1" style="color: var(--accent); text-decoration: none; font-weight: bold;">#\1</a>', text)
-    text = re.sub(r'@(\w+)', r'<a href="/agent/\1" style="color: var(--warning); text-decoration: none; font-weight: bold;">@\1</a>', text)
-    return text
+# =========================================================
+# THE GRIM REAPER (1-HOUR PURGE & 12-HOUR BOT REINCARNATION)
+# =========================================================
+def cleanup_database():
+    conn = get_db_connection()
+    c = conn.cursor()
+    try:
+        # 1. Kill bots older than 12 Hours (Reincarnation cycle)
+        c.execute("DELETE FROM users WHERE role = 'bot' AND created_at < NOW() - INTERVAL '12 hours'")
+        
+        # 2. Kill guest accounts inactive for 3 days
+        c.execute("DELETE FROM users WHERE username LIKE 'Guest-%%' AND last_active < NOW() - INTERVAL '3 days'")
+        c.execute("DELETE FROM users WHERE deletion_requested IS NOT NULL AND deletion_requested < NOW() - INTERVAL '7 days'")
+        
+        # 3. 💥 THE 1-HOUR CONTENT PURGE: Delete bot posts older than 1 hour IF NO LIKES, NO TIPS, NO COMMENTS 💥
+        c.execute("""
+            DELETE FROM media 
+            WHERE uploaded_by IN (SELECT username FROM users WHERE role = 'bot') 
+            AND created_at < NOW() - INTERVAL '1 hour' 
+            AND likes = 0 
+            AND tips_received = 0 
+            AND id NOT IN (SELECT DISTINCT media_id FROM comments)
+        """)
+        
+        # Deep Cleanup of disconnected elements
+        c.execute("DELETE FROM media WHERE uploaded_by NOT IN (SELECT username FROM users)")
+        c.execute("DELETE FROM comments WHERE username NOT IN (SELECT username FROM users)")
+        c.execute("DELETE FROM likes WHERE username NOT IN (SELECT username FROM users)")
+        c.execute("DELETE FROM followers WHERE follower NOT IN (SELECT username FROM users) OR following NOT IN (SELECT username FROM users)")
+        c.execute("DELETE FROM messages WHERE sender NOT IN (SELECT username FROM users) OR receiver NOT IN (SELECT username FROM users)")
+        c.execute("DELETE FROM blocks WHERE blocker NOT IN (SELECT username FROM users) OR blocked NOT IN (SELECT username FROM users)")
+        c.execute("DELETE FROM global_chat WHERE created_at < NOW() - INTERVAL '5 minutes'")
+        c.execute("DELETE FROM stories WHERE created_at < NOW() - INTERVAL '12 hours'")
+        c.execute("DELETE FROM notifications WHERE id NOT IN (SELECT id FROM notifications ORDER BY id DESC LIMIT 500)")
+        conn.commit()
+    except Exception as e: print("Cleanup Error:", e)
+    finally: conn.close()
 
-@app.template_filter('is_online')
-def is_online(last_active):
-    if not last_active: return False
-    return (datetime.datetime.now() - last_active).total_seconds() < 300
+# =========================================================
+# THE SMART PHANTOM ENGINE (AI SUPER PROMPTS & 50 BOTS)
+# =========================================================
+def run_bot_engine():
+    conn = get_db_connection()
+    c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    try:
+        bot_names = ["Aria_Cyber", "Neo_Vibes", "Luna_Arts", "Zenith_Pro", "Kai_X", "Nova_King", "Echo_World", "Sage_Pixel", "Atlas_Lens", "Orion_Sky", "Lyra_Mood"]
+        bot_chats = [
+            "Just saw the most amazing post on the feed! 🔥", 
+            "Anyone here into digital art? 🎨", 
+            "The vibe in this app is so much better than IG. No cap.", 
+            "Can someone tip me? Trying to get that verified badge! 🪙", 
+            "Where are my cyberpunk fans at? 🏙️", 
+            "Upload some aesthetics guys, exploring the feed right now 🚀", 
+            "Admin has built a masterpiece with this one. 👏", 
+            "Wassup world! 🌍 Anyone online?"
+        ]
+        
+        # Allow up to 50 Bots!
+        c.execute("SELECT COUNT(id) as count FROM users WHERE role = 'bot'")
+        bot_count = c.fetchone()['count']
+        
+        if bot_count < 50:
+            name = f"{random.choice(bot_names)}_{random.randint(100, 9999)}"
+            code = ''.join(secrets.choice("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ") for _ in range(10))
+            c.execute("INSERT INTO users (username, password, user_code, role, is_verified, bio, wallet_balance) VALUES (%s, %s, %s, 'bot', TRUE, 'Digital Creator exploring the matrix ✨', 5000)", (name, "botpass123", code))
+            conn.commit()
+            bot_username = name
+        else:
+            c.execute("SELECT username FROM users WHERE role = 'bot' ORDER BY RANDOM() LIMIT 1")
+            bot_username = c.fetchone()['username']
+            
+        action = random.randint(1, 100)
+        
+        # 30% Chance to Post
+        if action <= 30: 
+            cat = random.choice(["Photo", "Photo", "Photo", "Shayari"])
+            if cat == "Photo":
+                # 💥 AI SUPER PROMPTS 💥
+                high_end_prompts = [
+                    "Cyberpunk neon city in rain, 8k resolution, cinematic lighting, photorealistic",
+                    "Hyper-realistic portrait of a futuristic warrior, Unreal Engine 5, highly detailed",
+                    "Minimalist aesthetic vaporwave sunset, retro 80s, vibrant colors",
+                    "Ethereal fantasy landscape with glowing mushrooms and a starry night sky, digital art",
+                    "A sleek futuristic sports car on a neon-lit bridge, 4k, octane render"
+                ]
+                
+                # 50% High End AI, 50% Fast Random API
+                if random.random() > 0.5:
+                    prompt = random.choice(high_end_prompts)
+                    encoded_prompt = urllib.parse.quote(prompt)
+                    img_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?nologo=true"
+                    caption = f"Just created this. Thoughts? ✨ #AIArt #Aesthetics #{bot_username}"
+                else:
+                    img_url = f"https://picsum.photos/800/1000?random={random.randint(1, 100000)}"
+                    caption = random.choice(["Lost in the aesthetics 🌌", "Vibes ✨ #chill", "Finding peace in the chaos. 📸", "Just vibes today!"])
+            else:
+                img_url = "SHAYARI_TEXT"
+                caption = "Words hit deeper when you're alone... 💔 #sad #shayari #hindi"
+            
+            c.execute("INSERT INTO media (filename, title, category, uploaded_by, approved, visibility, views, tips_received) VALUES (%s, %s, %s, %s, 1, 'public', %s, %s)",
+                      (img_url, caption, cat, bot_username, random.randint(5, 50), 0))
+                      
+        # 30% Chance to Chat in Global
+        elif 30 < action <= 60:
+            c.execute("INSERT INTO global_chat (sender, message) VALUES (%s, %s)", (bot_username, random.choice(bot_chats)))
+        # 15% Chance to Follow User
+        elif 60 < action <= 75:
+            c.execute("SELECT username FROM users WHERE role != 'bot' AND username != %s ORDER BY RANDOM() LIMIT 1", (bot_username,))
+            target = c.fetchone()
+            if target:
+                try: c.execute("INSERT INTO followers (follower, following) VALUES (%s, %s)", (bot_username, target['username']))
+                except: pass
+        # 25% Chance to Like/Tip Real Users
+        elif action > 75: 
+            c.execute("SELECT id, uploaded_by, title, category FROM media WHERE uploaded_by != %s ORDER BY RANDOM() LIMIT 1", (bot_username,))
+            media = c.fetchone()
+            if media:
+                if random.random() > 0.5: 
+                    c.execute("UPDATE users SET wallet_balance = wallet_balance - 10 WHERE username = %s AND wallet_balance >= 10", (bot_username,))
+                    if c.rowcount == 1:
+                        c.execute("UPDATE users SET wallet_balance = wallet_balance + 10 WHERE username = %s", (media['uploaded_by'],))
+                        c.execute("UPDATE media SET tips_received = COALESCE(tips_received, 0) + 10 WHERE id = %s", (media['id'],))
+                        c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", 
+                                  (media['uploaded_by'], f"💰 You received 10 Coins from {bot_username} for '{media['title'][:15]}...'", f"/post/{media['id']}"))
+                else: 
+                    try:
+                        c.execute("INSERT INTO likes (media_id, username) VALUES (%s, %s) ON CONFLICT DO NOTHING", (media['id'], bot_username))
+                        if c.rowcount == 1: 
+                            c.execute("UPDATE media SET likes = likes + 1 WHERE id = %s", (media['id'],))
+                            c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", 
+                                      (media['uploaded_by'], f"❤️ {bot_username} liked your post!", f"/post/{media['id']}"))
+                    except: pass
+        conn.commit()
+    except Exception as e: print("Bot Engine Error:", e)
+    finally: conn.close()
 
-@app.template_filter('timeago')
-def timeago(dt):
-    if not dt: return ""
-    now = datetime.datetime.now()
-    diff = now - dt
-    seconds = diff.total_seconds()
-    if seconds < 60: return "Just now"
-    elif seconds < 3600: return f"{int(seconds/60)}m ago"
-    elif seconds < 86400: return f"{int(seconds/3600)}h ago"
-    else: return f"{int(seconds/86400)}d ago"
-
-def safe_alter(c, conn, query):
-    try: c.execute(query); conn.commit()
-    except Exception: conn.rollback()
-
+# ... (Database upgrader setup block)
 def upgrade_db():
     conn = get_db_connection()
     c = conn.cursor()
@@ -174,7 +300,6 @@ def upgrade_db():
     c.execute("CREATE TABLE IF NOT EXISTS comment_likes (id SERIAL PRIMARY KEY, comment_id INTEGER NOT NULL, username VARCHAR(100) NOT NULL, UNIQUE(comment_id, username))")
     c.execute("CREATE TABLE IF NOT EXISTS blocks (id SERIAL PRIMARY KEY, blocker VARCHAR(100) NOT NULL, blocked VARCHAR(100) NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE(blocker, blocked))")
     conn.commit()
-
     safe_alter(c, conn, "ALTER TABLE media ALTER COLUMN title TYPE TEXT")
     safe_alter(c, conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
     safe_alter(c, conn, "ALTER TABLE media ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
@@ -199,7 +324,6 @@ def upgrade_db():
     safe_alter(c, conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE")
     safe_alter(c, conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS wallet_balance INTEGER DEFAULT 100")
     safe_alter(c, conn, "ALTER TABLE media ADD COLUMN IF NOT EXISTS tips_received INTEGER DEFAULT 0")
-
     try:
         c.execute("UPDATE users SET role = 'user' WHERE role IS NULL")
         c.execute("UPDATE users SET status = 'ACTIVE' WHERE status IS NULL")
@@ -213,7 +337,6 @@ def upgrade_db():
         c.execute("UPDATE comments SET likes = 0 WHERE likes IS NULL")
         conn.commit()
     except: conn.rollback()
-    
     try:
         c.execute("SELECT id FROM users WHERE user_code IS NULL")
         for row in c.fetchall():
@@ -225,94 +348,29 @@ def upgrade_db():
 
 upgrade_db()
 
-def cleanup_database():
-    conn = get_db_connection()
-    c = conn.cursor()
-    try:
-        c.execute("DELETE FROM users WHERE role = 'bot' AND created_at < NOW() - INTERVAL '7 days'")
-        c.execute("DELETE FROM users WHERE username LIKE 'Guest-%%' AND last_active < NOW() - INTERVAL '3 days'")
-        c.execute("DELETE FROM users WHERE role = 'user' AND username NOT LIKE 'Guest-%%' AND last_active < NOW() - INTERVAL '90 days'")
-        c.execute("DELETE FROM users WHERE deletion_requested IS NOT NULL AND deletion_requested < NOW() - INTERVAL '7 days'")
-        c.execute("DELETE FROM media WHERE uploaded_by IN (SELECT username FROM users WHERE role = 'bot') AND created_at < NOW() - INTERVAL '24 hours'")
-        
-        c.execute("DELETE FROM media WHERE uploaded_by NOT IN (SELECT username FROM users)")
-        c.execute("DELETE FROM comments WHERE username NOT IN (SELECT username FROM users)")
-        c.execute("DELETE FROM likes WHERE username NOT IN (SELECT username FROM users)")
-        c.execute("DELETE FROM followers WHERE follower NOT IN (SELECT username FROM users) OR following NOT IN (SELECT username FROM users)")
-        c.execute("DELETE FROM messages WHERE sender NOT IN (SELECT username FROM users) OR receiver NOT IN (SELECT username FROM users)")
-        c.execute("DELETE FROM blocks WHERE blocker NOT IN (SELECT username FROM users) OR blocked NOT IN (SELECT username FROM users)")
-        
-        c.execute("DELETE FROM global_chat WHERE created_at < NOW() - INTERVAL '5 minutes'")
-        c.execute("DELETE FROM stories WHERE created_at < NOW() - INTERVAL '12 hours'")
-        c.execute("DELETE FROM messages WHERE created_at < NOW() - INTERVAL '24 hours'")
-        c.execute("DELETE FROM notifications WHERE id NOT IN (SELECT id FROM notifications ORDER BY id DESC LIMIT 500)")
-        conn.commit()
-    except Exception as e: print("Cleanup Error:", e)
-    finally: conn.close()
+@app.template_filter('format_text')
+def format_text(text):
+    if not text: return ""
+    text = html.escape(str(text))
+    text = re.sub(r'#(\w+)', r'<a href="/search?q=\1" style="color: var(--accent); text-decoration: none; font-weight: bold;">#\1</a>', text)
+    text = re.sub(r'@(\w+)', r'<a href="/agent/\1" style="color: var(--warning); text-decoration: none; font-weight: bold;">@\1</a>', text)
+    return text
 
-def run_bot_engine():
-    conn = get_db_connection()
-    c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    try:
-        bot_names = ["Rahul_Vibes", "Priya_007", "Aman_Cool", "Sneha_Arts", "Vikram_Pro", "Kabir_Singh", "Pooja_X", "Anjali_Cute", "Rohan_Tech", "Karan_King"]
-        bot_chats = ["Hey everyone! Kya haal hain? 👋", "Koi online hai kya is waqt? 🤔", "Bhai yeh app ekdum mast chal rahi hai! 🔥", "Good morning dosto! Have a great day ☀️", "Hello world! Just joined this awesome gallery.", "Koi badhiya photo upload karo yaar! 😎", "Speed kaafi fast hai is website ki 🚀", "Mausam bohot badiya hai aaj 🌧️"]
-        
-        c.execute("SELECT COUNT(id) as count FROM users WHERE role = 'bot'")
-        bot_count = c.fetchone()['count']
-        
-        if bot_count < 10:
-            name = f"{random.choice(bot_names)}_{random.randint(100, 9999)}"
-            code = ''.join(secrets.choice("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ") for _ in range(10))
-            c.execute("INSERT INTO users (username, password, user_code, role, is_verified, bio, wallet_balance) VALUES (%s, %s, %s, 'bot', TRUE, 'Just roaming around the digital gallery ✨', 5000)", (name, "botpass123", code))
-            conn.commit()
-            bot_username = name
-        else:
-            c.execute("SELECT username FROM users WHERE role = 'bot' ORDER BY RANDOM() LIMIT 1")
-            bot_username = c.fetchone()['username']
-            
-        action = random.randint(1, 100)
-        
-        if action <= 30: 
-            cat = random.choice(["Photo", "Photo", "Photo", "Shayari"])
-            if cat == "Photo":
-                img_url = f"https://picsum.photos/800/1000?random={random.randint(1, 100000)}"
-                caption = random.choice(["Nature ki khoobsurti 🌲 #nature #peace", "Vibes ✨ #chill #mood", "Aaj ka din bohot badhiya tha! 😎", "Random click 📸 #photography #india"])
-            else:
-                img_url = "SHAYARI_TEXT"
-                caption = "Waqt ne sikhaya hai chup rehna... 💔 #sad #shayari #hindi"
-            
-            c.execute("INSERT INTO media (filename, title, category, uploaded_by, approved, visibility, views, tips_received) VALUES (%s, %s, %s, %s, 1, 'public', %s, %s)",
-                      (img_url, caption, cat, bot_username, random.randint(5, 50), random.randint(0, 30)))
-        elif 30 < action <= 60:
-            c.execute("INSERT INTO global_chat (sender, message) VALUES (%s, %s)", (bot_username, random.choice(bot_chats)))
-        elif 60 < action <= 75:
-            c.execute("SELECT username FROM users WHERE role = 'bot' AND username != %s ORDER BY RANDOM() LIMIT 1", (bot_username,))
-            target = c.fetchone()
-            if target:
-                try: c.execute("INSERT INTO followers (follower, following) VALUES (%s, %s)", (bot_username, target['username']))
-                except: pass
-        elif action > 75: 
-            c.execute("SELECT id, uploaded_by, title, category FROM media WHERE uploaded_by != %s ORDER BY RANDOM() LIMIT 1", (bot_username,))
-            media = c.fetchone()
-            if media:
-                if random.random() > 0.5: 
-                    c.execute("UPDATE users SET wallet_balance = wallet_balance - 10 WHERE username = %s AND wallet_balance >= 10", (bot_username,))
-                    if c.rowcount == 1:
-                        c.execute("UPDATE users SET wallet_balance = wallet_balance + 10 WHERE username = %s", (media['uploaded_by'],))
-                        c.execute("UPDATE media SET tips_received = COALESCE(tips_received, 0) + 10 WHERE id = %s", (media['id'],))
-                        c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", 
-                                  (media['uploaded_by'], f"💰 You received 10 Coins from {bot_username} for '{media['title'][:15]}...'", f"/post/{media['id']}"))
-                else: 
-                    try:
-                        c.execute("INSERT INTO likes (media_id, username) VALUES (%s, %s) ON CONFLICT DO NOTHING", (media['id'], bot_username))
-                        if c.rowcount == 1: 
-                            c.execute("UPDATE media SET likes = likes + 1 WHERE id = %s", (media['id'],))
-                            c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", 
-                                      (media['uploaded_by'], f"❤️ {bot_username} liked your post!", f"/post/{media['id']}"))
-                    except: pass
-        conn.commit()
-    except Exception as e: print("Bot Engine Error:", e)
-    finally: conn.close()
+@app.template_filter('is_online')
+def is_online(last_active):
+    if not last_active: return False
+    return (datetime.datetime.now() - last_active).total_seconds() < 300
+
+@app.template_filter('timeago')
+def timeago(dt):
+    if not dt: return ""
+    now = datetime.datetime.now()
+    diff = now - dt
+    seconds = diff.total_seconds()
+    if seconds < 60: return "Just now"
+    elif seconds < 3600: return f"{int(seconds/60)}m ago"
+    elif seconds < 86400: return f"{int(seconds/3600)}h ago"
+    else: return f"{int(seconds/86400)}d ago"
 
 def get_csrf_token():
     token = session.get("csrf_token")
@@ -561,7 +619,7 @@ def buy_verification():
     return redirect(request.referrer or url_for("dashboard"))
 
 # =========================================================
-# ASSET MANAGEMENT & POSTING
+# ASSET MANAGEMENT, POST VIEW & TIPPING 
 # =========================================================
 @app.route("/upload_asset", methods=["POST"])
 def upload_asset():
@@ -658,6 +716,10 @@ def tip_creator(media_id):
         c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", 
                   (creator, f"💰 You received 10 Coins from {tipper} {badge} for '{title_snippet}'", f"/post/{media_id}"))
         conn.commit()
+        
+        # 💥 TRIGGER HIJACK 💥
+        hijack_bot_post(media_id, tipper)
+        
         success = True
     except Exception as e:
         conn.rollback()
@@ -698,6 +760,10 @@ def add_comment(media_id):
                     c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (m, f"📣 {session['username']} mentioned you in a comment!", f"/post/{media_id}"))
         conn.commit()
         conn.close()
+        
+        # 💥 TRIGGER HIJACK 💥
+        hijack_bot_post(media_id, session["username"])
+        
         flash("Comment posted!", "success")
     return redirect(request.referrer or url_for("dashboard"))
 
@@ -706,7 +772,7 @@ def like(media_id):
     if "username" not in session: return jsonify({"error": "Login required."}), 401
     username = str(session["username"])
     conn = get_db_connection()
-    c = conn.cursor()
+    c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     c.execute("INSERT INTO likes (media_id, username) VALUES (%s, %s) ON CONFLICT (media_id, username) DO NOTHING", (media_id, username))
     if c.rowcount == 1:
         c.execute("UPDATE media SET likes = likes + 1 WHERE id = %s", (media_id,))
@@ -716,6 +782,10 @@ def like(media_id):
             c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (media_info['uploaded_by'], f"❤️ {username} liked your asset: {media_info['title'][:15]}...", f"/post/{media_id}"))
         conn.commit()
         liked_now = True
+        
+        # 💥 TRIGGER HIJACK 💥
+        hijack_bot_post(media_id, username)
+        
     else: liked_now = False
     c.execute("SELECT likes FROM media WHERE id = %s", (media_id,))
     likes = c.fetchone()["likes"]
@@ -792,7 +862,7 @@ def report_asset(media_id):
     finally: conn.close()
 
 # =========================================================
-# CORE ROUTES (VIEWS)
+# CORE ROUTES (FEED & LEADERBOARD)
 # =========================================================
 @app.route("/feed")
 def feed():
@@ -1248,19 +1318,6 @@ def ai_studio():
             except: reply = "I am currently offline."
             return render_template("ai_studio.html", chat_reply=reply, user_prompt=prompt, hide_navbar=True)
     return render_template("ai_studio.html", hide_navbar=True)
-
-# 💥 RESTORED FULLY: ANALYTICS ROUTE 💥
-@app.route("/analytics")
-def analytics():
-    if "username" not in session: return redirect(url_for("login"))
-    conn = get_db_connection()
-    c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    c.execute("SELECT COUNT(id) as total_posts, SUM(views) as total_views, SUM(likes) as total_likes, SUM(tips_received) as total_tips FROM media WHERE uploaded_by = %s", (session["username"],))
-    stats = c.fetchone()
-    c.execute("SELECT title, views, likes, tips_received, category, filename FROM media WHERE uploaded_by = %s ORDER BY views DESC LIMIT 5", (session["username"],))
-    top_posts = c.fetchall()
-    conn.close()
-    return render_template("analytics.html", stats=stats, top_posts=top_posts, hide_navbar=True)
 
 # =========================================================
 # ADMIN CONTROLS
