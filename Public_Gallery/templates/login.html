@@ -1,62 +1,127 @@
-{% extends "base.html" %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login | Apna Gallery</title>
+    <meta name="theme-color" content="#0f172a">
+    <style>
+        body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: white; min-height: 100vh; display: flex; justify-content: center; align-items: center; overflow: hidden; position: relative; }
+        
+        .bg-blob-1 { position: absolute; top: -10%; left: -10%; width: 500px; height: 500px; background: #38bdf8; filter: blur(200px); opacity: 0.4; z-index: -1; border-radius: 50%; }
+        .bg-blob-2 { position: absolute; bottom: -10%; right: -10%; width: 600px; height: 600px; background: #a855f7; filter: blur(250px); opacity: 0.3; z-index: -1; border-radius: 50%; }
 
-{% block title %}Authentication | Apna Gallery{% endblock %}
+        .auth-card { background: rgba(30, 41, 59, 0.6); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); padding: 40px; border-radius: 24px; width: 100%; max-width: 400px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); text-align: center; }
+        
+        .logo { font-size: 2rem; font-weight: 900; letter-spacing: 2px; margin-bottom: 30px; display: block; }
+        .logo span { color: #38bdf8; }
 
-{% block content %}
-<div style="max-width: 450px; margin: 40px auto; background: var(--bg-card); padding: 40px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); text-align: center;">
-    
-    <h1 style="color: var(--accent); margin-top: 0;">Vault Access</h1>
-    
-    <!-- LOGIN FORM -->
-    <form method="POST" id="loginForm">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <input type="hidden" name="action" value="login" id="authAction">
-        
-        <input type="text" name="username" placeholder="Username or Email" required style="width: 100%; padding: 12px; margin-bottom: 15px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(8,17,31,0.6); color: white; outline: none; box-sizing: border-box;">
-        
-        <input type="email" name="email" id="emailField" placeholder="Email Address (Required for Recovery)" style="display: none; width: 100%; padding: 12px; margin-bottom: 15px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(8,17,31,0.6); color: white; outline: none; box-sizing: border-box;">
-        
-        <input type="password" name="password" id="passField" placeholder="Password" required style="width: 100%; padding: 12px; margin-bottom: 15px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(8,17,31,0.6); color: white; outline: none; box-sizing: border-box;">
-        
-        <input type="password" name="confirm_password" id="confirmField" placeholder="Confirm Password" style="display: none; width: 100%; padding: 12px; margin-bottom: 15px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(8,17,31,0.6); color: white; outline: none; box-sizing: border-box;">
-        
-        <button type="submit" id="mainBtn" class="btn" style="width: 100%; font-size: 1.1rem; padding: 12px; margin-bottom: 15px;">Login</button>
-    </form>
+        .flash-msg { padding: 12px; border-radius: 8px; margin-bottom: 20px; font-weight: bold; font-size: 0.9rem; }
+        .flash-msg.error { background: rgba(244, 63, 94, 0.2); border: 1px solid #f43f5e; color: #f43f5e; }
+        .flash-msg.success { background: rgba(34, 197, 94, 0.2); border: 1px solid #22c55e; color: #4ade80; }
 
-    <div style="display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 20px;">
-        <a href="#" onclick="toggleMode('register')" style="color: var(--text-muted);">New? Register</a>
-        <a href="#" onclick="toggleMode('forgot')" style="color: var(--warning);">Forgot Password?</a>
+        .input-group { margin-bottom: 20px; text-align: left; }
+        .input-group label { display: block; font-size: 0.85rem; color: #94a3b8; margin-bottom: 5px; font-weight: bold; }
+        .input-group input { width: 100%; padding: 12px 15px; border-radius: 10px; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.1); color: white; outline: none; transition: 0.3s; box-sizing: border-box; }
+        .input-group input:focus { border-color: #38bdf8; box-shadow: 0 0 10px rgba(56, 189, 248, 0.2); }
+
+        .btn-main { width: 100%; background: linear-gradient(135deg, #38bdf8, #2563eb); color: white; border: none; padding: 14px; border-radius: 10px; font-size: 1.1rem; font-weight: bold; cursor: pointer; transition: 0.3s; box-shadow: 0 4px 15px rgba(56, 189, 248, 0.3); margin-top: 10px; }
+        .btn-main:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(56, 189, 248, 0.5); }
+
+        .btn-guest { width: 100%; background: transparent; color: #94a3b8; border: 1px solid rgba(255,255,255,0.2); padding: 14px; border-radius: 10px; font-size: 1rem; font-weight: bold; cursor: pointer; transition: 0.3s; margin-top: 15px; }
+        .btn-guest:hover { background: rgba(255,255,255,0.05); color: white; border-color: white; }
+
+        .toggle-text { color: #94a3b8; margin-top: 25px; font-size: 0.9rem; }
+        .toggle-text span { color: #38bdf8; cursor: pointer; font-weight: bold; }
+        .toggle-text span:hover { text-decoration: underline; }
+
+        .form-section { display: none; animation: fadeIn 0.4s ease-out; }
+        .form-section.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+    <div class="bg-blob-1"></div>
+    <div class="bg-blob-2"></div>
+
+    <div class="auth-card">
+        <div class="logo">APNA<span>GALLERY</span></div>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash-msg {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- LOGIN FORM -->
+        <div id="login-box" class="form-section active">
+            <h2 style="margin-top: 0;">Welcome Back</h2>
+            <p style="color: #94a3b8; font-size: 0.9rem; margin-bottom: 30px;">Enter your credentials to access your vault.</p>
+            
+            <form method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="action" value="login">
+                <div class="input-group">
+                    <label>USERNAME OR EMAIL</label>
+                    <input type="text" name="username" required autocomplete="off">
+                </div>
+                <div class="input-group">
+                    <label>PASSWORD</label>
+                    <input type="password" name="password" required>
+                </div>
+                <button type="submit" class="btn-main">Sign In</button>
+            </form>
+            
+            <form method="POST" style="margin: 0;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="action" value="guest">
+                <button type="submit" class="btn-guest">Continue as Guest</button>
+            </form>
+
+            <p class="toggle-text">New here? <span onclick="toggleAuth('register')">Create an Account</span></p>
+        </div>
+
+        <!-- REGISTER FORM -->
+        <div id="register-box" class="form-section">
+            <h2 style="margin-top: 0;">Create Account</h2>
+            <p style="color: #38bdf8; font-size: 0.9rem; margin-bottom: 30px; font-weight: bold;">Signup & Get 100 Free Coins 🪙</p>
+            
+            <form method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="action" value="register">
+                <div class="input-group">
+                    <label>USERNAME</label>
+                    <input type="text" name="username" required autocomplete="off">
+                </div>
+                <div class="input-group">
+                    <label>EMAIL</label>
+                    <input type="email" name="email" required autocomplete="off">
+                </div>
+                <div class="input-group">
+                    <label>PASSWORD</label>
+                    <input type="password" name="password" required>
+                </div>
+                <button type="submit" class="btn-main" style="background: linear-gradient(135deg, #a855f7, #38bdf8);">Claim 100 Coins & Join</button>
+            </form>
+
+            <p class="toggle-text">Already a member? <span onclick="toggleAuth('login')">Sign In</span></p>
+        </div>
+
     </div>
-    
-    <hr style="border: 0; border-top: 1px solid var(--border-color); margin-bottom: 20px;">
-    
-    <form method="POST">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <input type="hidden" name="action" value="guest">
-        <button type="submit" class="btn" style="width: 100%; background: #334155; color: white;">Continue as Guest</button>
-        <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 10px;">Guest accounts auto-delete after 30 days of inactivity.</p>
-    </form>
-</div>
 
-<script>
-    function toggleMode(mode) {
-        document.getElementById('authAction').value = mode;
-        if(mode === 'register') {
-            document.getElementById('emailField').style.display = 'block';
-            document.getElementById('emailField').required = true;
-            document.getElementById('confirmField').style.display = 'block';
-            document.getElementById('confirmField').required = true;
-            document.getElementById('passField').style.display = 'block';
-            document.getElementById('mainBtn').innerText = 'Register Now';
-        } else if (mode === 'forgot') {
-            document.getElementById('emailField').style.display = 'block';
-            document.getElementById('emailField').required = true;
-            document.getElementById('confirmField').style.display = 'none';
-            document.getElementById('passField').style.display = 'none';
-            document.getElementById('passField').required = false;
-            document.getElementById('mainBtn').innerText = 'Send OTP';
-            document.getElementById('mainBtn').style.background = 'var(--warning)';
+    <script>
+        function toggleAuth(mode) {
+            if(mode === 'register') {
+                document.getElementById('login-box').classList.remove('active');
+                document.getElementById('register-box').classList.add('active');
+            } else {
+                document.getElementById('register-box').classList.remove('active');
+                document.getElementById('login-box').classList.add('active');
+            }
         }
-    }
-</script>
-{% endblock %}
+    </script>
+</body>
+</html>
