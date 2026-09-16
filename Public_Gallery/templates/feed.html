@@ -8,13 +8,12 @@
         <h1 style="color: var(--accent); margin: 0;">📰 Timeline</h1>
     </div>
 
-    <!-- DUAL FEED TABS -->
     <div style="display: flex; justify-content: center; gap: 20px; margin-bottom: 30px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
         <a href="{{ url_for('feed', tab='foryou') }}" style="text-decoration: none; color: {% if current_tab == 'foryou' %}var(--accent){% else %}var(--text-muted){% endif %}; font-size: 1.2rem; font-weight: bold; padding-bottom: 5px; {% if current_tab == 'foryou' %}border-bottom: 3px solid var(--accent);{% endif %}">
-            👥 For You
+            👥 Following
         </a>
         <a href="{{ url_for('feed', tab='global') }}" style="text-decoration: none; color: {% if current_tab == 'global' %}var(--accent){% else %}var(--text-muted){% endif %}; font-size: 1.2rem; font-weight: bold; padding-bottom: 5px; {% if current_tab == 'global' %}border-bottom: 3px solid var(--accent);{% endif %}">
-            🌍 Global
+            🌍 For You <span style="font-size:0.8rem; background:rgba(168,85,247,0.2); color:#a855f7; padding:2px 6px; border-radius:10px;">AI</span>
         </a>
     </div>
 
@@ -25,7 +24,7 @@
     
     <div id="loading-spinner" style="text-align: center; padding: 30px; display: none;">
         <span style="font-size: 2rem; display: inline-block; animation: spin 1s infinite linear;">🔄</span>
-        <p style="color: var(--text-muted); margin-top: 10px;">Loading more posts...</p>
+        <p style="color: var(--text-muted); margin-top: 10px;">Loading algorithm feed...</p>
     </div>
     
     <div id="end-message" style="text-align: center; padding: 40px; display: none; background: var(--bg-card); border-radius: 16px; border: 1px solid var(--border-color); margin-top: 20px;">
@@ -52,18 +51,15 @@ const currentTab = '{{ current_tab }}';
 const csrfToken = '{{ csrf_token() }}';
 const currentUser = '{{ session.username }}';
 
-// RENDER A SINGLE POST
 function createPostHTML(post) {
     const verifiedBadge = post.is_verified ? '<span style="color: #38bdf8; font-size: 1.1rem;" title="Verified">✅</span>' : '';
     const adminBadge = post.role === 'admin' ? '<span style="color: #38bdf8; font-size: 1.1rem;" title="Verified Admin">☑️</span>' : '';
     
-    // Avatar Logic
     let avatarUrl = post.profile_pic;
     if (!avatarUrl || avatarUrl.trim() === '') {
         avatarUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(post.uploaded_by)}&backgroundColor=1e293b`;
     }
 
-    // Media Logic
     let mediaHtml = '';
     if(post.category === 'Photo') {
         mediaHtml = `<img src="${post.filename}" style="width: 100%; max-height: 500px; object-fit: contain;">`;
@@ -75,7 +71,6 @@ function createPostHTML(post) {
         mediaHtml = `<a href="${post.filename}" target="_blank" style="color: var(--accent); padding: 50px; text-decoration: none; font-size: 2rem; text-align:center; display:block;">📁 View Document</a>`;
     }
 
-    // Comments Logic
     let commentsHtml = '';
     if (post.comments && post.comments.length > 0) {
         post.comments.forEach(c => {
@@ -101,6 +96,17 @@ function createPostHTML(post) {
     }
 
     let reportBtn = post.uploaded_by !== currentUser ? `<button class="btn" onclick="reportAsset(${post.id})" style="background: transparent; border: none; color: var(--text-muted); font-size: 1.2rem; cursor: pointer; padding: 0 5px;" title="Report this post">🚩</button>` : '';
+    
+    // 💥 NEW: TIPPING BUTTON UI 💥
+    let tipBtn = post.uploaded_by !== currentUser ? `
+        <button class="btn" onclick="tipCreator(${post.id}, '${post.uploaded_by}')" style="background: rgba(251, 191, 36, 0.2); border: 1px solid var(--warning); color: var(--warning); padding: 8px 15px; display:flex; align-items:center; gap:5px;" title="Send 10 Coins to Creator">
+            🪙 Tip <span id="tip-count-${post.id}" style="color: white; background: #000; padding: 2px 6px; border-radius: 6px; font-size:0.8rem;">${post.tips_received || 0}</span>
+        </button>
+    ` : `
+        <span style="background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.5); color: var(--text-muted); padding: 8px 15px; border-radius: 8px; display:flex; align-items:center; gap:5px;">
+            🪙 Tips <span style="color: white; background: #000; padding: 2px 6px; border-radius: 6px; font-size:0.8rem;">${post.tips_received || 0}</span>
+        </span>
+    `;
 
     return `
     <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.3); animation: slideDown 0.5s ease-out;">
@@ -129,21 +135,25 @@ function createPostHTML(post) {
             <h3 style="margin: 0 0 15px 0; font-size: 1.2rem; line-height: 1.4;">${post.title}</h3>
             
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
-                <div style="display: flex; gap: 10px; align-items: center;">
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                     <button class="btn" id="like-btn-${post.id}" onclick="toggleLike(${post.id})" style="background: transparent; border: 1px solid var(--danger); color: var(--danger); padding: 8px 15px;">
                         ❤️ <span id="like-count-${post.id}">${post.likes}</span>
                     </button>
                     <span style="background: rgba(8,17,31,0.6); border: 1px solid var(--border-color); color: var(--text-main); padding: 8px 15px; border-radius: 8px; font-weight: bold;">
                         👁️ <span id="view-count-${post.id}">${post.views}</span>
                     </span>
-                    <button class="btn" onclick="sharePost('${post.title.replace(/'/g, "\\'")}', window.location.origin + '/agent/${post.uploaded_by}')" style="background: transparent; border: 1px solid var(--accent); color: var(--accent); padding: 8px 15px;">
+                    ${tipBtn}
+                </div>
+                
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <button class="btn" id="bookmark-btn-${post.id}" onclick="toggleBookmark(${post.id})" style="background: transparent; border: 1px solid var(--accent); color: var(--accent); padding: 8px 15px; font-size: 1.1rem;">
+                        ${post.is_saved ? '📌 Saved' : '📍 Save'}
+                    </button>
+                    <button class="btn" onclick="sharePost('${post.title.replace(/'/g, "\\'")}', window.location.origin + '/agent/${post.uploaded_by}')" style="background: transparent; border: none; font-size: 1.5rem; padding: 0 5px;" title="Share">
                         📤
                     </button>
                     ${reportBtn}
                 </div>
-                <button class="btn" id="bookmark-btn-${post.id}" onclick="toggleBookmark(${post.id})" style="background: transparent; border: 1px solid var(--warning); color: var(--warning); padding: 8px 15px; font-size: 1.1rem;">
-                    ${post.is_saved ? '📌 Saved' : '📍 Save'}
-                </button>
             </div>
 
             <div style="background: rgba(8, 17, 31, 0.4); border-radius: 8px; padding: 15px;">
@@ -160,7 +170,6 @@ function createPostHTML(post) {
     </div>`;
 }
 
-// FETCH DATA FUNCTION
 async function loadMorePosts() {
     if (loading || !hasMore) return;
     loading = true;
@@ -186,18 +195,11 @@ async function loadMorePosts() {
     loading = false;
 }
 
-// SCROLL LISTENER
 window.addEventListener('scroll', () => {
-    // Load more when user is near bottom
-    if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 500) {
-        loadMorePosts();
-    }
+    if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 500) { loadMorePosts(); }
 });
-
-// INITIAL LOAD
 document.addEventListener("DOMContentLoaded", loadMorePosts);
 
-// UTILITY FUNCTIONS
 async function openLightbox(src, mediaId) {
     document.getElementById('imageLightbox').style.display = 'flex';
     document.getElementById('lightboxImgSrc').src = src;
@@ -214,6 +216,22 @@ async function toggleLike(mediaId) {
         const data = await response.json();
         if (response.ok) { document.getElementById(`like-count-${mediaId}`).innerText = data.likes; }
     } catch (e) {}
+}
+
+// 💥 NEW: CREATOR TIP API TRIGGER 💥
+async function tipCreator(mediaId, creatorName) {
+    if(confirm(`Send 10 🪙 from your Wallet to support ${creatorName}?`)) {
+        try {
+            const response = await fetch(`/tip/${mediaId}`, { method: 'POST', headers: { 'X-CSRF-Token': csrfToken } });
+            const data = await response.json();
+            if (response.ok && data.success) {
+                document.getElementById(`tip-count-${mediaId}`).innerText = data.new_tips;
+                alert(`Sent 10 Coins to ${creatorName}! 🎉 (Refresh page to update your balance)`);
+            } else {
+                alert(data.error || "Failed to send tip.");
+            }
+        } catch (e) { alert("Network Error"); }
+    }
 }
 
 async function toggleBookmark(mediaId) {
