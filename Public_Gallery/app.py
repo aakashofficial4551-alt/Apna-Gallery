@@ -10,7 +10,7 @@ import random
 import smtplib
 import re
 import json
-import html  # 💥 NEW: For Extreme Input Sanitization (Anti-XSS)
+import html
 
 import psycopg2
 import psycopg2.extras
@@ -43,16 +43,17 @@ cloudinary.config(
 app = Flask(__name__)
 init_db()
 
-# 💥 PHASE 78: EXTREME COOKIE SECURITY 💥
+# 💥 MILITARY GRADE COOKIE SECURITY 💥
 app.config.update(
     SECRET_KEY=os.environ.get("SECRET_KEY", "development-only-secret-change-me"),
     MAX_CONTENT_LENGTH=50 * 1024 * 1024,
-    SESSION_COOKIE_HTTPONLY=True,  # Blocks JS from stealing session
-    SESSION_COOKIE_SAMESITE='Lax', # Prevents cross-site token theft
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='Lax',
+    SESSION_COOKIE_SECURE=True, # Requires HTTPS (Render provides this)
 )
 
 # =========================================================
-# 🛡️ THE TITANIUM FIREWALL (ANTI-DDOS & CSRF ENFORCEMENT) 🛡️
+# 🛡️ THE TITANIUM FIREWALL (ANTI-DDOS, CSRF & CSP) 🛡️
 # =========================================================
 request_tracker = defaultdict(list)
 BANNED_IPS = set()
@@ -62,9 +63,8 @@ def security_firewall():
     ip = request.remote_addr or "127.0.0.1"
     now = time.time()
     
-    # 1. Anti-DDoS & Brute Force Monitor
     request_tracker[ip] = [t for t in request_tracker[ip] if now - t < 60]
-    if len(request_tracker[ip]) > 200: # Limit: 200 requests per minute
+    if len(request_tracker[ip]) > 200:
         BANNED_IPS.add(ip)
         
     if ip in BANNED_IPS:
@@ -72,16 +72,13 @@ def security_firewall():
         
     request_tracker[ip].append(now)
 
-    # 2. Strict CSRF Verification for ALL Data Modifications
     if request.method in ["POST", "PUT", "DELETE"]:
-        # Bypass login/register routes to avoid locking users out
         if request.endpoint not in ['login', 'verify_otp', 'logout', 'api_search_suggest']:
             token = request.form.get("csrf_token") or request.headers.get("X-CSRF-Token")
             session_token = session.get("csrf_token")
             
             if not token or not session_token or not hmac.compare_digest(token, session_token):
-                if request.path.startswith('/api/'):
-                    return jsonify({"error": "Security Firewall: Invalid CSRF Token"}), 403
+                if request.path.startswith('/api/'): return jsonify({"error": "Security Firewall: Invalid CSRF Token"}), 403
                 else:
                     flash("Security Firewall Blocked Your Request: Invalid Validation Token.", "error")
                     return redirect(request.referrer or url_for('feed'))
@@ -92,6 +89,8 @@ def set_security_headers(response):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    # 💥 NEW: Content Security Policy (Blocks external malicious scripts) 💥
+    response.headers["Content-Security-Policy"] = "default-src 'self' https: data: 'unsafe-inline' 'unsafe-eval';"
     return response
 
 # =========================================================
@@ -109,8 +108,7 @@ def create_database_backup():
         backup_dir = os.path.join(BASE_DIR, "backups")
         os.makedirs(backup_dir, exist_ok=True)
         file_path = os.path.join(backup_dir, f"backup_{datetime.date.today()}.json")
-        with open(file_path, "w", encoding="utf-8") as f:
-            json.dump(backup_data, f, default=str, indent=4)
+        with open(file_path, "w", encoding="utf-8") as f: json.dump(backup_data, f, default=str, indent=4)
         conn.close()
     except Exception as e: print(f"Backup Error: {e}")
 
@@ -120,7 +118,7 @@ def create_database_backup():
 @app.template_filter('format_text')
 def format_text(text):
     if not text: return ""
-    text = html.escape(text) # 💥 ANTI-XSS: Converts <script> to safe text!
+    text = html.escape(text) # ANTI-XSS
     text = re.sub(r'#(\w+)', r'<a href="/search?q=\1" style="color: var(--accent); text-decoration: none; font-weight: bold;">#\1</a>', text)
     text = re.sub(r'@(\w+)', r'<a href="/agent/\1" style="color: var(--warning); text-decoration: none; font-weight: bold;">@\1</a>', text)
     return text
@@ -405,7 +403,7 @@ def login():
     if session.get("username"): return redirect(url_for("feed"))
     if request.method == "POST":
         action = request.form.get("action")
-        username = html.escape(request.form.get("username", "").strip()) # Anti-XSS
+        username = html.escape(request.form.get("username", "").strip())
         password = request.form.get("password", "")
         
         if action == "guest":
@@ -477,7 +475,7 @@ def settings():
     if action == "update_profile":
         bio = html.escape(request.form.get("bio", ""))
         website = html.escape(request.form.get("website", ""))
-        theme = request.form.get("theme", "cyan")
+        theme = html.escape(request.form.get("theme", "cyan"))
         c.execute("UPDATE users SET bio = %s, theme = %s, website = %s WHERE username = %s", 
                   (bio, theme, website, session["username"]))
         flash("Profile Settings Updated!", "success")
@@ -560,7 +558,7 @@ def upload_asset():
     if "username" not in session: return redirect(url_for("login"))
     try:
         category = request.form.get("category", "Photo")
-        title = html.escape(request.form.get("title", "Untitled")) # ANTI-XSS
+        title = html.escape(request.form.get("title", "Untitled"))
         visibility = request.form.get("visibility", "public")
         file = request.files.get("media")
         filename = "SHAYARI_TEXT"
@@ -643,7 +641,7 @@ def add_view(media_id):
 @app.route("/add_comment/<int:media_id>", methods=["POST"])
 def add_comment(media_id):
     if "username" not in session: return redirect(url_for("login"))
-    text = html.escape(request.form.get("comment_text", "").strip()) # ANTI-XSS
+    text = html.escape(request.form.get("comment_text", "").strip())
     if text:
         conn = get_db_connection()
         c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
@@ -711,7 +709,7 @@ def like_comment(comment_id):
 @app.route("/edit_post/<int:media_id>", methods=["POST"])
 def edit_post(media_id):
     if "username" not in session: return redirect(url_for("login"))
-    new_title = html.escape(request.form.get("title", "").strip()) # ANTI-XSS
+    new_title = html.escape(request.form.get("title", "").strip())
     if new_title:
         conn = get_db_connection()
         c = conn.cursor()
@@ -860,6 +858,44 @@ def explore():
     trending_tags = [tag for tag, count in sorted(tag_counts.items(), key=lambda x: x[1], reverse=True)[:6]]
     conn.close()
     return render_template("explore.html", posts=explore_posts, trending_tags=trending_tags, spotlight=spotlight)
+
+# 💥 RESTORED FULLY: GALLERY ROUTE 💥
+@app.route("/gallery/<category>", methods=["GET", "POST"])
+def gallery(category):
+    if "username" not in session: return redirect(url_for("login"))
+    conn = get_db_connection()
+    c = conn.cursor()
+    if request.method == "POST":
+        try:
+            filename = "SHAYARI_TEXT"
+            if category != 'Shayari':
+                file = request.files.get("media")
+                if file and file.filename != "":
+                    filename = save_uploaded_file(file, category)
+                    if not filename:
+                        flash("Upload Failed! Check API keys.", "error")
+                        return redirect(url_for("gallery", category=category))
+            
+            is_approved = 1 if current_user_is_admin() else 0
+            visibility = request.form.get("visibility", "public")
+            c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved, visibility, views, is_pinned) VALUES (%s, %s, %s, %s, %s, %s, %s, 0, FALSE)",
+                      (filename, html.escape(request.form.get("title", "Untitled")), category, "", session.get("username"), is_approved, visibility))
+            conn.commit()
+            flash("File live!" if is_approved else "Sent to Admin for approval.", "success")
+        except Exception as e:
+            conn.rollback()
+            flash(f"Upload System Fault: {str(e)[:100]}", "error")
+        return redirect(url_for("gallery", category=category))
+
+    c.execute("SELECT m.*, u.profile_pic, u.role, u.is_verified FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.category = %s AND m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' AND m.uploaded_by NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) ORDER BY m.id DESC", (category, session["username"]))
+    if category == 'Shayari': c.execute("SELECT m.*, u.role, u.is_verified FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.category = %s AND m.approved = 1 AND m.visibility = 'public' AND m.uploaded_by NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) ORDER BY m.id DESC", (category, session["username"]))
+    media_files = c.fetchall()
+    c.execute("SELECT c.*, u.role, u.is_verified FROM comments c JOIN users u ON c.username = u.username ORDER BY c.id ASC")
+    comments_db = c.fetchall()
+    conn.close()
+    comments = defaultdict(list)
+    for comment in comments_db: comments[comment["media_id"]].append(comment)
+    return render_template("gallery.html", media_files=media_files, category=category, comments=comments)
 
 @app.route("/dashboard")
 def dashboard():
@@ -1043,7 +1079,7 @@ def chat(username):
         conn.close()
         return redirect(url_for("inbox"))
     if request.method == "POST":
-        msg = html.escape(request.form.get("message", "").strip()) # ANTI-XSS
+        msg = html.escape(request.form.get("message", "").strip())
         if msg:
             c.execute("INSERT INTO messages (sender, receiver, message) VALUES (%s, %s, %s)", (me, username, msg))
             conn.commit()
@@ -1099,7 +1135,7 @@ def global_chat():
     conn = get_db_connection()
     c = conn.cursor()
     if request.method == "POST":
-        msg = html.escape(request.form.get("message", "").strip()) # ANTI-XSS
+        msg = html.escape(request.form.get("message", "").strip())
         if msg:
             c.execute("INSERT INTO global_chat (sender, message) VALUES (%s, %s)", (session["username"], msg[:500]))
             conn.commit()
@@ -1175,7 +1211,7 @@ def ai_studio():
                 conn.commit()
                 conn.close()
                 flash("Image created successfully! (100% Free)", "success")
-                return redirect(url_for("gallery", Photo))
+                return redirect(url_for("gallery", category="Photo"))
             except: flash("Image generation failed.", "error")
         else:
             try: reply = get_ai_response(prompt)
