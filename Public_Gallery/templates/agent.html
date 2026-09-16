@@ -16,46 +16,45 @@
 <div style="background: var(--bg-card); padding: 20px 30px 30px 30px; border-radius: 0 0 20px 20px; border: 1px solid var(--border-color); border-top: none; margin-bottom: 40px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); display: flex; gap: 30px; flex-wrap: wrap;">
     
     <div style="margin-top: -60px;">
-        {% if agent.profile_pic %}
-            <img src="{{ agent.profile_pic }}" style="width: 140px; height: 140px; border-radius: 50%; object-fit: cover; border: 6px solid var(--bg-main);">
-        {% else %}
-            <div style="width: 140px; height: 140px; border-radius: 50%; background: #1e293b; border: 6px solid var(--bg-main); display: grid; place-items: center; font-size: 4rem;">👤</div>
-        {% endif %}
+        <img src="{{ get_avatar(agent.profile_pic, agent.username) }}" style="width: 140px; height: 140px; border-radius: 50%; object-fit: cover; border: 6px solid var(--bg-main);">
     </div>
 
     <div style="flex: 1; padding-top: 10px;">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 15px;">
             <div>
                 <h1 style="color: var(--accent); margin: 0 0 5px 0; display: flex; align-items: center; gap: 8px;">
                     {{ agent.username }}
-                    {% if agent.role == 'admin' %}
-                        <span style="color: #38bdf8; font-size: 1.5rem;" title="Verified Admin">☑️</span>
-                    {% endif %}
+                    {% if agent.is_verified %}<span style="color: #38bdf8; font-size: 1.5rem;" title="Verified Creator">✅</span>{% endif %}
+                    {% if agent.role == 'admin' %}<span style="background: rgba(239, 68, 68, 0.2); border: 1px solid var(--danger); color: var(--danger); font-size: 0.8rem; padding: 2px 8px; border-radius: 12px; vertical-align: middle;">ADMIN HQ</span>{% endif %}
                 </h1>
                 
-                <p style="color: var(--text-muted); font-size: 1.1rem; margin: 0 0 15px 0;">{{ agent.bio or 'No bio provided.' }}</p>
+                <p style="color: var(--text-muted); font-size: 1.1rem; margin: 0 0 10px 0;">{{ agent.bio or 'No bio provided.' }}</p>
                 
-                <!-- CLICKABLE NETWORK STATS -->
+                {% if agent.website %}
+                <a href="{{ agent.website }}" target="_blank" style="display: inline-block; margin-bottom: 15px; color: var(--accent); font-weight: bold; text-decoration: none; background: rgba(56, 189, 248, 0.1); padding: 5px 15px; border-radius: 20px; border: 1px solid var(--border-color); transition: 0.2s;">
+                    🔗 {{ agent.website.replace('https://', '').replace('http://', '') }}
+                </a>
+                {% endif %}
+                
                 <div style="display: flex; gap: 15px; margin-bottom: 15px;">
-                    <span onclick="openNetworkModal('followers', '{{ agent.username }}')" style="background: rgba(8,17,31,0.6); padding: 5px 10px; border-radius: 6px; font-size: 0.9rem; color: var(--success); cursor: pointer; transition: 0.2s;" onmouseover="this.style.background='rgba(8,17,31,0.9)'" onmouseout="this.style.background='rgba(8,17,31,0.6)'">👥 <span id="followers-count">{{ followers_count }}</span> Followers</span>
-                    
-                    <span onclick="openNetworkModal('following', '{{ agent.username }}')" style="background: rgba(8,17,31,0.6); padding: 5px 10px; border-radius: 6px; font-size: 0.9rem; color: var(--accent); cursor: pointer; transition: 0.2s;" onmouseover="this.style.background='rgba(8,17,31,0.9)'" onmouseout="this.style.background='rgba(8,17,31,0.6)'">🫂 {{ following_count }} Following</span>
+                    <span onclick="openNetworkModal('followers', '{{ agent.username }}')" style="background: rgba(8,17,31,0.6); padding: 5px 10px; border-radius: 6px; font-size: 0.9rem; color: var(--success); cursor: pointer;">👥 <span id="followers-count">{{ followers_count }}</span> Followers</span>
+                    <span onclick="openNetworkModal('following', '{{ agent.username }}')" style="background: rgba(8,17,31,0.6); padding: 5px 10px; border-radius: 6px; font-size: 0.9rem; color: var(--accent); cursor: pointer;">🫂 {{ following_count }} Following</span>
                 </div>
             </div>
 
             {% if session.username != agent.username %}
-            <div style="display: flex; gap: 10px;">
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                 <button id="follow-btn" onclick="toggleFollow('{{ agent.username }}')" class="btn" style="
-                    {% if is_following %}
-                        background: rgba(239, 68, 68, 0.2); border: 1px solid var(--danger); color: var(--danger);
-                    {% else %}
-                        background: var(--accent); border: 1px solid var(--accent); color: #000;
-                    {% endif %}
-                    padding: 8px 25px; border-radius: 20px;">
+                    {% if is_following %} background: rgba(239, 68, 68, 0.2); border: 1px solid var(--danger); color: var(--danger);
+                    {% else %} background: var(--accent); border: 1px solid var(--accent); color: #000; {% endif %}
+                    padding: 8px 20px; border-radius: 20px;">
                     {% if is_following %}Unfollow{% else %}Follow{% endif %}
                 </button>
                 
-                <a href="{{ url_for('chat', username=agent.username) }}" class="btn" style="background: #334155; color: white; padding: 8px 25px; border-radius: 20px; text-decoration: none;">💬 Message</a>
+                <a href="{{ url_for('chat', username=agent.username) }}" class="btn" style="background: #334155; color: white; padding: 8px 20px; border-radius: 20px; text-decoration: none;">💬 Message</a>
+                
+                <!-- 💥 NEW: PRIVACY SHIELD BLOCK BUTTON 💥 -->
+                <button onclick="blockUser('{{ agent.username }}')" class="btn" style="background: rgba(239, 68, 68, 0.1); border: 1px solid var(--danger); color: var(--danger); padding: 8px 15px; border-radius: 20px;" title="Block User">🚫 Block</button>
             </div>
             {% endif %}
         </div>
@@ -65,29 +64,38 @@
 <h2 style="color: var(--accent); border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">Public Showcase</h2>
 <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px;">
     {% for item in uploads %}
-    <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px;">
+    <div style="background: var(--bg-card); border: 1px solid {% if item.is_pinned %}var(--warning){% else %}var(--border-color){% endif %}; border-radius: 12px; padding: 15px; position: relative;">
+        
+        {% if item.is_pinned %}
+            <div style="position: absolute; top: -10px; left: -10px; background: var(--warning); color: #000; padding: 5px 10px; border-radius: 8px; font-size: 0.8rem; font-weight: bold; z-index: 10;">📌 PINNED</div>
+        {% endif %}
+        
         <div style="height: 180px; background: #000; border-radius: 8px; margin-bottom: 10px; overflow: hidden; display: grid; place-items: center;">
             {% if item.category == 'Photo' %}<img src="{{ item.filename }}" style="width: 100%; height: 100%; object-fit: cover;">
             {% elif item.category == 'Video' %}<video src="{{ item.filename }}" controls style="width: 100%; height: 100%; object-fit: cover;"></video>
+            {% elif item.category == 'Music' %}
+                <div style="width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: linear-gradient(135deg, rgba(8,17,31,1), rgba(15,23,42,1)); padding: 10px; box-sizing: border-box;">
+                    <span style="font-size: 2rem; margin-bottom: 5px; filter: drop-shadow(0 0 5px var(--accent));">🎵</span>
+                    <audio src="{{ item.filename }}" controls style="width: 100%; outline: none; height: 30px;"></audio>
+                </div>
             {% else %}<span style="font-size: 3rem;">📁</span>{% endif %}
         </div>
-        <p style="margin: 0; font-weight: bold; font-size: 1.1rem;">{{ item.title }}</p>
-        <p style="margin: 5px 0 0 0; font-size: 0.85rem; color: var(--text-muted);">Vault: {{ item.category }}</p>
-        <p style="margin: 5px 0 0 0; font-size: 0.85rem; color: var(--danger); font-weight: bold;">❤️ {{ item.likes }} Likes</p>
+        <p style="margin: 0; font-weight: bold; font-size: 1.1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ item.title }}</p>
+        <div style="display: flex; justify-content: space-between; margin-top: 5px;">
+            <p style="margin: 0; font-size: 0.85rem; color: var(--text-muted);">Vault: {{ item.category }}</p>
+            <p style="margin: 0; font-size: 0.85rem; color: var(--danger); font-weight: bold;">❤️ {{ item.likes }}  👁️ {{ item.views }}</p>
+        </div>
     </div>
     {% else %}
     <p style="grid-column: 1 / -1; text-align: center; color: var(--text-muted); font-size: 1.2rem; padding: 40px;">This agent hasn't shared any public assets yet.</p>
     {% endfor %}
 </div>
 
-<!-- NETWORK EXPLORER MODAL -->
 <div id="networkModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
     <div style="background: var(--bg-card); padding: 30px; border-radius: 20px; border: 1px solid var(--border-color); width: 90%; max-width: 400px; position: relative; box-shadow: 0 10px 40px rgba(0,0,0,0.5); max-height: 80vh; display: flex; flex-direction: column;">
         <span onclick="document.getElementById('networkModal').style.display='none'" style="position: absolute; top: 15px; right: 20px; font-size: 2rem; color: white; cursor: pointer;">&times;</span>
         <h2 id="networkTitle" style="color: var(--accent); margin-top: 0; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">Network</h2>
-        <div id="networkList" style="overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 15px; padding-right: 10px;">
-            <!-- JS inserts data here -->
-        </div>
+        <div id="networkList" style="overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 15px; padding-right: 10px;"></div>
     </div>
 </div>
 
@@ -98,6 +106,18 @@ async function toggleFollow(username) {
         const data = await response.json();
         if (response.ok) { location.reload(); }
     } catch (e) { console.error("Follow error:", e); }
+}
+
+async function blockUser(username) {
+    if(confirm(`Are you sure you want to block ${username}? They will not be able to interact with you or appear on your feed.`)) {
+        try {
+            const res = await fetch(`/block/${username}`, { method: 'POST', headers: { 'X-CSRF-Token': '{{ csrf_token() }}' }});
+            if(res.ok) {
+                alert("User blocked successfully.");
+                window.location.href = "/feed"; // Redirect to feed to refresh block filters
+            }
+        } catch(e) { console.error("Block error", e); }
+    }
 }
 
 async function openNetworkModal(type, username) {
@@ -112,7 +132,7 @@ async function openNetworkModal(type, username) {
         let html = '';
         data.forEach(user => {
             const pic = user.profile_pic ? `<img src="${user.profile_pic}" style="width:40px; height:40px; border-radius:50%; object-fit:cover; border:2px solid var(--accent);">` : `<div style="width:40px; height:40px; border-radius:50%; background:#1e293b; border:2px solid var(--accent); display:grid; place-items:center; font-size: 1.2rem;">👤</div>`;
-            const badge = user.role === 'admin' ? '<span style="color:#38bdf8; font-size:0.9rem;" title="Verified">☑️</span>' : '';
+            const badge = user.is_verified ? '<span style="color:#38bdf8; font-size:0.9rem;" title="Verified">✅</span>' : '';
             html += `
             <a href="/agent/${user.username}" style="display:flex; align-items:center; gap:15px; text-decoration:none; color:inherit; padding:10px; background:rgba(8,17,31,0.5); border-radius:10px; border:1px solid rgba(255,255,255,0.05); transition: 0.2s;" onmouseover="this.style.background='rgba(8,17,31,0.9)'" onmouseout="this.style.background='rgba(8,17,31,0.5)'">
                 ${pic}
