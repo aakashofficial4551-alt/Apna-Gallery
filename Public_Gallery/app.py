@@ -9,8 +9,10 @@ import datetime
 import random
 import smtplib
 import re
+import json
 
 import psycopg2
+import psycopg2.extras
 import cloudinary
 import cloudinary.uploader
 import requests
@@ -42,6 +44,46 @@ init_db()
 
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "development-only-secret-change-me")
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
+
+# =========================================================
+# SECURITY: MAXIMUM PROTECTION HEADERS (ANTI-HACKER)
+# =========================================================
+@app.after_request
+def set_security_headers(response):
+    response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
+
+# =========================================================
+# STORAGE & BACKUP ENGINE (FUTURE PROOF DATA SAFETY)
+# =========================================================
+def create_database_backup():
+    """Automatically exports core database records into a secure local JSON backup file."""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        
+        backup_data = {"timestamp": str(datetime.datetime.now()), "users": [], "media": [], "notifications": []}
+        
+        c.execute("SELECT username, email, role, is_verified, created_at FROM users")
+        backup_data["users"] = [dict(row) for row in c.fetchall()]
+        
+        c.execute("SELECT id, title, category, uploaded_by, likes, views, visibility, created_at FROM media")
+        backup_data["media"] = [dict(row) for row in c.fetchall()]
+        
+        backup_dir = os.path.join(BASE_DIR, "backups")
+        os.makedirs(backup_dir, exist_ok=True)
+        
+        file_path = os.path.join(backup_dir, f"backup_{datetime.date.today()}.json")
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump(backup_data, f, default=str, indent=4)
+            
+        conn.close()
+        print("Database backup created successfully.")
+    except Exception as e:
+        print(f"Backup Error: {e}")
 
 # =========================================================
 # TEXT & TIME FILTERS
@@ -93,8 +135,6 @@ def upgrade_db():
     conn.commit()
 
     safe_alter(c, conn, "ALTER TABLE media ALTER COLUMN title TYPE TEXT")
-    
-    safe_alter(c, conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
     safe_alter(c, conn, "ALTER TABLE media ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
     safe_alter(c, conn, "ALTER TABLE comments ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
     safe_alter(c, conn, "ALTER TABLE media ADD COLUMN IF NOT EXISTS visibility VARCHAR(20) DEFAULT 'public'")
@@ -133,23 +173,15 @@ def upgrade_db():
 
 upgrade_db()
 
-# =========================================================
-# THE GRIM REAPER (AUTO-CLEANUP AS REQUESTED)
-# =========================================================
 def cleanup_database():
     conn = get_db_connection()
     c = conn.cursor()
     try:
-        # 1. 7 Days Limit for BOT Accounts
         c.execute("DELETE FROM users WHERE role = 'bot' AND created_at < NOW() - INTERVAL '7 days'")
-        # 2. 1 Month Limit for Inactive GUEST Accounts
         c.execute("DELETE FROM users WHERE username LIKE 'Guest-%%' AND last_active < NOW() - INTERVAL '30 days'")
-        # 3. 3 Months Limit for Inactive REAL Users
         c.execute("DELETE FROM users WHERE role = 'user' AND last_active < NOW() - INTERVAL '90 days'")
-        # 4. Account Deletion Requests (7 Days)
         c.execute("DELETE FROM users WHERE deletion_requested IS NOT NULL AND deletion_requested < NOW() - INTERVAL '7 days'")
         
-        # 5. DATA PURGE: Delete orphaned posts, comments, likes, and messages of deleted users
         c.execute("DELETE FROM media WHERE uploaded_by NOT IN (SELECT username FROM users)")
         c.execute("DELETE FROM comments WHERE username NOT IN (SELECT username FROM users)")
         c.execute("DELETE FROM likes WHERE username NOT IN (SELECT username FROM users)")
@@ -164,54 +196,40 @@ def cleanup_database():
         print("Cleanup Error:", e)
     finally: conn.close()
 
-# =========================================================
-# THE PHANTOM ENGINE (AI BOT SPAMMER)
-# =========================================================
 def run_bot_engine():
     conn = get_db_connection()
     c = conn.cursor()
     try:
-        # Bot Names List
         bot_names = ["Rahul_Vibes", "Priya_007", "Aman_Cool", "Sneha_Arts", "Vikram_Pro", "Kabir_Singh", "Pooja_X", "Anjali_Cute", "Rohan_Tech", "Karan_King"]
-        bot_chats = ["Hey everyone! Welcome to the new gallery 👋", "Is anyone online?", "I just posted a new photo, check my profile! 🔥", "This website is so fast 🚀", "Hello world!", "Good morning guys ☀️", "Need some new followers, follow me! 🫂"]
+        bot_chats = ["Hey everyone! Welcome to the new gallery 👋", "Is anyone online?", "I just posted a new photo, check my profile! 🔥", "This website is so fast 🚀", "Hello world!", "Good morning guys ☀️"]
         
-        # Ensure we have at least 10 bots alive
         c.execute("SELECT COUNT(id) FROM users WHERE role = 'bot'")
         bot_count = c.fetchone()['count']
         
         if bot_count < 10:
-            # Create a new Bot
             name = f"{random.choice(bot_names)}_{random.randint(100, 9999)}"
             code = ''.join(secrets.choice("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ") for _ in range(10))
             c.execute("INSERT INTO users (username, password, user_code, role, is_verified, bio) VALUES (%s, %s, %s, 'bot', TRUE, 'Just an AI wandering in the gallery ✨')", (name, "botpass123", code))
             conn.commit()
             bot_username = name
         else:
-            # Pick a random existing bot
             c.execute("SELECT username FROM users WHERE role = 'bot' ORDER BY RANDOM() LIMIT 1")
             bot_username = c.fetchone()['username']
             
         action = random.randint(1, 100)
-        
-        # Action 1 (30% Chance): Bot uploads a new Photo to keep feed active
         if action <= 30:
-            cat = random.choice(["Photo", "Photo", "Photo", "Shayari"]) # mostly photos
+            cat = random.choice(["Photo", "Photo", "Photo", "Shayari"])
             if cat == "Photo":
-                # Uses free random image generator (Picsum)
                 img_url = f"https://picsum.photos/800/1000?random={random.randint(1, 100000)}"
-                caption = random.choice(["Nature is beautiful 🌲 #nature", "Vibes ✨ #chill", "What do you think? 🤔", "Random click 📸 #photography", "Missing this place! ✈️"])
+                caption = random.choice(["Nature is beautiful 🌲 #nature", "Vibes ✨ #chill", "What do you think? 🤔", "Random click 📸 #photography"])
             else:
                 img_url = "SHAYARI_TEXT"
                 caption = "Waqt ne sikhaya hai chup rehna... 💔 #sad #shayari"
             
             c.execute("INSERT INTO media (filename, title, category, uploaded_by, approved, visibility, views) VALUES (%s, %s, %s, %s, 1, 'public', %s)",
                       (img_url, caption, cat, bot_username, random.randint(5, 50)))
-            
-        # Action 2 (40% Chance): Bot chats in Global Chat
         elif 30 < action <= 70:
             c.execute("INSERT INTO global_chat (sender, message) VALUES (%s, %s)", (bot_username, random.choice(bot_chats)))
-            
-        # Action 3 (30% Chance): Bot Follows a Random User (maybe real user!)
         elif action > 70:
             c.execute("SELECT username FROM users WHERE username != %s ORDER BY RANDOM() LIMIT 1", (bot_username,))
             target = c.fetchone()
@@ -219,12 +237,10 @@ def run_bot_engine():
                 try:
                     c.execute("INSERT INTO followers (follower, following) VALUES (%s, %s)", (bot_username, target['username']))
                     c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (target['username'], f"👤 {bot_username} started following you!", f"/agent/{bot_username}"))
-                except: pass # already following
-                
+                except: pass
         conn.commit()
     except Exception as e: print("Bot Engine Error:", e)
     finally: conn.close()
-
 
 def get_csrf_token():
     token = session.get("csrf_token")
@@ -235,10 +251,9 @@ def get_csrf_token():
 
 @app.before_request
 def update_activity():
-    # 5% chance on any request to trigger DB Cleanup
-    if random.random() < 0.05: cleanup_database()
-    
-    # 15% chance to secretly run the Bot Engine in background! 👻
+    if random.random() < 0.05: 
+        cleanup_database()
+        create_database_backup() # Trigger automated backup on cleanup cycle
     if random.random() < 0.15: run_bot_engine()
         
     if "username" in session:
@@ -505,7 +520,7 @@ def add_view(media_id):
     return jsonify({"success": True})
 
 # =========================================================
-# CORE ROUTES (FEED, REELS, EXPLORE, DASHBOARD)
+# CORE ROUTES
 # =========================================================
 @app.route("/")
 def index():
@@ -844,7 +859,7 @@ def api_global_chat_history():
     return jsonify(formatted)
 
 # =========================================================
-# LIKES, COMMENTS, SEARCH, GALLERY & AI STUDIO
+# LIKES, COMMENTS, SEARCH, & GALLERY
 # =========================================================
 @app.route("/search")
 def search():
@@ -885,6 +900,7 @@ def gallery(category):
             conn.commit()
             flash("File live!" if is_approved else "Sent to Admin for approval.", "success")
         except Exception as e:
+            conn.rollback()
             flash(f"Upload System Fault: {str(e)[:100]}", "error")
         return redirect(url_for("gallery", category=category))
 
@@ -1049,7 +1065,7 @@ def report_asset(media_id):
     finally: conn.close()
 
 # =========================================================
-# ADMIN CONTROLS (WITH TRIGGER BOT ROUTE)
+# ADMIN CONTROLS
 # =========================================================
 @app.route("/admin", methods=["GET", "POST"])
 def admin():
@@ -1084,7 +1100,6 @@ def admin():
     c.execute("SELECT r.id as report_id, r.media_id, r.reported_by, r.reason, r.created_at, m.title, m.filename, m.category, m.uploaded_by FROM reports r JOIN media m ON r.media_id = m.id ORDER BY r.id DESC")
     reports = c.fetchall()
     
-    # Check Bot count
     c.execute("SELECT COUNT(*) as cnt FROM users WHERE role = 'bot'")
     bot_count = c.fetchone()['cnt']
     
@@ -1094,9 +1109,8 @@ def admin():
 @app.route("/admin/trigger_bots", methods=["POST"])
 def trigger_bots():
     if not current_user_is_admin(): return redirect(url_for("admin"))
-    # Manually fire the bot engine to test it out!
     run_bot_engine()
-    flash("🤖 Bot Engine Triggered Successfully! A new post, follower, or message has been generated.", "success")
+    flash("🤖 Bot Engine Triggered Successfully!", "success")
     return redirect(url_for("admin"))
 
 @app.route("/admin/user_action/<int:user_id>/<action>", methods=["POST"])
@@ -1145,7 +1159,7 @@ def approve(id):
     c.execute("SELECT uploaded_by, title, category FROM media WHERE id = %s", (id,))
     media_info = c.fetchone()
     if media_info:
-        c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (media_info['uploaded_by'], f"✅ Approved! '{media_info['title']}' is now live.", f"/gallery/{media_info['category']}"))
+        c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (media_info['uploaded_by'], f"✅ Approved! '{media_info['title'][:15]}' is now live.", f"/gallery/{media_info['category']}"))
     conn.commit()
     conn.close()
     flash("Approved!", "success")
@@ -1173,13 +1187,6 @@ def dismiss_report(report_id):
     conn.close()
     flash("Report dismissed.", "success")
     return redirect(url_for("admin"))
-
-@app.route("/mystery", methods=["POST"])
-def mystery():
-    if hmac.compare_digest(request.form.get("passcode", ""), os.environ.get("MYSTERY_CODE", "SOCHO")): 
-        return render_template("mystery.html")
-    flash("Incorrect code.", "error")
-    return redirect(url_for("dashboard"))
 
 @app.errorhandler(404)
 def not_found_error(error): return render_template("404.html"), 404
