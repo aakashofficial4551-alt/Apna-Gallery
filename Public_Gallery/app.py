@@ -54,7 +54,7 @@ app.config.update(
 )
 
 # =========================================================
-# 🛡️ THE TITANIUM FIREWALL (ANTI-DDOS, CSRF, CSP & SESSION KILLER) 🛡️
+# 🛡️ THE TITANIUM FIREWALL 🛡️
 # =========================================================
 request_tracker = defaultdict(list)
 BANNED_IPS = set()
@@ -72,7 +72,7 @@ def security_firewall_and_session_check():
         return "Your IP has been permanently blocked for malicious activity. (Error 429)", 429
     request_tracker[ip].append(now)
 
-    if request.endpoint in ['login', 'verify_otp', 'logout', 'static', 'api_search_suggest'] or (request.path and request.path.startswith('/static/')):
+    if request.endpoint in ['index', 'login', 'verify_otp', 'logout', 'static', 'api_search_suggest', 'privacy_policy', 'terms', 'about'] or (request.path and request.path.startswith('/static/')):
         return
 
     # 2. Strict CSRF Verification
@@ -118,7 +118,6 @@ def set_security_headers(response):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-    response.headers["Content-Security-Policy"] = "default-src 'self' https: data: 'unsafe-inline' 'unsafe-eval';"
     return response
 
 def create_database_backup():
@@ -140,7 +139,7 @@ def create_database_backup():
 @app.template_filter('format_text')
 def format_text(text):
     if not text: return ""
-    text = html.escape(str(text)) # ABSOLUTE XSS BLOCK
+    text = html.escape(str(text))
     text = re.sub(r'#(\w+)', r'<a href="/search?q=\1" style="color: var(--accent); text-decoration: none; font-weight: bold;">#\1</a>', text)
     text = re.sub(r'@(\w+)', r'<a href="/agent/\1" style="color: var(--warning); text-decoration: none; font-weight: bold;">@\1</a>', text)
     return text
@@ -259,12 +258,7 @@ def run_bot_engine():
     c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     try:
         bot_names = ["Rahul_Vibes", "Priya_007", "Aman_Cool", "Sneha_Arts", "Vikram_Pro", "Kabir_Singh", "Pooja_X", "Anjali_Cute", "Rohan_Tech", "Karan_King"]
-        bot_chats = [
-            "Hey everyone! Kya haal hain? 👋", "Koi online hai kya is waqt? 🤔", 
-            "Bhai yeh app ekdum mast chal rahi hai! 🔥", "Good morning dosto! Have a great day ☀️", 
-            "Hello world! Just joined this awesome gallery.", "Koi badhiya photo upload karo yaar! 😎",
-            "Speed kaafi fast hai is website ki 🚀", "Mausam bohot badiya hai aaj 🌧️"
-        ]
+        bot_chats = ["Hey everyone! Kya haal hain? 👋", "Koi online hai kya is waqt? 🤔", "Bhai yeh app ekdum mast chal rahi hai! 🔥", "Good morning dosto! Have a great day ☀️", "Hello world! Just joined this awesome gallery.", "Koi badhiya photo upload karo yaar! 😎", "Speed kaafi fast hai is website ki 🚀", "Mausam bohot badiya hai aaj 🌧️"]
         
         c.execute("SELECT COUNT(id) as count FROM users WHERE role = 'bot'")
         bot_count = c.fetchone()['count']
@@ -309,7 +303,6 @@ def run_bot_engine():
                     if c.rowcount == 1:
                         c.execute("UPDATE users SET wallet_balance = wallet_balance + 10 WHERE username = %s", (media['uploaded_by'],))
                         c.execute("UPDATE media SET tips_received = COALESCE(tips_received, 0) + 10 WHERE id = %s", (media['id'],))
-                        # 💥 FIX: Send precise post URL 💥
                         c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", 
                                   (media['uploaded_by'], f"💰 You received 10 Coins from {bot_username} for '{media['title'][:15]}...'", f"/post/{media['id']}"))
                 else: 
@@ -317,7 +310,6 @@ def run_bot_engine():
                         c.execute("INSERT INTO likes (media_id, username) VALUES (%s, %s) ON CONFLICT DO NOTHING", (media['id'], bot_username))
                         if c.rowcount == 1: 
                             c.execute("UPDATE media SET likes = likes + 1 WHERE id = %s", (media['id'],))
-                            # 💥 FIX: Send precise post URL 💥
                             c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", 
                                       (media['uploaded_by'], f"❤️ {bot_username} liked your post!", f"/post/{media['id']}"))
                     except: pass
@@ -395,6 +387,27 @@ def sync_admin_session():
             session["is_admin"] = (user["role"] == "admin")
 
 # =========================================================
+# 💥 PHASE 86 & 87: PUBLIC ROUTES & LANDING PAGE 💥
+# =========================================================
+@app.route("/")
+def index():
+    # If already logged in, they can still see the beautiful landing page
+    # and the button will say "Go to Dashboard" instead of Login.
+    return render_template("index.html")
+
+@app.route("/terms")
+def terms():
+    return render_template("terms.html", hide_navbar=True)
+
+@app.route("/about")
+def about():
+    return render_template("about.html", hide_navbar=True)
+
+@app.route("/privacy")
+def privacy_policy():
+    return render_template("privacy.html", hide_navbar=True)
+
+# =========================================================
 # ROUTES: AUTHENTICATION & SETTINGS
 # =========================================================
 @app.route("/login", methods=["GET", "POST"])
@@ -465,7 +478,7 @@ def login():
 @app.route("/logout")
 def logout():
     session.clear()
-    return redirect(url_for("login"))
+    return redirect(url_for("index"))
 
 @app.route("/settings", methods=["POST"])
 def settings():
@@ -522,7 +535,7 @@ def settings():
         conn.commit()
         conn.close()
         flash("Account scheduled for deletion in 7 days.", "warning")
-        return redirect(url_for("login"))
+        return redirect(url_for("index"))
         
     conn.commit()
     conn.close()
@@ -553,7 +566,7 @@ def buy_verification():
     return redirect(request.referrer or url_for("dashboard"))
 
 # =========================================================
-# ASSET MANAGEMENT, POST VIEW & TIPPING 
+# ASSET MANAGEMENT & POSTING
 # =========================================================
 @app.route("/upload_asset", methods=["POST"])
 def upload_asset():
@@ -575,8 +588,6 @@ def upload_asset():
         is_approved = 1 if current_user_is_admin() else 0
         conn = get_db_connection()
         c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-        
-        # 💥 FIX: GETTING INSERTED ID FOR NOTIFICATIONS 💥
         c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved, visibility, views, is_pinned, tips_received) VALUES (%s, %s, %s, %s, %s, %s, %s, 0, FALSE, 0) RETURNING id",
                   (filename, title, category, "", session.get("username"), is_approved, visibility))
         new_media_id = c.fetchone()['id']
@@ -594,35 +605,26 @@ def upload_asset():
         flash(f"Server Alert: {str(e)[:150]}", "error")
     return redirect(request.referrer or url_for("feed"))
 
-# 💥 PHASE 84: DEDICATED POST ROUTE (FIXES 404) 💥
 @app.route("/post/<int:media_id>")
 def view_post(media_id):
     if "username" not in session: return redirect(url_for("login"))
     conn = get_db_connection()
     c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    
     block_filter = "m.uploaded_by NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) AND m.uploaded_by NOT IN (SELECT blocker FROM blocks WHERE blocked = %s)"
-    
     c.execute(f"SELECT m.*, u.profile_pic, u.role, u.is_verified FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.id = %s AND {block_filter}", (media_id, session["username"], session["username"]))
     post = c.fetchone()
-    
     if not post:
         conn.close()
         return render_template("404.html")
-        
     post_dict = dict(post)
     c.execute("SELECT c.*, u.role, u.is_verified FROM comments c JOIN users u ON c.username = u.username WHERE c.media_id = %s ORDER BY c.id ASC", (media_id,))
     post_dict['comments'] = [dict(row) for row in c.fetchall()]
-    
     c.execute("SELECT id FROM bookmarks WHERE username = %s AND media_id = %s", (session["username"], media_id))
     post_dict['is_saved'] = bool(c.fetchone())
-    
     post_dict['created_at'] = timeago(post_dict['created_at'])
     for comm in post_dict['comments']: comm['created_at'] = timeago(comm['created_at'])
-    
     conn.close()
     return render_template("single_post.html", post=post_dict, hide_navbar=True)
-
 
 @app.route("/tip/<int:media_id>", methods=["POST"])
 def tip_creator(media_id):
@@ -674,7 +676,6 @@ def add_view(media_id):
     conn.close()
     return jsonify({"success": True})
 
-# 💥 RESTORED: ADD COMMENT ROUTE 💥
 @app.route("/add_comment/<int:media_id>", methods=["POST"])
 def add_comment(media_id):
     if "username" not in session: return redirect(url_for("login"))
@@ -794,11 +795,6 @@ def report_asset(media_id):
 # =========================================================
 # CORE ROUTES
 # =========================================================
-@app.route("/")
-def index():
-    if "username" not in session: return redirect(url_for("login"))
-    return redirect(url_for("feed"))
-
 @app.route("/feed")
 def feed():
     if "username" not in session: return redirect(url_for("login"))
@@ -895,7 +891,6 @@ def explore():
     conn.close()
     return render_template("explore.html", posts=explore_posts, trending_tags=trending_tags, spotlight=spotlight)
 
-# 💥 FIX: DASHBOARD ROUTE 💥
 @app.route("/dashboard")
 def dashboard():
     if "username" not in session: return redirect(url_for("login"))
@@ -1205,13 +1200,11 @@ def ai_studio():
                 secure_url = cloudinary.uploader.upload(r.content, resource_type="image")["secure_url"] if r.status_code == 200 else image_url
                 conn = get_db_connection()
                 c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-                # 💥 FIX: GETTING ID FOR NOTIFICATIONS 💥
                 c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved, visibility, views, is_pinned) VALUES (%s, %s, %s, %s, %s, 1, 'public', 0, FALSE) RETURNING id",
                           (secure_url, f"AI: {prompt[:20]}...", "Photo", prompt, session["username"]))
                 conn.commit()
                 conn.close()
                 flash("Image created successfully! (100% Free)", "success")
-                # 💥 BUG FIX: Category string correctly formatted 💥
                 return redirect(url_for("gallery", category="Photo"))
             except: flash("Image generation failed.", "error")
         else:
@@ -1231,44 +1224,6 @@ def analytics():
     top_posts = c.fetchall()
     conn.close()
     return render_template("analytics.html", stats=stats, top_posts=top_posts, hide_navbar=True)
-
-# 💥 RESTORED FULLY: GALLERY ROUTE 💥
-@app.route("/gallery/<category>", methods=["GET", "POST"])
-def gallery(category):
-    if "username" not in session: return redirect(url_for("login"))
-    conn = get_db_connection()
-    c = conn.cursor()
-    if request.method == "POST":
-        try:
-            filename = "SHAYARI_TEXT"
-            if category != 'Shayari':
-                file = request.files.get("media")
-                if file and file.filename != "":
-                    filename = save_uploaded_file(file, category)
-                    if not filename:
-                        flash("Upload Failed! Check API keys.", "error")
-                        return redirect(url_for("gallery", category=category))
-            
-            is_approved = 1 if current_user_is_admin() else 0
-            visibility = request.form.get("visibility", "public")
-            c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved, visibility, views, is_pinned) VALUES (%s, %s, %s, %s, %s, %s, %s, 0, FALSE)",
-                      (filename, html.escape(request.form.get("title", "Untitled")), category, "", session.get("username"), is_approved, visibility))
-            conn.commit()
-            flash("File live!" if is_approved else "Sent to Admin for approval.", "success")
-        except Exception as e:
-            conn.rollback()
-            flash(f"Upload System Fault: {str(e)[:100]}", "error")
-        return redirect(url_for("gallery", category=category))
-
-    c.execute("SELECT m.*, u.profile_pic, u.role, u.is_verified FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.category = %s AND m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' AND m.uploaded_by NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) ORDER BY m.id DESC", (category, session["username"]))
-    if category == 'Shayari': c.execute("SELECT m.*, u.role, u.is_verified FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.category = %s AND m.approved = 1 AND m.visibility = 'public' AND m.uploaded_by NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) ORDER BY m.id DESC", (category, session["username"]))
-    media_files = c.fetchall()
-    c.execute("SELECT c.*, u.role, u.is_verified FROM comments c JOIN users u ON c.username = u.username ORDER BY c.id ASC")
-    comments_db = c.fetchall()
-    conn.close()
-    comments = defaultdict(list)
-    for comment in comments_db: comments[comment["media_id"]].append(comment)
-    return render_template("gallery.html", media_files=media_files, category=category, comments=comments)
 
 # =========================================================
 # ADMIN CONTROLS
@@ -1429,6 +1384,14 @@ def mystery():
 @app.route("/privacy")
 def privacy_policy():
     return render_template("privacy.html", hide_navbar=True)
+
+@app.route("/terms")
+def terms():
+    return render_template("terms.html", hide_navbar=True)
+
+@app.route("/about")
+def about():
+    return render_template("about.html", hide_navbar=True)
 
 @app.route("/manifest.json")
 def dynamic_manifest():
