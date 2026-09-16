@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Apna Gallery{% endblock %}</title>
-    
-    <!-- 💥 PHASE 71: VIRAL SEO TAGS FOR WHATSAPP/TELEGRAM 💥 -->
     <meta name="description" content="Join Apna Gallery - The Ultimate AI-Powered Creator Economy and Social Network.">
     <meta property="og:title" content="Apna Gallery - The Creator Network">
     <meta property="og:description" content="Earn coins, tip creators, and enjoy the ultimate AI-powered social media experience. Join me now!">
@@ -98,6 +96,10 @@
             <a href="{{ url_for('feed') }}" class="{% if request.endpoint == 'feed' %}active{% endif %}">📰 Feed</a>
             <a href="{{ url_for('explore') }}" class="{% if request.endpoint == 'explore' %}active{% endif %}">🌍 Explore</a>
             <a href="{{ url_for('reels') }}" class="{% if request.endpoint == 'reels' %}active{% endif %}" style="color: var(--accent);">🎬 Reels</a>
+            
+            <!-- 💥 LEADERBOARD ADDED HERE 💥 -->
+            <a href="{{ url_for('leaderboard') }}" class="{% if request.endpoint == 'leaderboard' %}active{% endif %}" style="color: var(--warning);">🏆 Top Ranks</a>
+            
             <a href="{{ url_for('global_chat') }}" style="color: var(--success);">🌐 Chatroom</a>
             <a href="{{ url_for('dashboard') }}" class="{% if request.endpoint == 'dashboard' %}active{% endif %}">🎛️ HQ</a>
             <a href="{{ url_for('profile') }}" class="{% if request.endpoint == 'profile' %}active{% endif %}" style="color: var(--accent);">👤 Profile</a>
@@ -194,7 +196,6 @@
                 <button type="submit" class="btn" style="width: 100%; background: #334155; color: white;">Change Password</button>
             </form>
 
-            <!-- 💥 NEW: PHASE 70 VERIFICATION STORE 💥 -->
             {% if not my_is_verified %}
             <form method="POST" action="/buy_verification" style="margin-top: 15px; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 20px;">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -238,6 +239,32 @@
 
     <script>
         window.addEventListener('load', () => { setTimeout(() => { const splash = document.getElementById('splash-screen'); if(splash) splash.classList.add('hidden'); }, 600); });
+        
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            const installBtn = document.getElementById('installAppBtn');
+            if(installBtn) installBtn.style.display = 'inline-block';
+        });
+
+        const installBtnElement = document.getElementById('installAppBtn');
+        if (installBtnElement) {
+            installBtnElement.addEventListener('click', async () => {
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    const { outcome } = await deferredPrompt.userChoice;
+                    if (outcome === 'accepted') { installBtnElement.style.display = 'none'; }
+                    deferredPrompt = null;
+                }
+            });
+        }
+
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register("{{ url_for('static', filename='js/service-worker.js') }}").catch(()=>{});
+            });
+        }
         
         async function generateAICaption() {
             const cat = document.getElementById('vaultCategory').value;
