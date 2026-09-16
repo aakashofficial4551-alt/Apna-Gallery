@@ -16,7 +16,6 @@
         }
         body { margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--bg-main); color: var(--text-main); min-height: 100vh; display: flex; flex-direction: column; }
         
-        /* THE UNIFIED NAVBAR */
         .navbar-top { background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(10px); display: flex; flex-direction: column; border-bottom: 1px solid var(--border-color); position: sticky; top: 0; z-index: 1000; }
         .header-row { display: flex; justify-content: space-between; align-items: center; padding: 15px 30px; }
         .logo { font-size: 1.5rem; font-weight: 900; color: white; text-decoration: none; letter-spacing: 1px; }
@@ -24,13 +23,11 @@
         
         .desktop-icons { display: flex; align-items: center; gap: 15px; }
         
-        /* THE HORIZONTAL SCROLL NAV */
         .nav-scroller { display: flex; gap: 20px; overflow-x: auto; padding: 10px 30px; background: rgba(8, 17, 31, 0.5); white-space: nowrap; scrollbar-width: none; }
         .nav-scroller::-webkit-scrollbar { display: none; }
         .nav-scroller a { color: var(--text-muted); text-decoration: none; font-weight: 600; font-size: 0.95rem; transition: 0.2s; }
         .nav-scroller a.active, .nav-scroller a:hover { color: var(--accent); border-bottom: 2px solid var(--accent); padding-bottom: 3px; }
         
-        /* 💥 LIVE SEARCH DROPDOWN 💥 */
         .search-container { position: relative; display: flex; align-items: center; flex: 1; max-width: 400px; margin: 0 20px; }
         .search-container input { width: 100%; padding: 10px 15px; border-radius: 20px; border: 1px solid var(--border-color); background: rgba(8, 17, 31, 0.8); color: white; outline: none; }
         .search-dropdown { display: none; position: absolute; top: 100%; left: 0; width: 100%; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; margin-top: 5px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); overflow: hidden; z-index: 10001; }
@@ -75,6 +72,11 @@
             </div>
 
             <div class="desktop-icons">
+                <!-- 💥 NEW: USER WALLET BALANCE 💥 -->
+                <div style="background: rgba(251, 191, 36, 0.2); color: var(--warning); padding: 5px 10px; border-radius: 20px; font-size: 0.9rem; font-weight: bold; display: flex; align-items: center; gap: 5px; border: 1px solid var(--warning);" title="Your Wallet Balance">
+                    🪙 {{ my_wallet }}
+                </div>
+                
                 <a href="{{ url_for('inbox') }}" style="color: white; text-decoration: none; position: relative; font-size: 1.3rem;">✉️ {% if unread_messages > 0 %}<span class="notif-badge">{{ unread_messages }}</span>{% endif %}</a>
                 <a href="{{ url_for('notifications') }}" style="color: white; text-decoration: none; position: relative; font-size: 1.3rem;">🔔 {% if unread_notifications > 0 %}<span class="notif-badge">{{ unread_notifications }}</span>{% endif %}</a>
                 <span onclick="document.getElementById('settingsModal').style.display='flex'" style="font-size: 1.3rem; cursor: pointer; margin-left: 5px;">⚙️</span>
@@ -168,12 +170,19 @@
                 <input type="text" name="bio" value="{{ my_bio }}" placeholder="Bio..." style="padding: 12px; border-radius: 8px; background: rgba(8,17,31,0.8); color: white; outline: none;">
                 <input type="url" name="website" value="{{ my_website }}" placeholder="https://your-link.com" style="padding: 12px; border-radius: 8px; background: rgba(8,17,31,0.8); color: white; outline: none;">
                 <select name="theme" style="padding: 12px; border-radius: 8px; background: rgba(8,17,31,0.8); color: white; outline: none;">
-                    <option value="cyan" {% if my_theme == 'cyan' %}selected{% endif %}>Cyan</option>
+                    <option value="cyan" {% if my_theme == 'cyan' %}selected{% endif %}>Cyan (Default)</option>
                     <option value="gold" {% if my_theme == 'gold' %}selected{% endif %}>Gold</option>
                     <option value="rose" {% if my_theme == 'rose' %}selected{% endif %}>Rose Pink</option>
                     <option value="matrix" {% if my_theme == 'matrix' %}selected{% endif %}>Matrix Green</option>
                 </select>
                 <button type="submit" class="btn" style="width: 100%;">Save Profile</button>
+            </form>
+
+            <form method="POST" action="/settings" style="display: flex; flex-direction: column; gap: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 20px; margin-top: 20px;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="action" value="change_password">
+                <input type="password" name="new_password" placeholder="Enter new password" required style="padding: 12px; border-radius: 8px; background: rgba(8,17,31,0.8); color: white; border: 1px solid var(--border-color); outline: none;">
+                <button type="submit" class="btn" style="width: 100%; background: #334155; color: white;">Change Password</button>
             </form>
             {% endif %}
 
@@ -196,6 +205,12 @@
             </div>
             {% endif %}
 
+            <form method="POST" action="/settings" onsubmit="return confirm('Account will be deleted in 7 days. Proceed?');" style="margin-top: 20px;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="action" value="delete_account">
+                <button type="submit" class="btn" style="width: 100%; background: rgba(239, 68, 68, 0.1); border: 1px solid var(--danger); color: var(--danger);">⚠️ Request Account Deletion</button>
+            </form>
+            
             <a href="{{ url_for('logout') }}" class="btn" style="width: 100%; text-align: center; display: block; margin-top: 15px; background: var(--danger); color: white;">Logout</a>
         </div>
     </div>
@@ -215,39 +230,29 @@
             } catch(e) { input.value = "Epic moment! 🔥"; }
         }
 
-        // 💥 LIVE SEARCH DROPDOWN JS 💥
         async function fetchSuggestions(query) {
             const dropdown = document.getElementById('search-dropdown');
             if(query.length < 2) { dropdown.style.display = 'none'; return; }
-            
             try {
                 const res = await fetch(`/api/search_suggest?q=${encodeURIComponent(query)}`);
                 const data = await res.json();
-                
                 if(data.length === 0) { dropdown.style.display = 'none'; return; }
-                
                 let html = '';
                 data.forEach(item => {
                     if(item.type === 'user') {
                         let pic = item.pic ? `<img src="${item.pic}" style="width:30px; height:30px; border-radius:50%; object-fit:cover;">` : `<div style="width:30px; height:30px; border-radius:50%; background:#1e293b; display:grid; place-items:center;">👤</div>`;
                         let badge = item.verified ? '<span style="color:#38bdf8; font-size:0.8rem;">✅</span>' : '';
                         html += `<a href="/agent/${item.username}" class="search-item">${pic} <strong>${item.username}</strong> ${badge}</a>`;
-                    } else {
-                        html += `<a href="/search?q=${encodeURIComponent(item.tag)}" class="search-item"><span style="font-size:1.5rem; color:var(--accent);">#</span> <strong>${item.tag}</strong></a>`;
-                    }
+                    } else { html += `<a href="/search?q=${encodeURIComponent(item.tag)}" class="search-item"><span style="font-size:1.5rem; color:var(--accent);">#</span> <strong>${item.tag}</strong></a>`; }
                 });
                 dropdown.innerHTML = html;
                 dropdown.style.display = 'block';
             } catch(e) { console.error(e); }
         }
-        
-        // Hide dropdown when clicking outside
         document.addEventListener('click', function(event) {
             const dropdown = document.getElementById('search-dropdown');
             const searchInput = document.getElementById('live-search');
-            if (dropdown && !dropdown.contains(event.target) && event.target !== searchInput) {
-                dropdown.style.display = 'none';
-            }
+            if (dropdown && !dropdown.contains(event.target) && event.target !== searchInput) { dropdown.style.display = 'none'; }
         });
     </script>
 </body>
