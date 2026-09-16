@@ -2,285 +2,106 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>SOCHO KYA HOGA | The Premium Vault</title>
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;700;900&display=swap" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apna Gallery | The Creator Ecosystem</title>
+    <meta name="description" content="Join Apna Gallery - The Ultimate AI-Powered Creator Economy and Social Network. Earn coins, tip creators, and enjoy absolute privacy.">
+    <meta name="theme-color" content="#0f172a">
     <style>
-        /* Premium Animated Background */
-        body { 
-            font-family: 'Montserrat', sans-serif; 
-            margin: 0; padding: 0; overflow-x: hidden;
-            background: linear-gradient(-45deg, #000000, #1a0000, #0d0000, #220000);
-            background-size: 400% 400%;
-            animation: gradientBG 15s ease infinite;
-            color: #fff;
-        }
-
-        @keyframes gradientBG {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
-        }
-
-        @keyframes neonPulse {
-            0% { box-shadow: 0 0 10px rgba(229, 9, 20, 0.2); }
-            50% { box-shadow: 0 0 25px rgba(229, 9, 20, 0.6); }
-            100% { box-shadow: 0 0 10px rgba(229, 9, 20, 0.2); }
-        }
-
-        /* Header */
-        header { 
-            text-align: center; padding: 60px 20px 40px; 
-            background: transparent; 
-        }
-        header h1 { 
-            font-weight: 900; letter-spacing: 6px; font-size: 4em; margin: 0; 
-            text-transform: uppercase; text-shadow: 2px 2px 10px rgba(229,9,20,0.5);
-        }
-        header span { color: #e50914; }
-        .welcome-text { font-size: 1.1em; color: #ccc; margin-top: 15px; font-weight: 300; letter-spacing: 1px;}
-        .welcome-text a { color: #e50914; text-decoration: none; font-weight: bold; border-bottom: 1px solid #e50914;}
-
-        /* Upload Container - Glassmorphism */
-        .upload-container { 
-            max-width: 650px; margin: 0 auto 40px; 
-            background: rgba(10, 10, 10, 0.6); 
-            padding: 30px; border-radius: 15px; 
-            backdrop-filter: blur(20px); 
-            border: 1px solid rgba(229, 9, 20, 0.3); 
-            animation: neonPulse 3s infinite;
-        }
-        .form-group { margin-bottom: 20px; }
-        input[type="text"], input[type="password"], select, textarea { 
-            width: 100%; padding: 15px; background: rgba(0,0,0,0.7); 
-            color: white; border: 1px solid #333; border-radius: 8px; 
-            box-sizing: border-box; font-family: 'Montserrat', sans-serif;
-            transition: 0.3s;
-        }
-        input:focus, select:focus { outline: none; border-color: #e50914; }
+        body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #f8fafc; min-height: 100vh; display: flex; flex-direction: column; overflow-x: hidden; }
         
-        .btn { 
-            background: linear-gradient(90deg, #e50914, #8a050c); 
-            color: white; border: none; padding: 15px 20px; width: 100%; 
-            font-size: 1.1em; font-weight: bold; cursor: pointer; 
-            border-radius: 8px; text-transform: uppercase; transition: 0.4s; 
-            letter-spacing: 2px;
-        }
-        .btn:hover { transform: translateY(-3px); box-shadow: 0 10px 20px rgba(229, 9, 20, 0.5); }
-
-        /* Modern Filters */
-        .filters { text-align: center; margin: 40px 0; }
-        .filter-btn { 
-            background: rgba(255,255,255,0.05); border: 1px solid transparent; 
-            color: #fff; padding: 10px 30px; margin: 5px; 
-            border-radius: 30px; cursor: pointer; transition: 0.4s; font-weight: 500; 
-            backdrop-filter: blur(5px);
-        }
-        .filter-btn:hover, .filter-btn.active { 
-            border-color: #e50914; background: rgba(229, 9, 20, 0.2); box-shadow: 0 0 15px rgba(229,9,20,0.4);
-        }
-        .mystery-btn { border-color: #8a2be2; color: #d4a5ff; }
-        .mystery-btn:hover { background: rgba(138, 43, 226, 0.3); box-shadow: 0 0 15px rgba(138, 43, 226, 0.6); }
-
-        /* Gallery Grid */
-        .gallery { 
-            display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); 
-            gap: 30px; padding: 20px; max-width: 1400px; margin: 0 auto; 
-        }
-        .media-card { 
-            background: rgba(0,0,0,0.8); border-radius: 12px; overflow: hidden; 
-            border: 1px solid #222; transition: all 0.4s ease; 
-        }
-        .media-card:hover { 
-            transform: translateY(-10px) scale(1.02); 
-            border-color: #e50914; box-shadow: 0 15px 30px rgba(0,0,0,0.8); 
-            z-index: 2;
-        }
-        .media-content { height: 280px; display: flex; justify-content: center; align-items: center; overflow: hidden; background:#000;}
-        .media-content img, .media-content video { width: 100%; height: 100%; object-fit: cover; }
+        .navbar { display: flex; justify-content: space-between; align-items: center; padding: 20px 40px; background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 1000; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .logo { font-size: 1.8rem; font-weight: 900; color: white; text-decoration: none; letter-spacing: 2px; }
+        .logo span { color: #38bdf8; }
         
-        .card-info { padding: 20px; }
-        .card-info h3 { margin: 0 0 10px; font-size: 1.4em; letter-spacing: 1px; color: #fff; }
-        .badge { background: #e50914; font-size: 0.7em; padding: 4px 10px; border-radius: 4px; color: #fff; font-weight: bold; text-transform: uppercase;}
-
-        /* Comments Styling */
-        .comments-section { margin-top: 20px; border-top: 1px solid #333; padding-top: 15px; }
-        .comment-list { max-height: 120px; overflow-y: auto; font-size: 0.9em; margin-bottom: 15px; color: #bbb; padding-right:5px;}
-        .comment-list::-webkit-scrollbar { width: 5px; }
-        .comment-list::-webkit-scrollbar-thumb { background: #e50914; border-radius: 5px;}
+        .nav-links a { color: #94a3b8; text-decoration: none; font-weight: bold; margin-left: 20px; transition: 0.3s; }
+        .nav-links a:hover { color: #38bdf8; }
         
-        .comment-item { margin-bottom: 8px; background: rgba(255,255,255,0.05); padding: 8px 12px; border-radius: 6px; border-left: 3px solid #e50914; }
-        .comment-item strong { color: #fff; }
-        .comment-form { display: flex; gap: 10px; }
-        .comment-form input { flex: 1; padding: 10px; background:rgba(0,0,0,0.5); border:1px solid #444;}
-        .comment-form button { background: #e50914; color: white; border: none; cursor: pointer; padding: 0 15px; border-radius: 6px; font-weight:bold;}
+        .hero { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 100px 20px; position: relative; }
+        
+        /* Glowing Orbs for Premium Effect */
+        .orb-1 { position: absolute; top: 10%; left: 20%; width: 300px; height: 300px; background: #38bdf8; filter: blur(150px); opacity: 0.3; z-index: -1; border-radius: 50%; }
+        .orb-2 { position: absolute; bottom: 10%; right: 20%; width: 400px; height: 400px; background: #a855f7; filter: blur(200px); opacity: 0.3; z-index: -1; border-radius: 50%; }
+        
+        .hero h1 { font-size: 4.5rem; margin: 0; line-height: 1.1; max-width: 800px; font-weight: 900; background: linear-gradient(135deg, #fff, #94a3b8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .hero p { font-size: 1.3rem; color: #94a3b8; max-width: 600px; margin: 20px auto 40px auto; line-height: 1.6; }
+        
+        .btn-primary { background: linear-gradient(135deg, #38bdf8, #2563eb); color: white; padding: 15px 40px; border-radius: 30px; font-size: 1.2rem; font-weight: bold; text-decoration: none; box-shadow: 0 10px 30px rgba(56, 189, 248, 0.4); transition: 0.3s; border: none; cursor: pointer; }
+        .btn-primary:hover { transform: translateY(-3px); box-shadow: 0 15px 40px rgba(56, 189, 248, 0.6); }
+        
+        .features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px; padding: 80px 40px; max-width: 1200px; margin: 0 auto; width: 100%; box-sizing: border-box; }
+        .feature-card { background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255,255,255,0.1); padding: 40px 30px; border-radius: 20px; backdrop-filter: blur(10px); transition: 0.3s; text-align: center; }
+        .feature-card:hover { transform: translateY(-10px); border-color: #38bdf8; background: rgba(30, 41, 59, 0.8); }
+        .feature-card span { font-size: 3rem; display: block; margin-bottom: 20px; }
+        .feature-card h3 { color: white; margin-top: 0; font-size: 1.5rem; }
+        .feature-card p { color: #94a3b8; line-height: 1.5; margin-bottom: 0; }
 
-        /* Floating Pulsing Music Player */
-        .music-player { 
-            position: fixed; bottom: 30px; right: 30px; 
-            background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(15px); 
-            padding: 12px 25px; border-radius: 50px; 
-            border: 1px solid #e50914; display: flex; align-items: center; gap: 15px; 
-            z-index: 1000; animation: neonPulse 2s infinite;
+        footer { border-top: 1px solid rgba(255,255,255,0.1); padding: 40px; text-align: center; color: #94a3b8; margin-top: auto; }
+        footer a { color: #94a3b8; text-decoration: none; margin: 0 10px; font-size: 0.9rem; transition: 0.2s; }
+        footer a:hover { color: #38bdf8; }
+
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 3rem; }
+            .navbar { padding: 15px 20px; flex-direction: column; gap: 15px; }
+            .nav-links { margin: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+            .nav-links a { margin: 0; }
         }
-        .music-player button { 
-            background: #e50914; border: none; color: white; 
-            width: 40px; height: 40px; border-radius: 50%; font-size: 1.2em; 
-            cursor: pointer; display: flex; justify-content: center; align-items: center;
-            transition: 0.3s;
-        }
-        .music-player button:hover { transform: scale(1.1); }
-        .music-player span { font-size: 0.9em; color: #fff; font-weight: 700; letter-spacing: 2px;}
     </style>
 </head>
 <body>
 
-    <!-- Soft suspenseful ambient track -->
-    <audio id="bg-music" loop>
-        <source src="https://cdn.pixabay.com/download/audio/2022/05/16/audio_b2875f28ce.mp3" type="audio/mpeg">
-    </audio>
+    <nav class="navbar">
+        <a href="/" class="logo">APNA <span>GALLERY</span></a>
+        <div class="nav-links">
+            <a href="#features">Features</a>
+            {% if session.get('username') %}
+                <a href="{{ url_for('feed') }}" class="btn-primary" style="padding: 10px 20px; font-size: 1rem; margin-left: 15px; box-shadow: none;">Go to Dashboard</a>
+            {% else %}
+                <a href="{{ url_for('login') }}">Sign In</a>
+                <a href="{{ url_for('login') }}" class="btn-primary" style="padding: 10px 20px; font-size: 1rem; margin-left: 15px; box-shadow: none;">Get Started</a>
+            {% endif %}
+        </div>
+    </nav>
 
-    <div class="music-player">
-        <span id="music-status">BGM: WAITING...</span>
-        <button id="music-btn" onclick="toggleMusic()">▶</button>
+    <div class="hero">
+        <div class="orb-1"></div>
+        <div class="orb-2"></div>
+        
+        <h1>Your Digital Universe, Secured & Monetized.</h1>
+        <p>Apna Gallery is the ultimate AI-powered creator economy platform. Share moments, earn crypto-style coins, and rule the algorithmic feed without compromising your privacy.</p>
+        
+        {% if session.get('username') %}
+            <a href="{{ url_for('feed') }}" class="btn-primary">Launch Dashboard</a>
+        {% else %}
+            <a href="{{ url_for('login') }}" class="btn-primary">Start Earning Today</a>
+        {% endif %}
     </div>
 
-    <header>
-        <h1>SOCHO KYA <span>HOGA</span></h1>
-        <div class="welcome-text">Welcome to the inner circle, <span>Agent {{ session.username }}</span> | <a href="/logout">ABORT MISSION</a></div>
-    </header>
-
-    <div class="upload-container">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-          {% if messages %}
-            {% for category, message in messages %}
-              <div style="color: {% if category=='error' %}#ff4c4c{% else %}#4caf50{% endif %}; text-align:center; font-weight:bold; margin-bottom:15px; padding:10px; border:1px solid currentColor; border-radius:5px;">{{ message }}</div>
-            {% endfor %}
-          {% endif %}
-        {% endwith %}
-
-        <form action="/upload" method="POST" enctype="multipart/form-data">
-            <div class="form-group"><input type="text" name="title" placeholder="ENTER CLASSIFIED TITLE" required></div>
-            <div class="form-group">
-                <select name="category">
-                    <option value="Photo">PHOTO / STILL</option>
-                    <option value="Video">MOTION / VIDEO</option>
-                    <option value="Music">AUDIO / SCORE</option>
-                    <option value="Document">INTEL / DOCUMENT</option>
-                </select>
-            </div>
-            <div class="form-group"><input type="file" name="media" required style="color: white; padding: 10px 0;"></div>
-            <button type="submit" class="btn">SECURE UPLOAD</button>
-        </form>
+    <div id="features" class="features-grid">
+        <div class="feature-card">
+            <span>🛡️</span>
+            <h3>Titanium Security</h3>
+            <p>End-to-End CSRF & XSS protection, anti-DDoS firewalls, and absolute data control. Your media is locked in the safest vault.</p>
+        </div>
+        <div class="feature-card">
+            <span>🪙</span>
+            <h3>Creator Tipping</h3>
+            <p>Don't just post, earn! Receive 100 free coins on signup and start tipping your favorite creators instantly. Climb the leaderboard!</p>
+        </div>
+        <div class="feature-card">
+            <span>🧠</span>
+            <h3>AI Smart Feed</h3>
+            <p>Our intelligent algorithm ranks content by engagement (Likes + Tips + Views). The best content always rises to the top, automatically.</p>
+        </div>
     </div>
 
-    <div class="filters">
-        <button class="filter-btn active" onclick="filterMedia('All')">ALL INTEL</button>
-        <button class="filter-btn" onclick="filterMedia('Photo')">PHOTOS</button>
-        <button class="filter-btn" onclick="filterMedia('Video')">VIDEOS</button>
-        <button class="filter-btn" onclick="filterMedia('Music')">AUDIO</button>
-        <button class="filter-btn" onclick="filterMedia('Document')">DOCS</button>
-        <form action="/mystery" method="POST" style="display:inline;">
-            <button class="filter-btn mystery-btn" type="button" onclick="askMystery()">MYSTERY 🔒</button>
-            <input type="hidden" name="passcode" id="mystery-pass">
-        </form>
-    </div>
+    <footer>
+        <div style="margin-bottom: 20px;">
+            <a href="{{ url_for('about') }}">About Us</a>
+            <a href="{{ url_for('privacy_policy') }}">Privacy Policy</a>
+            <a href="{{ url_for('terms') }}">Terms of Service</a>
+        </div>
+        <p>&copy; 2026 Apna Gallery Network. All rights reserved.</p>
+    </footer>
 
-    <div class="gallery">
-        {% for item in media_files %}
-            <div class="media-card" data-category="{{ item.category }}">
-                <div class="media-content">
-                    {% if item.category == 'Video' %}
-                        <video controls><source src="{{ url_for('static', filename='uploads/' + item.filename) }}"></video>
-                    {% elif item.category == 'Music' %}
-                        <audio controls style="width: 85%;"><source src="{{ url_for('static', filename='uploads/' + item.filename) }}"></audio>
-                    {% elif item.category == 'Document' %}
-                        <a href="{{ url_for('static', filename='uploads/' + item.filename) }}" target="_blank" style="color:white; text-decoration:none; text-align:center;">
-                            <div style="font-size: 60px; margin-bottom:10px;">📄</div><div style="letter-spacing:1px;">VIEW DOC</div>
-                        </a>
-                    {% else %}
-                        <img src="{{ url_for('static', filename='uploads/' + item.filename) }}">
-                    {% endif %}
-                </div>
-                <div class="card-info">
-                    <span class="badge">{{ item.category }}</span>
-                    <h3 style="margin-top:15px;">{{ item.title }}</h3>
-                    
-                    <div class="comments-section">
-                        <div class="comment-list">
-                            {% if comments.get(item.id) %}
-                                {% for comment in comments[item.id] %}
-                                    <div class="comment-item"><strong>{{ comment.user_name }}:</strong> {{ comment.comment }}</div>
-                                {% endfor %}
-                            {% else %}<i>No interactions yet.</i>{% endif %}
-                        </div>
-                        <form action="/comment/{{ item.id }}" method="POST" class="comment-form">
-                            <input type="text" name="comment" placeholder="Add intel..." required autocomplete="off">
-                            <button type="submit">SEND</button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        {% endfor %}
-    </div>
-
-    <script>
-        // Music Logic - Force play on FIRST click anywhere on screen
-        let music = document.getElementById("bg-music");
-        let btn = document.getElementById("music-btn");
-        let status = document.getElementById("music-status");
-        let isPlaying = false;
-        let musicStarted = false;
-
-        music.volume = 0.25;
-
-        function playAudio() {
-            music.play().then(() => {
-                isPlaying = true;
-                musicStarted = true;
-                btn.innerText = "⏸"; 
-                status.innerText = "BGM: ON";
-            }).catch(e => console.log("Waiting for user interaction..."));
-        }
-
-        // Start music automatically when user clicks anywhere on the page
-        document.body.addEventListener('click', function() {
-            if (!musicStarted) {
-                playAudio();
-            }
-        }, { once: true }); // Only runs once
-
-        function toggleMusic() {
-            if (isPlaying) {
-                music.pause(); 
-                btn.innerText = "▶"; 
-                status.innerText = "BGM: OFF";
-            } else {
-                music.play(); 
-                btn.innerText = "⏸"; 
-                status.innerText = "BGM: ON";
-            }
-            isPlaying = !isPlaying;
-            musicStarted = true; // prevent the auto-click from interfering
-        }
-
-        // Filter Logic
-        function filterMedia(category) {
-            let cards = document.querySelectorAll('.media-card');
-            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
-            event.target.classList.add('active');
-            cards.forEach(card => {
-                card.style.display = (category === 'All' || card.getAttribute('data-category') === category) ? 'block' : 'none';
-            });
-        }
-
-        // Mystery Vault Logic
-        function askMystery() {
-            let pass = prompt("CLASSIFIED AREA: Enter Secret Code:");
-            if (pass) {
-                document.getElementById('mystery-pass').value = pass;
-                document.forms[1].submit(); 
-            }
-        }
-    </script>
 </body>
 </html>
