@@ -561,7 +561,7 @@ def buy_verification():
     return redirect(request.referrer or url_for("dashboard"))
 
 # =========================================================
-# ASSET MANAGEMENT, POST VIEW & TIPPING 
+# ASSET MANAGEMENT & POSTING
 # =========================================================
 @app.route("/upload_asset", methods=["POST"])
 def upload_asset():
@@ -792,7 +792,7 @@ def report_asset(media_id):
     finally: conn.close()
 
 # =========================================================
-# CORE ROUTES (FEED & LEADERBOARD)
+# CORE ROUTES (VIEWS)
 # =========================================================
 @app.route("/feed")
 def feed():
@@ -890,7 +890,6 @@ def explore():
     conn.close()
     return render_template("explore.html", posts=explore_posts, trending_tags=trending_tags, spotlight=spotlight)
 
-# 💥 RESTORED FULLY: GALLERY ROUTE 💥
 @app.route("/gallery/<category>", methods=["GET", "POST"])
 def gallery(category):
     if "username" not in session: return redirect(url_for("login"))
@@ -1249,6 +1248,19 @@ def ai_studio():
             except: reply = "I am currently offline."
             return render_template("ai_studio.html", chat_reply=reply, user_prompt=prompt, hide_navbar=True)
     return render_template("ai_studio.html", hide_navbar=True)
+
+# 💥 RESTORED FULLY: ANALYTICS ROUTE 💥
+@app.route("/analytics")
+def analytics():
+    if "username" not in session: return redirect(url_for("login"))
+    conn = get_db_connection()
+    c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    c.execute("SELECT COUNT(id) as total_posts, SUM(views) as total_views, SUM(likes) as total_likes, SUM(tips_received) as total_tips FROM media WHERE uploaded_by = %s", (session["username"],))
+    stats = c.fetchone()
+    c.execute("SELECT title, views, likes, tips_received, category, filename FROM media WHERE uploaded_by = %s ORDER BY views DESC LIMIT 5", (session["username"],))
+    top_posts = c.fetchall()
+    conn.close()
+    return render_template("analytics.html", stats=stats, top_posts=top_posts, hide_navbar=True)
 
 # =========================================================
 # ADMIN CONTROLS
