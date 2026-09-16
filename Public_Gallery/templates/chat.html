@@ -2,18 +2,19 @@
 {% block title %}Chat | Apna Gallery{% endblock %}
 
 {% block content %}
-<div style="max-width: 800px; margin: 0 auto; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; display: flex; flex-direction: column; height: 75vh; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
+<!-- 💥 DEDICATED FULL-SCREEN CHAT CONTAINER 💥 -->
+<div style="display: flex; flex-direction: column; height: 100vh; width: 100%; background: #0f172a; position: absolute; top: 0; left: 0;">
     
-    <div style="background: rgba(15,23,42,0.9); padding: 15px 20px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between;">
+    <!-- APP HEADER -->
+    <div style="background: rgba(15,23,42,0.95); padding: 15px 20px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; z-index: 100; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
         <div style="display: flex; align-items: center; gap: 15px;">
-            <a href="{{ url_for('inbox') }}" style="color: white; text-decoration: none; font-size: 1.2rem;">&larr;</a>
+            <a href="{{ url_for('inbox') }}" style="color: white; text-decoration: none; font-size: 1.5rem; font-weight: bold;">&larr;</a>
             
             <a href="{{ url_for('agent_profile', username=contact.username) }}" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit;">
                 <div style="position: relative;">
                     <img src="{{ get_avatar(contact.profile_pic, contact.username) }}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid var(--accent);">
-                    
                     {% if contact.last_active | is_online %}
-                        <div style="position: absolute; bottom: 0; right: 0; width: 10px; height: 10px; background: #22c55e; border-radius: 50%; border: 2px solid var(--bg-card);"></div>
+                        <div style="position: absolute; bottom: 0; right: 0; width: 10px; height: 10px; background: #22c55e; border-radius: 50%; border: 2px solid #0f172a;"></div>
                     {% endif %}
                 </div>
                 
@@ -21,10 +22,9 @@
                     <h3 style="margin: 0; display: flex; align-items: center; gap: 5px; font-size: 1.1rem;">
                         {{ contact.username }}
                         {% if contact.is_verified %}<span style="color: #38bdf8; font-size: 1rem;">✅</span>{% endif %}
-                        {% if contact.role == 'admin' %}<span style="color: #38bdf8; font-size: 1rem;">☑️</span>{% endif %}
                     </h3>
                     {% if contact.last_active | is_online %}
-                        <span style="font-size: 0.75rem; color: #22c55e;">Online now</span>
+                        <span style="font-size: 0.75rem; color: #22c55e;">Online</span>
                     {% else %}
                         <span style="font-size: 0.75rem; color: var(--text-muted);">Offline</span>
                     {% endif %}
@@ -34,14 +34,15 @@
     </div>
 
     <!-- CHAT BOX -->
-    <div id="chat-box" style="flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; background: rgba(8,17,31,0.4);">
+    <div id="chat-box" style="flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; background: url('https://www.transparenttextures.com/patterns/cubes.png') rgba(8,17,31,0.9);">
         <!-- Messages loaded via JS -->
     </div>
 
-    <form method="POST" style="background: rgba(15,23,42,0.9); padding: 15px; border-top: 1px solid var(--border-color); display: flex; gap: 10px;">
+    <!-- INPUT AREA -->
+    <form method="POST" style="background: rgba(15,23,42,0.95); padding: 15px 20px; border-top: 1px solid var(--border-color); display: flex; gap: 10px; padding-bottom: env(safe-area-inset-bottom, 15px);">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <input type="text" name="message" id="chat-input" placeholder="Type a secure message..." required autocomplete="off" style="flex: 1; padding: 12px 20px; border-radius: 25px; border: 1px solid var(--border-color); background: #1e293b; color: white; outline: none; font-size: 1rem;">
-        <button type="submit" style="background: var(--accent); color: #000; border: none; width: 45px; height: 45px; border-radius: 50%; font-size: 1.2rem; cursor: pointer; display: grid; place-items: center; transition: 0.2s;">➤</button>
+        <input type="text" name="message" id="chat-input" placeholder="Message..." required autocomplete="off" style="flex: 1; padding: 14px 20px; border-radius: 25px; border: 1px solid rgba(255,255,255,0.1); background: #1e293b; color: white; outline: none; font-size: 1rem;">
+        <button type="submit" style="background: var(--accent); color: #000; border: none; width: 50px; height: 50px; border-radius: 50%; font-size: 1.3rem; cursor: pointer; display: grid; place-items: center; box-shadow: 0 4px 10px rgba(56, 189, 248, 0.3);">➤</button>
     </form>
 </div>
 
@@ -67,22 +68,21 @@
                 const isMe = (msg.sender === myUsername);
                 
                 if(isMe) {
-                    // 💥 NEW: BLUE TICK SYSTEM 💥
                     let seenTick = msg.is_read ? '<span style="color:#0ea5e9; font-weight:bold; font-size:0.8rem; margin-left:5px;">✓✓</span>' : '<span style="color:rgba(0,0,0,0.5); font-size:0.8rem; margin-left:5px;">✓</span>';
                     
                     html += `
-                    <div style="align-self: flex-end; display: flex; align-items: center; gap: 8px;">
+                    <div style="align-self: flex-end; display: flex; align-items: center; gap: 8px; max-width: 80%;">
                         <span onclick="unsendMessage(${msg.id})" style="cursor: pointer; font-size: 0.9rem; opacity: 0.6;" title="Unsend">🗑️</span>
-                        <div style="background: var(--accent); color: #000; padding: 10px 15px; border-radius: 15px 15px 0 15px; max-width: 70%; word-wrap: break-word; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
-                            <p style="margin: 0; font-size: 1rem; font-weight: 500;">${msg.message}</p>
-                            <span style="font-size: 0.7rem; color: rgba(0,0,0,0.6); display: block; text-align: right; margin-top: 5px;">${msg.time} ${seenTick}</span>
+                        <div style="background: var(--accent); color: #000; padding: 12px 18px; border-radius: 18px 18px 0 18px; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
+                            <p style="margin: 0; font-size: 1.05rem; font-weight: 500;">${msg.message}</p>
+                            <span style="font-size: 0.7rem; color: rgba(0,0,0,0.6); display: block; text-align: right; margin-top: 4px;">${msg.time} ${seenTick}</span>
                         </div>
                     </div>`;
                 } else {
                     html += `
-                    <div style="align-self: flex-start; background: #334155; color: white; padding: 10px 15px; border-radius: 15px 15px 15px 0; max-width: 70%; word-wrap: break-word; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
-                        <p style="margin: 0; font-size: 1rem;">${msg.message}</p>
-                        <span style="font-size: 0.7rem; color: var(--text-muted); display: block; text-align: right; margin-top: 5px;">${msg.time}</span>
+                    <div style="align-self: flex-start; background: #334155; color: white; padding: 12px 18px; border-radius: 18px 18px 18px 0; max-width: 80%; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
+                        <p style="margin: 0; font-size: 1.05rem;">${msg.message}</p>
+                        <span style="font-size: 0.7rem; color: var(--text-muted); display: block; text-align: right; margin-top: 4px;">${msg.time}</span>
                     </div>`;
                 }
             });
