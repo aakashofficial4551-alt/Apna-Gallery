@@ -61,17 +61,17 @@ BANNED_IPS = set()
 
 @app.before_request
 def security_firewall_and_session_check():
-    # 1. Anti-DDoS
     ip = request.remote_addr or "127.0.0.1"
     now = time.time()
+    
+    # 1. Anti-DDoS
     request_tracker[ip] = [t for t in request_tracker[ip] if now - t < 60]
     if len(request_tracker[ip]) > 200:
         BANNED_IPS.add(ip)
     if ip in BANNED_IPS:
-        return "Your IP has been permanently blocked by Apna Gallery Security System for malicious activity. (Error 429)", 429
+        return "Your IP has been permanently blocked for malicious activity. (Error 429)", 429
     request_tracker[ip].append(now)
 
-    # Allow static and auth routes to bypass strict checks
     if request.endpoint in ['login', 'verify_otp', 'logout', 'static', 'api_search_suggest'] or (request.path and request.path.startswith('/static/')):
         return
 
@@ -85,34 +85,30 @@ def security_firewall_and_session_check():
                 flash("Security Firewall Blocked Your Request: Invalid Validation Token.", "error")
                 return redirect(request.referrer or url_for('feed'))
 
-    # 3. 💥 THE GUILLOTINE ENGINE: ABSOLUTE SESSION TERMINATION 💥
+    # 3. GUILLOTINE ENGINE: SESSION TERMINATION
     if "username" in session:
         conn = get_db_connection()
         c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
         c.execute("SELECT status FROM users WHERE username = %s", (session["username"],))
         user = c.fetchone()
         
-        # Update Last Active
         if user:
             c.execute("UPDATE users SET last_active = CURRENT_TIMESTAMP WHERE username = %s", (session["username"],))
             conn.commit()
         conn.close()
 
-        # If user is deleted from DB
         if not user:
             session.clear()
             if request.path.startswith('/api/'): return jsonify({"error": "Account deleted", "redirect": True}), 401
             flash("Your account has been deleted.", "error")
             return redirect(url_for('login'))
             
-        # If user is Banned
         if user['status'] == 'BANNED':
             session.clear()
             if request.path.startswith('/api/'): return jsonify({"error": "Account suspended", "redirect": True}), 401
             flash("Your account has been suspended by the Admin.", "error")
             return redirect(url_for('login'))
             
-    # Random Database Cleanup Trigger
     if random.random() < 0.05: cleanup_database()
     if random.random() < 0.20: run_bot_engine() 
 
@@ -125,9 +121,6 @@ def set_security_headers(response):
     response.headers["Content-Security-Policy"] = "default-src 'self' https: data: 'unsafe-inline' 'unsafe-eval';"
     return response
 
-# =========================================================
-# BACKUP ENGINE
-# =========================================================
 def create_database_backup():
     try:
         conn = get_db_connection()
@@ -144,13 +137,10 @@ def create_database_backup():
         conn.close()
     except Exception as e: print(f"Backup Error: {e}")
 
-# =========================================================
-# TEXT & TIME FILTERS
-# =========================================================
 @app.template_filter('format_text')
 def format_text(text):
     if not text: return ""
-    text = html.escape(text) # ANTI-XSS
+    text = html.escape(str(text)) # ABSOLUTE XSS BLOCK
     text = re.sub(r'#(\w+)', r'<a href="/search?q=\1" style="color: var(--accent); text-decoration: none; font-weight: bold;">#\1</a>', text)
     text = re.sub(r'@(\w+)', r'<a href="/agent/\1" style="color: var(--warning); text-decoration: none; font-weight: bold;">@\1</a>', text)
     return text
@@ -171,9 +161,6 @@ def timeago(dt):
     elif seconds < 86400: return f"{int(seconds/3600)}h ago"
     else: return f"{int(seconds/86400)}d ago"
 
-# =========================================================
-# DATABASE AUTO-HEALER
-# =========================================================
 def safe_alter(c, conn, query):
     try: c.execute(query); conn.commit()
     except Exception: conn.rollback()
@@ -230,7 +217,7 @@ def upgrade_db():
         c.execute("UPDATE comments SET likes = 0 WHERE likes IS NULL")
         conn.commit()
     except: conn.rollback()
-
+    
     try:
         c.execute("SELECT id FROM users WHERE user_code IS NULL")
         for row in c.fetchall():
@@ -242,9 +229,6 @@ def upgrade_db():
 
 upgrade_db()
 
-# =========================================================
-# THE GRIM REAPER (AUTO-CLEANUP)
-# =========================================================
 def cleanup_database():
     conn = get_db_connection()
     c = conn.cursor()
@@ -270,9 +254,6 @@ def cleanup_database():
     except Exception as e: print("Cleanup Error:", e)
     finally: conn.close()
 
-# =========================================================
-# THE SMART PHANTOM ENGINE (AI BOTS)
-# =========================================================
 def run_bot_engine():
     conn = get_db_connection()
     c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
@@ -282,8 +263,7 @@ def run_bot_engine():
             "Hey everyone! Kya haal hain? 👋", "Koi online hai kya is waqt? 🤔", 
             "Bhai yeh app ekdum mast chal rahi hai! 🔥", "Good morning dosto! Have a great day ☀️", 
             "Hello world! Just joined this awesome gallery.", "Koi badhiya photo upload karo yaar! 😎",
-            "Speed kaafi fast hai is website ki 🚀", "Mausam bohot badiya hai aaj 🌧️",
-            "Are yaar, kya chal raha hai aajkal? 🧐"
+            "Speed kaafi fast hai is website ki 🚀", "Mausam bohot badiya hai aaj 🌧️"
         ]
         
         c.execute("SELECT COUNT(id) as count FROM users WHERE role = 'bot'")
@@ -329,15 +309,17 @@ def run_bot_engine():
                     if c.rowcount == 1:
                         c.execute("UPDATE users SET wallet_balance = wallet_balance + 10 WHERE username = %s", (media['uploaded_by'],))
                         c.execute("UPDATE media SET tips_received = COALESCE(tips_received, 0) + 10 WHERE id = %s", (media['id'],))
+                        # 💥 FIX: Send precise post URL 💥
                         c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", 
-                                  (media['uploaded_by'], f"💰 You received 10 Coins from {bot_username} for '{media['title'][:15]}...'", f"/profile"))
+                                  (media['uploaded_by'], f"💰 You received 10 Coins from {bot_username} for '{media['title'][:15]}...'", f"/post/{media['id']}"))
                 else: 
                     try:
                         c.execute("INSERT INTO likes (media_id, username) VALUES (%s, %s) ON CONFLICT DO NOTHING", (media['id'], bot_username))
                         if c.rowcount == 1: 
                             c.execute("UPDATE media SET likes = likes + 1 WHERE id = %s", (media['id'],))
+                            # 💥 FIX: Send precise post URL 💥
                             c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", 
-                                      (media['uploaded_by'], f"❤️ {bot_username} liked your post!", f"/profile"))
+                                      (media['uploaded_by'], f"❤️ {bot_username} liked your post!", f"/post/{media['id']}"))
                     except: pass
         conn.commit()
     except Exception as e: print("Bot Engine Error:", e)
@@ -571,7 +553,7 @@ def buy_verification():
     return redirect(request.referrer or url_for("dashboard"))
 
 # =========================================================
-# ASSET MANAGEMENT & TIPPING 
+# ASSET MANAGEMENT, POST VIEW & TIPPING 
 # =========================================================
 @app.route("/upload_asset", methods=["POST"])
 def upload_asset():
@@ -592,14 +574,18 @@ def upload_asset():
         
         is_approved = 1 if current_user_is_admin() else 0
         conn = get_db_connection()
-        c = conn.cursor()
-        c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved, visibility, views, is_pinned, tips_received) VALUES (%s, %s, %s, %s, %s, %s, %s, 0, FALSE, 0)",
+        c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        
+        # 💥 FIX: GETTING INSERTED ID FOR NOTIFICATIONS 💥
+        c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved, visibility, views, is_pinned, tips_received) VALUES (%s, %s, %s, %s, %s, %s, %s, 0, FALSE, 0) RETURNING id",
                   (filename, title, category, "", session.get("username"), is_approved, visibility))
+        new_media_id = c.fetchone()['id']
+        
         mentions = set(re.findall(r'@(\w+)', title))
         for m in mentions:
             if m != session["username"]:
                 c.execute("SELECT id FROM users WHERE username = %s", (m,))
-                if c.fetchone(): c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (m, f"📣 {session['username']} mentioned you!", f"/agent/{session['username']}"))
+                if c.fetchone(): c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (m, f"📣 {session['username']} mentioned you!", f"/post/{new_media_id}"))
         conn.commit()
         conn.close()
         flash(f"Asset published as {visibility.upper()}!" if is_approved else "Asset sent to Admin for approval.", "success")
@@ -607,6 +593,36 @@ def upload_asset():
         conn.rollback()
         flash(f"Server Alert: {str(e)[:150]}", "error")
     return redirect(request.referrer or url_for("feed"))
+
+# 💥 PHASE 84: DEDICATED POST ROUTE (FIXES 404) 💥
+@app.route("/post/<int:media_id>")
+def view_post(media_id):
+    if "username" not in session: return redirect(url_for("login"))
+    conn = get_db_connection()
+    c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    
+    block_filter = "m.uploaded_by NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) AND m.uploaded_by NOT IN (SELECT blocker FROM blocks WHERE blocked = %s)"
+    
+    c.execute(f"SELECT m.*, u.profile_pic, u.role, u.is_verified FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.id = %s AND {block_filter}", (media_id, session["username"], session["username"]))
+    post = c.fetchone()
+    
+    if not post:
+        conn.close()
+        return render_template("404.html")
+        
+    post_dict = dict(post)
+    c.execute("SELECT c.*, u.role, u.is_verified FROM comments c JOIN users u ON c.username = u.username WHERE c.media_id = %s ORDER BY c.id ASC", (media_id,))
+    post_dict['comments'] = [dict(row) for row in c.fetchall()]
+    
+    c.execute("SELECT id FROM bookmarks WHERE username = %s AND media_id = %s", (session["username"], media_id))
+    post_dict['is_saved'] = bool(c.fetchone())
+    
+    post_dict['created_at'] = timeago(post_dict['created_at'])
+    for comm in post_dict['comments']: comm['created_at'] = timeago(comm['created_at'])
+    
+    conn.close()
+    return render_template("single_post.html", post=post_dict, hide_navbar=True)
+
 
 @app.route("/tip/<int:media_id>", methods=["POST"])
 def tip_creator(media_id):
@@ -638,7 +654,7 @@ def tip_creator(media_id):
         title_snippet = (media['title'][:15] + '...') if media['title'] else 'your post'
         badge = "👑 (Admin)" if is_admin else ""
         c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", 
-                  (creator, f"💰 You received 10 Coins from {tipper} {badge} for '{title_snippet}'", f"/profile"))
+                  (creator, f"💰 You received 10 Coins from {tipper} {badge} for '{title_snippet}'", f"/post/{media_id}"))
         conn.commit()
         success = True
     except Exception as e:
@@ -658,6 +674,7 @@ def add_view(media_id):
     conn.close()
     return jsonify({"success": True})
 
+# 💥 RESTORED: ADD COMMENT ROUTE 💥
 @app.route("/add_comment/<int:media_id>", methods=["POST"])
 def add_comment(media_id):
     if "username" not in session: return redirect(url_for("login"))
@@ -670,14 +687,14 @@ def add_comment(media_id):
         media_info = c.fetchone()
         
         if media_info and media_info['uploaded_by'] != session["username"]:
-            c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (media_info['uploaded_by'], f"💬 {session['username']} commented on {media_info['title'][:15]}...", f"/gallery/{media_info['category']}"))
+            c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (media_info['uploaded_by'], f"💬 {session['username']} commented on {media_info['title'][:15]}...", f"/post/{media_id}"))
             
         mentions = set(re.findall(r'@(\w+)', text))
         for m in mentions:
             if m != session["username"]:
                 c.execute("SELECT id FROM users WHERE username = %s", (m,))
                 if c.fetchone():
-                    c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (m, f"📣 {session['username']} mentioned you in a comment!", f"/gallery/{media_info['category']}"))
+                    c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (m, f"📣 {session['username']} mentioned you in a comment!", f"/post/{media_id}"))
         conn.commit()
         conn.close()
         flash("Comment posted!", "success")
@@ -695,7 +712,7 @@ def like(media_id):
         c.execute("SELECT uploaded_by, title, category FROM media WHERE id = %s", (media_id,))
         media_info = c.fetchone()
         if media_info and media_info['uploaded_by'] != username:
-            c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (media_info['uploaded_by'], f"❤️ {username} liked your asset: {media_info['title'][:15]}...", f"/gallery/{media_info['category']}"))
+            c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (media_info['uploaded_by'], f"❤️ {username} liked your asset: {media_info['title'][:15]}...", f"/post/{media_id}"))
         conn.commit()
         liked_now = True
     else: liked_now = False
@@ -718,8 +735,7 @@ def like_comment(comment_id):
         if comment_info and comment_info['username'] != username:
             c.execute("SELECT category FROM media WHERE id = %s", (comment_info['media_id'],))
             media_cat = c.fetchone()
-            cat = media_cat['category'] if media_cat else 'Photo'
-            c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (comment_info['username'], f"❤️ {username} liked your comment!", f"/gallery/{cat}"))
+            c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (comment_info['username'], f"❤️ {username} liked your comment!", f"/post/{comment_info['media_id']}"))
         conn.commit()
     c.execute("SELECT likes FROM comments WHERE id = %s", (comment_id,))
     likes = c.fetchone()["likes"]
@@ -879,6 +895,7 @@ def explore():
     conn.close()
     return render_template("explore.html", posts=explore_posts, trending_tags=trending_tags, spotlight=spotlight)
 
+# 💥 FIX: DASHBOARD ROUTE 💥
 @app.route("/dashboard")
 def dashboard():
     if "username" not in session: return redirect(url_for("login"))
@@ -1187,13 +1204,14 @@ def ai_studio():
                 r = requests.get(image_url, timeout=15)
                 secure_url = cloudinary.uploader.upload(r.content, resource_type="image")["secure_url"] if r.status_code == 200 else image_url
                 conn = get_db_connection()
-                c = conn.cursor()
-                c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved, visibility, views, is_pinned) VALUES (%s, %s, %s, %s, %s, 1, 'public', 0, FALSE)",
+                c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+                # 💥 FIX: GETTING ID FOR NOTIFICATIONS 💥
+                c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved, visibility, views, is_pinned) VALUES (%s, %s, %s, %s, %s, 1, 'public', 0, FALSE) RETURNING id",
                           (secure_url, f"AI: {prompt[:20]}...", "Photo", prompt, session["username"]))
                 conn.commit()
                 conn.close()
                 flash("Image created successfully! (100% Free)", "success")
-                # 💥 BUG FIX: Category parameter passed correctly! 💥
+                # 💥 BUG FIX: Category string correctly formatted 💥
                 return redirect(url_for("gallery", category="Photo"))
             except: flash("Image generation failed.", "error")
         else:
@@ -1213,6 +1231,44 @@ def analytics():
     top_posts = c.fetchall()
     conn.close()
     return render_template("analytics.html", stats=stats, top_posts=top_posts, hide_navbar=True)
+
+# 💥 RESTORED FULLY: GALLERY ROUTE 💥
+@app.route("/gallery/<category>", methods=["GET", "POST"])
+def gallery(category):
+    if "username" not in session: return redirect(url_for("login"))
+    conn = get_db_connection()
+    c = conn.cursor()
+    if request.method == "POST":
+        try:
+            filename = "SHAYARI_TEXT"
+            if category != 'Shayari':
+                file = request.files.get("media")
+                if file and file.filename != "":
+                    filename = save_uploaded_file(file, category)
+                    if not filename:
+                        flash("Upload Failed! Check API keys.", "error")
+                        return redirect(url_for("gallery", category=category))
+            
+            is_approved = 1 if current_user_is_admin() else 0
+            visibility = request.form.get("visibility", "public")
+            c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved, visibility, views, is_pinned) VALUES (%s, %s, %s, %s, %s, %s, %s, 0, FALSE)",
+                      (filename, html.escape(request.form.get("title", "Untitled")), category, "", session.get("username"), is_approved, visibility))
+            conn.commit()
+            flash("File live!" if is_approved else "Sent to Admin for approval.", "success")
+        except Exception as e:
+            conn.rollback()
+            flash(f"Upload System Fault: {str(e)[:100]}", "error")
+        return redirect(url_for("gallery", category=category))
+
+    c.execute("SELECT m.*, u.profile_pic, u.role, u.is_verified FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.category = %s AND m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' AND m.uploaded_by NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) ORDER BY m.id DESC", (category, session["username"]))
+    if category == 'Shayari': c.execute("SELECT m.*, u.role, u.is_verified FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.category = %s AND m.approved = 1 AND m.visibility = 'public' AND m.uploaded_by NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) ORDER BY m.id DESC", (category, session["username"]))
+    media_files = c.fetchall()
+    c.execute("SELECT c.*, u.role, u.is_verified FROM comments c JOIN users u ON c.username = u.username ORDER BY c.id ASC")
+    comments_db = c.fetchall()
+    conn.close()
+    comments = defaultdict(list)
+    for comment in comments_db: comments[comment["media_id"]].append(comment)
+    return render_template("gallery.html", media_files=media_files, category=category, comments=comments)
 
 # =========================================================
 # ADMIN CONTROLS
@@ -1335,7 +1391,7 @@ def approve(id):
     c.execute("UPDATE media SET approved = 1 WHERE id = %s", (id,))
     c.execute("SELECT uploaded_by, title, category FROM media WHERE id = %s", (id,))
     media_info = c.fetchone()
-    if media_info: c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (media_info['uploaded_by'], f"✅ Approved! '{media_info['title'][:15]}' is now live.", f"/gallery/{media_info['category']}"))
+    if media_info: c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (media_info['uploaded_by'], f"✅ Approved! '{media_info['title'][:15]}' is now live.", f"/post/{id}"))
     conn.commit()
     conn.close()
     flash("Approved!", "success")
