@@ -70,7 +70,7 @@ def timeago(dt):
     else: return f"{int(seconds/86400)}d ago"
 
 # =========================================================
-# THE 100% BULLETPROOF DATABASE AUTO-HEALER
+# DATABASE AUTO-HEALER
 # =========================================================
 def safe_alter(c, conn, query):
     try:
@@ -92,10 +92,9 @@ def upgrade_db():
     c.execute("CREATE TABLE IF NOT EXISTS comment_likes (id SERIAL PRIMARY KEY, comment_id INTEGER NOT NULL, username VARCHAR(100) NOT NULL, UNIQUE(comment_id, username))")
     conn.commit()
 
-    # 💥 THE FIX: Convert title to TEXT so unlimited AI captions can fit! 💥
     safe_alter(c, conn, "ALTER TABLE media ALTER COLUMN title TYPE TEXT")
     
-    # Executing Alters Safely
+    safe_alter(c, conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
     safe_alter(c, conn, "ALTER TABLE media ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
     safe_alter(c, conn, "ALTER TABLE comments ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
     safe_alter(c, conn, "ALTER TABLE media ADD COLUMN IF NOT EXISTS visibility VARCHAR(20) DEFAULT 'public'")
@@ -115,8 +114,6 @@ def upgrade_db():
     safe_alter(c, conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_pic TEXT")
     safe_alter(c, conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS theme VARCHAR(20) DEFAULT 'cyan'")
     safe_alter(c, conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS cover_pic TEXT")
-    
-    # NEW: PHASE 52 & 53 (Link in Bio & Verified Badges)
     safe_alter(c, conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS website TEXT")
     safe_alter(c, conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE")
 
@@ -131,33 +128,103 @@ def upgrade_db():
         c.execute("UPDATE comments SET likes = 0 WHERE likes IS NULL")
         conn.commit()
     except: conn.rollback()
-
-    try:
-        c.execute("SELECT id FROM users WHERE user_code IS NULL")
-        for row in c.fetchall():
-            code = ''.join(secrets.choice("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ") for _ in range(10))
-            c.execute("UPDATE users SET user_code = %s WHERE id = %s", (code, row['id']))
-        conn.commit()
-    except: conn.rollback()
         
     conn.close()
 
 upgrade_db()
 
+# =========================================================
+# THE GRIM REAPER (AUTO-CLEANUP AS REQUESTED)
+# =========================================================
 def cleanup_database():
     conn = get_db_connection()
     c = conn.cursor()
     try:
-        c.execute("DELETE FROM users WHERE deletion_requested IS NOT NULL AND deletion_requested < NOW() - INTERVAL '7 days'")
+        # 1. 7 Days Limit for BOT Accounts
+        c.execute("DELETE FROM users WHERE role = 'bot' AND created_at < NOW() - INTERVAL '7 days'")
+        # 2. 1 Month Limit for Inactive GUEST Accounts
         c.execute("DELETE FROM users WHERE username LIKE 'Guest-%%' AND last_active < NOW() - INTERVAL '30 days'")
+        # 3. 3 Months Limit for Inactive REAL Users
         c.execute("DELETE FROM users WHERE role = 'user' AND last_active < NOW() - INTERVAL '90 days'")
+        # 4. Account Deletion Requests (7 Days)
+        c.execute("DELETE FROM users WHERE deletion_requested IS NOT NULL AND deletion_requested < NOW() - INTERVAL '7 days'")
+        
+        # 5. DATA PURGE: Delete orphaned posts, comments, likes, and messages of deleted users
+        c.execute("DELETE FROM media WHERE uploaded_by NOT IN (SELECT username FROM users)")
+        c.execute("DELETE FROM comments WHERE username NOT IN (SELECT username FROM users)")
+        c.execute("DELETE FROM likes WHERE username NOT IN (SELECT username FROM users)")
+        c.execute("DELETE FROM followers WHERE follower NOT IN (SELECT username FROM users) OR following NOT IN (SELECT username FROM users)")
+        c.execute("DELETE FROM messages WHERE sender NOT IN (SELECT username FROM users) OR receiver NOT IN (SELECT username FROM users)")
+        c.execute("DELETE FROM global_chat WHERE sender NOT IN (SELECT username FROM users)")
+        
         c.execute("DELETE FROM stories WHERE created_at < NOW() - INTERVAL '12 hours'")
         c.execute("DELETE FROM notifications WHERE id NOT IN (SELECT id FROM notifications ORDER BY id DESC LIMIT 500)")
-        c.execute("DELETE FROM messages WHERE created_at < NOW() - INTERVAL '30 days'")
-        c.execute("DELETE FROM global_chat WHERE id NOT IN (SELECT id FROM global_chat ORDER BY id DESC LIMIT 200)")
         conn.commit()
-    except: pass
+    except Exception as e: 
+        print("Cleanup Error:", e)
     finally: conn.close()
+
+# =========================================================
+# THE PHANTOM ENGINE (AI BOT SPAMMER)
+# =========================================================
+def run_bot_engine():
+    conn = get_db_connection()
+    c = conn.cursor()
+    try:
+        # Bot Names List
+        bot_names = ["Rahul_Vibes", "Priya_007", "Aman_Cool", "Sneha_Arts", "Vikram_Pro", "Kabir_Singh", "Pooja_X", "Anjali_Cute", "Rohan_Tech", "Karan_King"]
+        bot_chats = ["Hey everyone! Welcome to the new gallery 👋", "Is anyone online?", "I just posted a new photo, check my profile! 🔥", "This website is so fast 🚀", "Hello world!", "Good morning guys ☀️", "Need some new followers, follow me! 🫂"]
+        
+        # Ensure we have at least 10 bots alive
+        c.execute("SELECT COUNT(id) FROM users WHERE role = 'bot'")
+        bot_count = c.fetchone()['count']
+        
+        if bot_count < 10:
+            # Create a new Bot
+            name = f"{random.choice(bot_names)}_{random.randint(100, 9999)}"
+            code = ''.join(secrets.choice("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ") for _ in range(10))
+            c.execute("INSERT INTO users (username, password, user_code, role, is_verified, bio) VALUES (%s, %s, %s, 'bot', TRUE, 'Just an AI wandering in the gallery ✨')", (name, "botpass123", code))
+            conn.commit()
+            bot_username = name
+        else:
+            # Pick a random existing bot
+            c.execute("SELECT username FROM users WHERE role = 'bot' ORDER BY RANDOM() LIMIT 1")
+            bot_username = c.fetchone()['username']
+            
+        action = random.randint(1, 100)
+        
+        # Action 1 (30% Chance): Bot uploads a new Photo to keep feed active
+        if action <= 30:
+            cat = random.choice(["Photo", "Photo", "Photo", "Shayari"]) # mostly photos
+            if cat == "Photo":
+                # Uses free random image generator (Picsum)
+                img_url = f"https://picsum.photos/800/1000?random={random.randint(1, 100000)}"
+                caption = random.choice(["Nature is beautiful 🌲 #nature", "Vibes ✨ #chill", "What do you think? 🤔", "Random click 📸 #photography", "Missing this place! ✈️"])
+            else:
+                img_url = "SHAYARI_TEXT"
+                caption = "Waqt ne sikhaya hai chup rehna... 💔 #sad #shayari"
+            
+            c.execute("INSERT INTO media (filename, title, category, uploaded_by, approved, visibility, views) VALUES (%s, %s, %s, %s, 1, 'public', %s)",
+                      (img_url, caption, cat, bot_username, random.randint(5, 50)))
+            
+        # Action 2 (40% Chance): Bot chats in Global Chat
+        elif 30 < action <= 70:
+            c.execute("INSERT INTO global_chat (sender, message) VALUES (%s, %s)", (bot_username, random.choice(bot_chats)))
+            
+        # Action 3 (30% Chance): Bot Follows a Random User (maybe real user!)
+        elif action > 70:
+            c.execute("SELECT username FROM users WHERE username != %s ORDER BY RANDOM() LIMIT 1", (bot_username,))
+            target = c.fetchone()
+            if target:
+                try:
+                    c.execute("INSERT INTO followers (follower, following) VALUES (%s, %s)", (bot_username, target['username']))
+                    c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (target['username'], f"👤 {bot_username} started following you!", f"/agent/{bot_username}"))
+                except: pass # already following
+                
+        conn.commit()
+    except Exception as e: print("Bot Engine Error:", e)
+    finally: conn.close()
+
 
 def get_csrf_token():
     token = session.get("csrf_token")
@@ -168,7 +235,12 @@ def get_csrf_token():
 
 @app.before_request
 def update_activity():
+    # 5% chance on any request to trigger DB Cleanup
     if random.random() < 0.05: cleanup_database()
+    
+    # 15% chance to secretly run the Bot Engine in background! 👻
+    if random.random() < 0.15: run_bot_engine()
+        
     if "username" in session:
         try:
             conn = get_db_connection()
@@ -181,8 +253,7 @@ def update_activity():
 @app.context_processor
 def inject_global_vars():
     def get_avatar(profile_pic, username):
-        if profile_pic and str(profile_pic).strip() != "":
-            return profile_pic
+        if profile_pic and str(profile_pic).strip() != "": return profile_pic
         encoded_name = urllib.parse.quote(str(username))
         return f"https://api.dicebear.com/7.x/avataaars/svg?seed={encoded_name}&backgroundColor=1e293b"
 
@@ -332,7 +403,6 @@ def settings():
     c = conn.cursor()
     
     if action == "update_profile":
-        # 💥 Added Website to settings update 💥
         c.execute("UPDATE users SET bio = %s, theme = %s, website = %s WHERE username = %s", 
                   (request.form.get("bio", ""), request.form.get("theme", "cyan"), request.form.get("website", ""), session["username"]))
         flash("Profile Settings Updated!", "success")
@@ -355,7 +425,7 @@ def settings():
     return redirect(request.referrer or url_for("dashboard"))
 
 # =========================================================
-# CRASH-PROOF UPLOAD ROUTE (PHASE 50 FIX)
+# ASSET MANAGEMENT
 # =========================================================
 @app.route("/upload_asset", methods=["POST"])
 def upload_asset():
@@ -394,7 +464,6 @@ def upload_asset():
         flash(f"Asset published as {visibility.upper()}!" if is_approved else "Asset sent to Admin for approval.", "success")
         
     except Exception as e:
-        # Prints EXACT error to the flash message if it ever fails again!
         conn.rollback()
         print(f"UPLOAD CRASH: {e}")
         flash(f"Server Alert: {str(e)[:150]}", "error")
@@ -405,7 +474,6 @@ def upload_asset():
 def edit_post(media_id):
     if "username" not in session: return redirect(url_for("login"))
     new_title = request.form.get("title", "").strip()
-    
     if new_title:
         conn = get_db_connection()
         c = conn.cursor()
@@ -424,7 +492,7 @@ def pin_post(media_id):
     c.execute("UPDATE media SET is_pinned = TRUE WHERE id = %s AND uploaded_by = %s", (media_id, session["username"]))
     conn.commit()
     conn.close()
-    flash("Post Pinned to top of your profile!", "success")
+    flash("Post Pinned!", "success")
     return redirect(request.referrer or url_for("profile"))
 
 @app.route("/api/view/<int:media_id>", methods=["POST"])
@@ -437,7 +505,7 @@ def add_view(media_id):
     return jsonify({"success": True})
 
 # =========================================================
-# CORE ROUTES
+# CORE ROUTES (FEED, REELS, EXPLORE, DASHBOARD)
 # =========================================================
 @app.route("/")
 def index():
@@ -493,7 +561,6 @@ def explore():
     if "username" not in session: return redirect(url_for("login"))
     conn = get_db_connection()
     c = conn.cursor()
-    
     c.execute("SELECT m.id, m.filename, m.title, m.category, m.likes, m.views, m.uploaded_by FROM media m WHERE m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' ORDER BY RANDOM() LIMIT 40")
     explore_posts = c.fetchall()
     
@@ -536,7 +603,7 @@ def dashboard():
         conn.close()
         return render_template("dashboard.html", trending=trending, stories=stories)
     except Exception as e:
-        return f"<div style='color:#f43f5e; padding:50px; text-align:center; font-family:sans-serif;'><h1>Dashboard Engine Error</h1><p>{str(e)}</p><a href='/feed' style='color:#38bdf8;'>Go back to Feed</a></div>"
+        return f"<div style='color:#f43f5e; padding:50px; text-align:center;'><h1>Dashboard Engine Error</h1><p>{str(e)}</p><a href='/feed'>Go back to Feed</a></div>"
 
 @app.route("/notifications")
 def notifications():
@@ -777,7 +844,7 @@ def api_global_chat_history():
     return jsonify(formatted)
 
 # =========================================================
-# LIKES, COMMENTS, SEARCH, & GALLERY
+# LIKES, COMMENTS, SEARCH, GALLERY & AI STUDIO
 # =========================================================
 @app.route("/search")
 def search():
@@ -900,7 +967,7 @@ def like(media_id):
         c.execute("SELECT uploaded_by, title, category FROM media WHERE id = %s", (media_id,))
         media_info = c.fetchone()
         if media_info and media_info['uploaded_by'] != username:
-            c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (media_info['uploaded_by'], f"❤️ {username} liked your asset: {media_info['title']}", f"/gallery/{media_info['category']}"))
+            c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (media_info['uploaded_by'], f"❤️ {username} liked your asset: {media_info['title'][:15]}...", f"/gallery/{media_info['category']}"))
         conn.commit()
         liked_now = True
     else: liked_now = False
@@ -944,7 +1011,7 @@ def add_comment(media_id):
         media_info = c.fetchone()
         
         if media_info and media_info['uploaded_by'] != session["username"]:
-            c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (media_info['uploaded_by'], f"💬 {session['username']} commented on {media_info['title']}", f"/gallery/{media_info['category']}"))
+            c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (media_info['uploaded_by'], f"💬 {session['username']} commented on {media_info['title'][:15]}...", f"/gallery/{media_info['category']}"))
             
         mentions = set(re.findall(r'@(\w+)', text))
         for m in mentions:
@@ -982,7 +1049,7 @@ def report_asset(media_id):
     finally: conn.close()
 
 # =========================================================
-# ADMIN CONTROLS (PHASE 53: ADDED VERIFY BUTTON)
+# ADMIN CONTROLS (WITH TRIGGER BOT ROUTE)
 # =========================================================
 @app.route("/admin", methods=["GET", "POST"])
 def admin():
@@ -1016,8 +1083,21 @@ def admin():
     all_users = c.fetchall()
     c.execute("SELECT r.id as report_id, r.media_id, r.reported_by, r.reason, r.created_at, m.title, m.filename, m.category, m.uploaded_by FROM reports r JOIN media m ON r.media_id = m.id ORDER BY r.id DESC")
     reports = c.fetchall()
+    
+    # Check Bot count
+    c.execute("SELECT COUNT(*) as cnt FROM users WHERE role = 'bot'")
+    bot_count = c.fetchone()['cnt']
+    
     conn.close()
-    return render_template("admin.html", pending_media=pending_media, user_count=user_count, media_count=media_count, likes_count=likes_count, all_users=all_users, reports=reports, auth_required=False)
+    return render_template("admin.html", pending_media=pending_media, user_count=user_count, media_count=media_count, likes_count=likes_count, all_users=all_users, reports=reports, bot_count=bot_count, auth_required=False)
+
+@app.route("/admin/trigger_bots", methods=["POST"])
+def trigger_bots():
+    if not current_user_is_admin(): return redirect(url_for("admin"))
+    # Manually fire the bot engine to test it out!
+    run_bot_engine()
+    flash("🤖 Bot Engine Triggered Successfully! A new post, follower, or message has been generated.", "success")
+    return redirect(url_for("admin"))
 
 @app.route("/admin/user_action/<int:user_id>/<action>", methods=["POST"])
 def admin_user_action(user_id, action):
@@ -1093,6 +1173,13 @@ def dismiss_report(report_id):
     conn.close()
     flash("Report dismissed.", "success")
     return redirect(url_for("admin"))
+
+@app.route("/mystery", methods=["POST"])
+def mystery():
+    if hmac.compare_digest(request.form.get("passcode", ""), os.environ.get("MYSTERY_CODE", "SOCHO")): 
+        return render_template("mystery.html")
+    flash("Incorrect code.", "error")
+    return redirect(url_for("dashboard"))
 
 @app.errorhandler(404)
 def not_found_error(error): return render_template("404.html"), 404
