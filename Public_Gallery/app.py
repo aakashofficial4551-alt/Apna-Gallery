@@ -157,41 +157,43 @@ def upgrade_db():
         c.execute("UPDATE comments SET likes = 0 WHERE likes IS NULL")
         conn.commit()
     except: conn.rollback()
-
-    try:
-        c.execute("SELECT id FROM users WHERE user_code IS NULL")
-        for row in c.fetchall():
-            code = ''.join(secrets.choice("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ") for _ in range(10))
-            c.execute("UPDATE users SET user_code = %s WHERE id = %s", (code, row['id']))
-        conn.commit()
-    except: conn.rollback()
         
     conn.close()
 
 upgrade_db()
 
 # =========================================================
-# THE GRIM REAPER (AUTO-CLEANUP)
+# 💥 THE GRIM REAPER (NEW: STRICT AUTO-CLEANUP POLICIES) 💥
 # =========================================================
 def cleanup_database():
     conn = get_db_connection()
     c = conn.cursor()
     try:
+        # 1. BOTS: 7 Days Lifecycle
         c.execute("DELETE FROM users WHERE role = 'bot' AND created_at < NOW() - INTERVAL '7 days'")
-        c.execute("DELETE FROM users WHERE username LIKE 'Guest-%%' AND last_active < NOW() - INTERVAL '30 days'")
-        c.execute("DELETE FROM users WHERE role = 'user' AND last_active < NOW() - INTERVAL '90 days'")
+        
+        # 2. GUESTS: 3 Days Inactive Lifecycle (Strict)
+        c.execute("DELETE FROM users WHERE username LIKE 'Guest-%%' AND last_active < NOW() - INTERVAL '3 days'")
+        
+        # 3. REAL USERS: 3 Months Inactive Lifecycle
+        c.execute("DELETE FROM users WHERE role = 'user' AND username NOT LIKE 'Guest-%%' AND last_active < NOW() - INTERVAL '90 days'")
         c.execute("DELETE FROM users WHERE deletion_requested IS NOT NULL AND deletion_requested < NOW() - INTERVAL '7 days'")
         
+        # 4. BOT POSTS: 24-Hour Cycle (Keep feed fresh)
+        c.execute("DELETE FROM media WHERE uploaded_by IN (SELECT username FROM users WHERE role = 'bot') AND created_at < NOW() - INTERVAL '24 hours'")
+        
+        # 5. VANISH MODE CHATS: Global (5 Mins) & Personal DMs (24 Hours)
+        c.execute("DELETE FROM global_chat WHERE created_at < NOW() - INTERVAL '5 minutes'")
+        c.execute("DELETE FROM messages WHERE created_at < NOW() - INTERVAL '24 hours'")
+        
+        # 6. ORPHAN DATA PURGE (Save Storage)
         c.execute("DELETE FROM media WHERE uploaded_by NOT IN (SELECT username FROM users)")
         c.execute("DELETE FROM comments WHERE username NOT IN (SELECT username FROM users)")
         c.execute("DELETE FROM likes WHERE username NOT IN (SELECT username FROM users)")
         c.execute("DELETE FROM followers WHERE follower NOT IN (SELECT username FROM users) OR following NOT IN (SELECT username FROM users)")
-        c.execute("DELETE FROM messages WHERE sender NOT IN (SELECT username FROM users) OR receiver NOT IN (SELECT username FROM users)")
         c.execute("DELETE FROM blocks WHERE blocker NOT IN (SELECT username FROM users) OR blocked NOT IN (SELECT username FROM users)")
-        
-        c.execute("DELETE FROM global_chat WHERE created_at < NOW() - INTERVAL '1 hour'")
         c.execute("DELETE FROM stories WHERE created_at < NOW() - INTERVAL '12 hours'")
-        c.execute("DELETE FROM notifications WHERE id NOT IN (SELECT id FROM notifications ORDER BY id DESC LIMIT 500)")
+        
         conn.commit()
     except Exception as e: print("Cleanup Error:", e)
     finally: conn.close()
@@ -209,7 +211,7 @@ def run_bot_engine():
             "Bhai yeh app ekdum mast chal rahi hai! 🔥", "Good morning dosto! Have a great day ☀️", 
             "Hello world! Just joined this awesome gallery.", "Koi badhiya photo upload karo yaar! 😎",
             "Speed kaafi fast hai is website ki 🚀", "Mausam bohot badiya hai aaj 🌧️",
-            "Just testing out the features here. Awesome stuff!"
+            "Are yaar, kya chal raha hai aajkal? 🧐"
         ]
         
         c.execute("SELECT COUNT(id) FROM users WHERE role = 'bot'")
@@ -227,7 +229,7 @@ def run_bot_engine():
             
         action = random.randint(1, 100)
         
-        if action <= 30:
+        if action <= 35:  # Uploads
             cat = random.choice(["Photo", "Photo", "Photo", "Shayari"])
             if cat == "Photo":
                 img_url = f"https://picsum.photos/800/1000?random={random.randint(1, 100000)}"
@@ -238,23 +240,21 @@ def run_bot_engine():
             
             c.execute("INSERT INTO media (filename, title, category, uploaded_by, approved, visibility, views) VALUES (%s, %s, %s, %s, 1, 'public', %s)",
                       (img_url, caption, cat, bot_username, random.randint(5, 50)))
-        elif 30 < action <= 60:
+        elif 35 < action <= 70: # Global Chat
             c.execute("INSERT INTO global_chat (sender, message) VALUES (%s, %s)", (bot_username, random.choice(bot_chats)))
-        elif 60 < action <= 80:
+        elif 70 < action <= 85: # Follow Bots Only
             c.execute("SELECT username FROM users WHERE role = 'bot' AND username != %s ORDER BY RANDOM() LIMIT 1", (bot_username,))
             target = c.fetchone()
             if target:
-                try:
-                    c.execute("INSERT INTO followers (follower, following) VALUES (%s, %s)", (bot_username, target['username']))
+                try: c.execute("INSERT INTO followers (follower, following) VALUES (%s, %s)", (bot_username, target['username']))
                 except: pass
-        elif action > 80:
+        elif action > 85: # Like Any Media
             c.execute("SELECT id FROM media ORDER BY RANDOM() LIMIT 1")
             media = c.fetchone()
             if media:
                 try:
                     c.execute("INSERT INTO likes (media_id, username) VALUES (%s, %s) ON CONFLICT DO NOTHING", (media['id'], bot_username))
-                    if c.rowcount == 1:
-                        c.execute("UPDATE media SET likes = likes + 1 WHERE id = %s", (media['id'],))
+                    if c.rowcount == 1: c.execute("UPDATE media SET likes = likes + 1 WHERE id = %s", (media['id'],))
                 except: pass
 
         conn.commit()
@@ -273,7 +273,7 @@ def update_activity():
     if random.random() < 0.05: 
         cleanup_database()
         create_database_backup()
-    if random.random() < 0.15: run_bot_engine()
+    if random.random() < 0.20: run_bot_engine() # 20% Chance for more activity
         
     if "username" in session:
         try:
@@ -291,7 +291,7 @@ def inject_global_vars():
         encoded_name = urllib.parse.quote(str(username))
         return f"https://api.dicebear.com/7.x/avataaars/svg?seed={encoded_name}&backgroundColor=1e293b"
 
-    vars_dict = {"csrf_token": get_csrf_token, "unread_notifications": 0, "unread_messages": 0, "my_theme": "cyan", "get_avatar": get_avatar, "my_website": ""}
+    vars_dict = {"csrf_token": get_csrf_token, "unread_notifications": 0, "unread_messages": 0, "my_theme": "cyan", "get_avatar": get_avatar, "my_website": "", "my_blocked_users": []}
     if session.get("username"):
         try:
             conn = get_db_connection()
@@ -312,6 +312,9 @@ def inject_global_vars():
                 vars_dict["my_profile_pic"] = u_data["profile_pic"]
                 vars_dict["my_website"] = u_data.get("website", "")
                 vars_dict["my_is_verified"] = u_data.get("is_verified", False)
+                
+            c.execute("SELECT blocked FROM blocks WHERE blocker = %s", (session.get("username"),))
+            vars_dict["my_blocked_users"] = [r['blocked'] for r in c.fetchall()]
             conn.close()
         except: pass
     return vars_dict
@@ -397,7 +400,8 @@ def login():
                     conn.commit()
                     flash("Account deletion cancelled.", "success")
                     
-                session.update({"username": user["username"], "is_registered": True, "is_admin": (user["role"] == "admin"), "role": user["role"]})
+                is_guest = user["username"].startswith("Guest-")
+                session.update({"username": user["username"], "is_registered": not is_guest, "is_admin": (user["role"] == "admin"), "role": user["role"]})
                 conn.close()
                 return redirect(url_for("feed"))
             conn.close()
@@ -446,6 +450,41 @@ def settings():
         c.execute("UPDATE users SET password = %s WHERE username = %s", (generate_password_hash(new_pass), session["username"]))
         flash("Password Changed Successfully!", "success")
         
+    # 💥 NEW: GUEST UPGRADE TO PERMANENT ACCOUNT 💥
+    elif action == "upgrade_guest":
+        new_username = request.form.get("new_username", "").strip()
+        email = request.form.get("email", "").strip()
+        password = request.form.get("password", "")
+        old_username = session["username"]
+        
+        c.execute("SELECT id FROM users WHERE username = %s OR email = %s", (new_username, email))
+        if c.fetchone():
+            flash("Username or Email already exists!", "error")
+        else:
+            try:
+                c.execute("UPDATE users SET username = %s, email = %s, password = %s WHERE username = %s", (new_username, email, generate_password_hash(password), old_username))
+                # Cascading Username Updates for safety
+                tables_to_update = [
+                    ("media", "uploaded_by"), ("comments", "username"), ("likes", "username"),
+                    ("followers", "follower"), ("followers", "following"), ("messages", "sender"),
+                    ("messages", "receiver"), ("bookmarks", "username"), ("global_chat", "sender"),
+                    ("reports", "reported_by"), ("comment_likes", "username"), ("blocks", "blocker"),
+                    ("blocks", "blocked"), ("notifications", "username"), ("stories", "username")
+                ]
+                for table, col in tables_to_update:
+                    c.execute(f"UPDATE {table} SET {col} = %s WHERE {col} = %s", (new_username, old_username))
+                
+                session.update({"username": new_username, "is_registered": True})
+                flash("Account Upgraded Permanently! 🎉", "success")
+            except Exception as e:
+                flash("Error upgrading account.", "error")
+
+    # 💥 NEW: UNBLOCK USER FROM SETTINGS 💥
+    elif action == "unblock_user":
+        target = request.form.get("blocked_username")
+        c.execute("DELETE FROM blocks WHERE blocker = %s AND blocked = %s", (session["username"], target))
+        flash(f"User unblocked.", "success")
+        
     elif action == "delete_account":
         c.execute("UPDATE users SET deletion_requested = CURRENT_TIMESTAMP WHERE username = %s", (session["username"],))
         session.clear()
@@ -459,12 +498,11 @@ def settings():
     return redirect(request.referrer or url_for("dashboard"))
 
 # =========================================================
-# ASSET MANAGEMENT (UPLOAD, EDIT, PIN, VIEWS)
+# ASSET MANAGEMENT
 # =========================================================
 @app.route("/upload_asset", methods=["POST"])
 def upload_asset():
     if "username" not in session: return redirect(url_for("login"))
-    
     try:
         category = request.form.get("category", "Photo")
         title = request.form.get("title", "Untitled")
@@ -476,13 +514,12 @@ def upload_asset():
             if file and file.filename != "":
                 filename = save_uploaded_file(file, category)
                 if not filename:
-                    flash("Upload Failed! Format not supported or file too large.", "error")
+                    flash("Upload Failed! Format not supported.", "error")
                     return redirect(request.referrer or url_for("dashboard"))
         
         is_approved = 1 if current_user_is_admin() else 0
         conn = get_db_connection()
         c = conn.cursor()
-        
         c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved, visibility, views, is_pinned) VALUES (%s, %s, %s, %s, %s, %s, %s, 0, FALSE)",
                   (filename, title, category, "", session.get("username"), is_approved, visibility))
         
@@ -490,17 +527,13 @@ def upload_asset():
         for m in mentions:
             if m != session["username"]:
                 c.execute("SELECT id FROM users WHERE username = %s", (m,))
-                if c.fetchone():
-                    c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (m, f"📣 {session['username']} mentioned you in a post!", f"/agent/{session['username']}"))
-                    
+                if c.fetchone(): c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", (m, f"📣 {session['username']} mentioned you!", f"/agent/{session['username']}"))
         conn.commit()
         conn.close()
         flash(f"Asset published as {visibility.upper()}!" if is_approved else "Asset sent to Admin for approval.", "success")
-        
     except Exception as e:
         conn.rollback()
         flash(f"Server Alert: {str(e)[:150]}", "error")
-        
     return redirect(request.referrer or url_for("feed"))
 
 @app.route("/edit_post/<int:media_id>", methods=["POST"])
@@ -513,7 +546,7 @@ def edit_post(media_id):
         c.execute("UPDATE media SET title = %s WHERE id = %s AND uploaded_by = %s", (new_title, media_id, session["username"]))
         conn.commit()
         conn.close()
-        flash("Post updated successfully!", "success")
+        flash("Post updated!", "success")
     return redirect(request.referrer or url_for("profile"))
 
 @app.route("/pin_post/<int:media_id>", methods=["POST"])
@@ -542,7 +575,6 @@ def block_user(username):
     if "username" not in session: return jsonify({"error": "Login required"}), 401
     current_user = session["username"]
     if current_user == username: return jsonify({"error": "Cannot block yourself"}), 400
-    
     conn = get_db_connection()
     c = conn.cursor()
     c.execute("DELETE FROM followers WHERE (follower = %s AND following = %s) OR (follower = %s AND following = %s)", (current_user, username, username, current_user))
@@ -556,18 +588,8 @@ def block_user(username):
     conn.close()
     return jsonify({"success": success})
 
-@app.route("/unblock/<username>", methods=["POST"])
-def unblock_user(username):
-    if "username" not in session: return jsonify({"error": "Login required"}), 401
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("DELETE FROM blocks WHERE blocker = %s AND blocked = %s", (session["username"], username))
-    conn.commit()
-    conn.close()
-    return jsonify({"success": True})
-
 # =========================================================
-# CORE ROUTES (FEED & DASHBOARD)
+# CORE ROUTES
 # =========================================================
 @app.route("/")
 def index():
@@ -583,14 +605,11 @@ def feed():
 @app.route("/api/feed_data")
 def api_feed_data():
     if "username" not in session: return jsonify([])
-    
     tab = request.args.get("tab", "foryou")
     offset = int(request.args.get("offset", 0))
     limit = 10 
-    
     conn = get_db_connection()
     c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    
     block_filter = "m.uploaded_by NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) AND m.uploaded_by NOT IN (SELECT blocker FROM blocks WHERE blocked = %s)"
     
     if tab == "global":
@@ -605,7 +624,6 @@ def api_feed_data():
 
     post_ids = [p['id'] for p in feed_posts]
     comments = defaultdict(list)
-    
     if post_ids:
         c.execute("SELECT c.*, u.role, u.is_verified FROM comments c JOIN users u ON c.username = u.username WHERE c.media_id = ANY(%s) AND c.username NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) AND c.username NOT IN (SELECT blocker FROM blocks WHERE blocked = %s) ORDER BY c.id ASC", (post_ids, session["username"], session["username"]))
         for comment in c.fetchall(): comments[comment["media_id"]].append(dict(comment))
@@ -619,7 +637,6 @@ def api_feed_data():
         post['comments'] = comments[post['id']]
         for comm in post['comments']: comm['created_at'] = timeago(comm['created_at'])
         post['is_saved'] = post['id'] in saved_ids
-        
     return jsonify(feed_posts)
 
 @app.route("/reels")
@@ -649,7 +666,6 @@ def explore():
         if row['title']:
             tags = re.findall(r'#(\w+)', row['title'])
             for t in tags: tag_counts[t.lower()] += 1
-            
     trending_tags = [tag for tag, count in sorted(tag_counts.items(), key=lambda x: x[1], reverse=True)[:6]]
     return render_template("explore.html", posts=explore_posts, trending_tags=trending_tags)
 
@@ -723,7 +739,6 @@ def profile():
     c.execute("SELECT m.* FROM media m JOIN bookmarks b ON m.id = b.media_id WHERE b.username = %s ORDER BY b.id DESC", (session["username"],))
     saved_uploads = c.fetchall()
     conn.close()
-    
     return render_template("profile.html", user=user, my_uploads=my_uploads, saved_uploads=saved_uploads, post_count=len(my_uploads), followers_count=followers_count, following_count=following_count)
 
 # =========================================================
@@ -761,7 +776,6 @@ def agent_profile(username):
     c.execute("SELECT COUNT(*) as cnt FROM followers WHERE follower = %s", (username,))
     following_count = c.fetchone()['cnt']
     conn.close()
-    
     return render_template("agent.html", agent=agent, uploads=agent_uploads, post_count=len(agent_uploads), followers_count=followers_count, following_count=following_count, is_following=is_following)
 
 @app.route("/follow/<username>", methods=["POST"])
@@ -802,7 +816,7 @@ def api_network(action_type, username):
     return jsonify(results)
 
 # =========================================================
-# DIRECT MESSAGING & STORY DM (WITH READ RECEIPTS 👀)
+# DIRECT MESSAGING & STORY DM
 # =========================================================
 @app.route("/inbox")
 def inbox():
@@ -858,7 +872,6 @@ def api_chat_history(username):
     me = session["username"]
     conn = get_db_connection()
     c = conn.cursor()
-    # Fetch is_read to display blue ticks!
     c.execute("SELECT id, sender, message, TO_CHAR(created_at, 'HH24:MI') as time, is_read FROM messages WHERE (sender = %s AND receiver = %s) OR (sender = %s AND receiver = %s) ORDER BY created_at ASC", (me, username, username, me))
     history = c.fetchall()
     c.execute("UPDATE messages SET is_read = TRUE WHERE sender = %s AND receiver = %s AND is_read = FALSE", (username, me))
@@ -921,7 +934,7 @@ def api_global_chat_history():
     return jsonify(formatted)
 
 # =========================================================
-# LIKES, COMMENTS, SEARCH, GALLERY & AI STUDIO (💥 THE FIX 💥)
+# LIKES, COMMENTS, SEARCH, GALLERY & AI STUDIO
 # =========================================================
 @app.route("/search")
 def search():
@@ -993,7 +1006,6 @@ def bookmark(media_id):
     conn.close()
     return jsonify({"bookmarked": bookmarked})
 
-# 💥 AI ENDPOINTS RESTORED TO FIX DASHBOARD ERROR 💥
 @app.route("/api/ai", methods=["POST"])
 def ai_endpoint():
     if "username" not in session: return jsonify({"reply": "Login first."}), 401
@@ -1050,6 +1062,7 @@ def like(media_id):
         conn.commit()
         liked_now = True
     else: liked_now = False
+    
     c.execute("SELECT likes FROM media WHERE id = %s", (media_id,))
     likes = c.fetchone()["likes"]
     conn.close()
@@ -1161,8 +1174,10 @@ def admin():
     all_users = c.fetchall()
     c.execute("SELECT r.id as report_id, r.media_id, r.reported_by, r.reason, r.created_at, m.title, m.filename, m.category, m.uploaded_by FROM reports r JOIN media m ON r.media_id = m.id ORDER BY r.id DESC")
     reports = c.fetchall()
+    
     c.execute("SELECT COUNT(*) as cnt FROM users WHERE role = 'bot'")
     bot_count = c.fetchone()['cnt']
+    
     conn.close()
     return render_template("admin.html", pending_media=pending_media, user_count=user_count, media_count=media_count, likes_count=likes_count, all_users=all_users, reports=reports, bot_count=bot_count, auth_required=False)
 
