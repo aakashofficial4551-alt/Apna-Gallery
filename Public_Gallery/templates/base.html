@@ -16,7 +16,15 @@
         }
         body { margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--bg-main); color: var(--text-main); min-height: 100vh; display: flex; flex-direction: column; }
         
-        /* DESKTOP TOP NAVBAR */
+        /* APP SPLASH SCREEN */
+        #splash-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--bg-main); z-index: 999999;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            transition: opacity 0.5s ease-out;
+        }
+        #splash-screen.hidden { opacity: 0; pointer-events: none; }
+        
         .navbar { background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(10px); padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); position: sticky; top: 0; z-index: 1000; }
         .logo { font-size: 1.5rem; font-weight: 900; color: white; text-decoration: none; letter-spacing: 1px; }
         .logo span { color: var(--accent); transition: color 0.3s; }
@@ -25,7 +33,6 @@
         .nav-links a:hover { color: var(--accent); }
         .search-form input { padding: 8px 15px; border-radius: 20px; border: 1px solid var(--border-color); background: rgba(8, 17, 31, 0.8); color: white; outline: none; width: 180px; }
         
-        /* 💥 MOBILE BOTTOM NAVBAR 💥 */
         .mobile-bottom-nav { display: none; position: fixed; bottom: 0; left: 0; width: 100%; background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(10px); border-top: 1px solid var(--border-color); padding: 10px 0; z-index: 9999; justify-content: space-around; align-items: center; padding-bottom: env(safe-area-inset-bottom, 10px); }
         .mobile-bottom-nav a { color: var(--text-muted); text-decoration: none; font-size: 1.5rem; display: flex; flex-direction: column; align-items: center; gap: 3px; }
         .mobile-bottom-nav a.active { color: var(--accent); }
@@ -33,21 +40,25 @@
 
         .btn { background: var(--accent); color: #000; border: none; padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.3s; text-decoration: none; display: inline-block; }
         
-        /* If Dedicated Page (hide_navbar=True), remove paddings */
         .container { flex: 1; width: 100%; box-sizing: border-box; {% if not hide_navbar %} max-width: 1200px; margin: 0 auto; padding: 20px; padding-bottom: 80px; {% endif %} }
         .notif-badge { position: absolute; top: -5px; right: -10px; background: var(--danger); color: white; border-radius: 50%; padding: 2px 6px; font-size: 0.7rem; font-weight: bold; }
 
         @media (max-width: 768px) {
-            .navbar .nav-links { display: none; } /* Hide top links on mobile */
-            .mobile-bottom-nav { display: flex; } /* Show bottom bar */
+            .navbar .nav-links { display: none; }
+            .mobile-bottom-nav { display: flex; }
         }
     </style>
     {% block head %}{% endblock %}
 </head>
 <body>
 
+    <!-- APP SPLASH SCREEN -->
+    <div id="splash-screen">
+        <h1 style="font-size: 3rem; color: white; margin: 0; letter-spacing: 2px;">APNA <span style="color: var(--accent);">GALLERY</span></h1>
+        <p style="color: var(--text-muted); margin-top: 10px;">Connecting You...</p>
+    </div>
+
     {% if not hide_navbar %}
-    <!-- DESKTOP TOP NAV -->
     <nav class="navbar">
         <a href="{{ url_for('feed') }}" class="logo">APNA <span>GALLERY</span></a>
         <div class="nav-links">
@@ -70,7 +81,6 @@
         </div>
     </nav>
 
-    <!-- MOBILE BOTTOM NAV -->
     {% if session.get('username') %}
     <div class="mobile-bottom-nav">
         <a href="{{ url_for('feed') }}" class="{% if request.endpoint == 'feed' %}active{% endif %}">🏠</a>
@@ -80,13 +90,11 @@
         <a href="{{ url_for('profile') }}" class="{% if request.endpoint == 'profile' %}active{% endif %}">👤</a>
     </div>
     
-    <!-- DESKTOP UPLOAD FLOATING BUTTON (Hidden on mobile via CSS usually, but let's keep it clean) -->
     <button class="desktop-upload-btn" onclick="document.getElementById('uploadModal').style.display='flex'" style="position: fixed; bottom: 30px; right: 30px; width: 65px; height: 65px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), #0ea5e9); color: #000; border: none; font-size: 2.5rem; box-shadow: 0 5px 15px rgba(56, 189, 248, 0.4); cursor: pointer; z-index: 9000; display: grid; place-items: center;">+</button>
     <style>@media (max-width: 768px) { .desktop-upload-btn { display: none !important; } }</style>
     {% endif %}
     {% endif %}
 
-    <!-- ALERTS -->
     {% if not hide_navbar %}
     <div style="padding: 10px 20px; max-width: 1200px; margin: 0 auto;">
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -104,7 +112,7 @@
     </div>
 
     {% if session.get('username') %}
-    <!-- UPLOAD MODAL (Accessible from Bottom Nav and Desktop Nav) -->
+    <!-- UPLOAD MODAL -->
     <div id="uploadModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
         <div style="background: var(--bg-card); padding: 30px; border-radius: 20px; border: 1px solid var(--border-color); width: 90%; max-width: 450px; position: relative;">
             <span onclick="document.getElementById('uploadModal').style.display='none'" style="position: absolute; top: 15px; right: 20px; font-size: 2rem; color: white; cursor: pointer;">&times;</span>
@@ -132,11 +140,11 @@
         </div>
     </div>
 
+    <!-- SETTINGS MODAL -->
     <div id="settingsModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
-        <!-- Settings Content from previous step remains exactly here -->
         <div style="background: var(--bg-card); padding: 30px; border-radius: 20px; border: 1px solid var(--border-color); width: 90%; max-width: 450px; position: relative; box-shadow: 0 10px 40px rgba(0,0,0,0.5); max-height: 85vh; overflow-y: auto;">
             <span onclick="document.getElementById('settingsModal').style.display='none'" style="position: absolute; top: 15px; right: 20px; font-size: 2rem; color: white; cursor: pointer;">&times;</span>
-            <h2 style="color: var(--accent); margin-top: 0;">⚙️ Settings Hub</h2>
+            <h2 style="color: var(--accent); margin-top: 0; margin-bottom: 25px;">⚙️ Settings Hub</h2>
             <form method="POST" action="/settings" style="display: flex; flex-direction: column; gap: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 20px;">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="action" value="update_profile">
@@ -149,6 +157,22 @@
     {% endif %}
 
     <script>
+        // HIDE SPLASH SCREEN AFTER 1 SECOND
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                const splash = document.getElementById('splash-screen');
+                if(splash) splash.classList.add('hidden');
+            }, 600); // 0.6 seconds looks snappier!
+        });
+
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register("{{ url_for('static', filename='js/service-worker.js') }}")
+                    .then((registration) => { console.log('ServiceWorker success'); })
+                    .catch((err) => { console.log('ServiceWorker failed', err); });
+            });
+        }
+        
         async function generateAICaption() {
             const cat = document.getElementById('vaultCategory').value;
             const input = document.getElementById('uploadCaption');
@@ -157,7 +181,7 @@
                 const res = await fetch('/api/ai', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json', 'X-CSRF-Token': '{{ csrf_token() }}'},
-                    body: JSON.stringify({query: `Write a short, cool 1-sentence social media caption for a ${cat} post.`})
+                    body: JSON.stringify({query: `Write a short social media caption for a ${cat} post.`})
                 });
                 const data = await res.json();
                 input.value = data.reply;
