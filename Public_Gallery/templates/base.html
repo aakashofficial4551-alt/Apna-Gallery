@@ -61,7 +61,6 @@
         
         <div class="nav-links">
             {% if session.get('username') %}
-                <!-- 💥 NEW: PWA INSTALL BUTTON 💥 -->
                 <button id="installAppBtn" class="btn" style="display: none; background: linear-gradient(135deg, var(--accent), var(--success)); color: #000; margin-right: 10px; padding: 6px 15px; font-size: 0.9rem;">📱 Install App</button>
 
                 <form action="{{ url_for('search') }}" method="GET" class="search-form">
@@ -82,7 +81,6 @@
                 </a>
                 
                 <a href="{{ url_for('dashboard') }}">HQ</a>
-                
                 <a href="{{ url_for('profile') }}" style="color: var(--accent);">
                     <img src="{{ get_avatar(my_profile_pic, session.username) }}" style="width: 25px; height: 25px; border-radius: 50%; vertical-align: middle; border: 1px solid var(--accent); margin-right: 5px;"> Profile
                 </a>
@@ -118,7 +116,7 @@
         +
     </button>
 
-    <!-- UPLOAD MODAL -->
+    <!-- UPLOAD MODAL WITH AI CAPTION GENERATOR -->
     <div id="uploadModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
         <div style="background: var(--bg-card); padding: 30px; border-radius: 20px; border: 1px solid var(--border-color); width: 90%; max-width: 450px; position: relative; box-shadow: 0 10px 40px rgba(0,0,0,0.5);">
             <span onclick="document.getElementById('uploadModal').style.display='none'" style="position: absolute; top: 15px; right: 20px; font-size: 2rem; color: white; cursor: pointer;">&times;</span>
@@ -163,17 +161,28 @@
             <span onclick="document.getElementById('settingsModal').style.display='none'" style="position: absolute; top: 15px; right: 20px; font-size: 2rem; color: white; cursor: pointer;">&times;</span>
             <h2 style="color: var(--accent); margin-top: 0; margin-bottom: 25px;">⚙️ Settings Hub</h2>
             
+            {% if not session.is_registered %}
+            <!-- 💥 IDENTITY CONVERTER (GUEST -> REAL) 💥 -->
+            <form method="POST" action="/settings" style="display: flex; flex-direction: column; gap: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 20px; background: rgba(251, 191, 36, 0.1); padding: 15px; border-radius: 12px; border: 1px solid var(--warning);">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="action" value="upgrade_guest">
+                <h3 style="margin: 0; font-size: 1.1rem; color: var(--warning);">⭐ Save Your Account</h3>
+                <p style="margin: 0; font-size: 0.85rem; color: var(--text-muted);">Guest accounts are deleted after 3 days of inactivity. Create a permanent username!</p>
+                <input type="text" name="new_username" placeholder="Choose new Username" required style="padding: 12px; border-radius: 8px; background: rgba(8,17,31,0.8); color: white; border: 1px solid var(--border-color); outline: none;">
+                <input type="email" name="email" placeholder="Enter Email" required style="padding: 12px; border-radius: 8px; background: rgba(8,17,31,0.8); color: white; border: 1px solid var(--border-color); outline: none;">
+                <input type="password" name="password" placeholder="Create Password" required style="padding: 12px; border-radius: 8px; background: rgba(8,17,31,0.8); color: white; border: 1px solid var(--border-color); outline: none;">
+                <button type="submit" class="btn" style="width: 100%; background: var(--warning); color: #000;">Upgrade to Permanent Account</button>
+            </form>
+            {% else %}
+            <!-- NORMAL SETTINGS FOR REGISTERED USERS -->
             <form method="POST" action="/settings" style="display: flex; flex-direction: column; gap: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 20px;">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="action" value="update_profile">
                 <h3 style="margin: 0; font-size: 1.1rem; color: var(--text-main);">Profile Settings</h3>
-                
                 <label style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: -10px;">Bio</label>
                 <input type="text" name="bio" value="{{ my_bio }}" placeholder="Write something about yourself..." style="padding: 12px; border-radius: 8px; background: rgba(8,17,31,0.8); color: white; border: 1px solid var(--border-color); outline: none;">
-                
                 <label style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: -10px;">Website / Portfolio Link</label>
                 <input type="url" name="website" value="{{ my_website }}" placeholder="https://your-link.com" style="padding: 12px; border-radius: 8px; background: rgba(8,17,31,0.8); color: white; border: 1px solid var(--border-color); outline: none;">
-                
                 <label style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: -10px;">Theme</label>
                 <select name="theme" style="padding: 12px; border-radius: 8px; background: rgba(8,17,31,0.8); color: white; border: 1px solid var(--border-color); outline: none;">
                     <option value="cyan" {% if my_theme == 'cyan' %}selected{% endif %}>Cyan (Default)</option>
@@ -191,6 +200,27 @@
                 <input type="password" name="new_password" placeholder="Enter new password" required style="padding: 12px; border-radius: 8px; background: rgba(8,17,31,0.8); color: white; border: 1px solid var(--border-color); outline: none;">
                 <button type="submit" class="btn" style="width: 100%; background: #334155; color: white;">Change Password</button>
             </form>
+            {% endif %}
+
+            <!-- 💥 NEW: BLOCKED USERS MANAGEMENT 💥 -->
+            {% if my_blocked_users %}
+            <div style="margin-top: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 20px;">
+                <h3 style="margin: 0 0 10px 0; font-size: 1.1rem; color: var(--danger);">🚫 Blocked Users</h3>
+                <div style="display: flex; flex-direction: column; gap: 10px; max-height: 100px; overflow-y: auto;">
+                    {% for blocked_user in my_blocked_users %}
+                    <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(8,17,31,0.5); padding: 8px 12px; border-radius: 8px;">
+                        <span style="color: white; font-weight: bold;">{{ blocked_user }}</span>
+                        <form method="POST" action="/settings" style="margin: 0;">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="action" value="unblock_user">
+                            <input type="hidden" name="blocked_username" value="{{ blocked_user }}">
+                            <button type="submit" class="btn" style="padding: 4px 10px; font-size: 0.8rem; background: var(--success); color: white;">Unblock</button>
+                        </form>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
 
             <form method="POST" action="/settings" onsubmit="return confirm('Account will be deleted in 7 days. Proceed?');" style="margin-top: 20px;">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -204,7 +234,6 @@
     {% endif %}
 
     <script>
-        // 💥 NEW: PWA APP INSTALLATION LOGIC 💥
         let deferredPrompt;
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
@@ -248,7 +277,7 @@
                 const data = await res.json();
                 input.value = data.reply;
             } catch(e) {
-                input.value = "Error generating caption.";
+                input.value = "Epic moment! 🔥 #vibes #nature"; // Fallback directly into UI
             }
         }
     </script>
