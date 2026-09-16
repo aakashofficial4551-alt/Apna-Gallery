@@ -4,6 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Apna Gallery{% endblock %}</title>
+    
+    <!-- 💥 PHASE 71: VIRAL SEO TAGS FOR WHATSAPP/TELEGRAM 💥 -->
+    <meta name="description" content="Join Apna Gallery - The Ultimate AI-Powered Creator Economy and Social Network.">
+    <meta property="og:title" content="Apna Gallery - The Creator Network">
+    <meta property="og:description" content="Earn coins, tip creators, and enjoy the ultimate AI-powered social media experience. Join me now!">
+    <meta property="og:image" content="https://res.cloudinary.com/demo/image/upload/v1312461204/sample.jpg">
+    <meta name="twitter:card" content="summary_large_image">
+
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
     <meta name="theme-color" content="#0f172a">
     <style>
@@ -72,7 +80,6 @@
             </div>
 
             <div class="desktop-icons">
-                <!-- 💥 NEW: USER WALLET BALANCE 💥 -->
                 <div style="background: rgba(251, 191, 36, 0.2); color: var(--warning); padding: 5px 10px; border-radius: 20px; font-size: 0.9rem; font-weight: bold; display: flex; align-items: center; gap: 5px; border: 1px solid var(--warning);" title="Your Wallet Balance">
                     🪙 {{ my_wallet }}
                 </div>
@@ -167,6 +174,7 @@
             <form method="POST" action="/settings" style="display: flex; flex-direction: column; gap: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 20px;">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="action" value="update_profile">
+                <h3 style="margin: 0; font-size: 1.1rem; color: var(--text-main);">Profile Settings</h3>
                 <input type="text" name="bio" value="{{ my_bio }}" placeholder="Bio..." style="padding: 12px; border-radius: 8px; background: rgba(8,17,31,0.8); color: white; outline: none;">
                 <input type="url" name="website" value="{{ my_website }}" placeholder="https://your-link.com" style="padding: 12px; border-radius: 8px; background: rgba(8,17,31,0.8); color: white; outline: none;">
                 <select name="theme" style="padding: 12px; border-radius: 8px; background: rgba(8,17,31,0.8); color: white; outline: none;">
@@ -181,9 +189,21 @@
             <form method="POST" action="/settings" style="display: flex; flex-direction: column; gap: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 20px; margin-top: 20px;">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="action" value="change_password">
+                <h3 style="margin: 0; font-size: 1.1rem; color: var(--text-main);">Security</h3>
                 <input type="password" name="new_password" placeholder="Enter new password" required style="padding: 12px; border-radius: 8px; background: rgba(8,17,31,0.8); color: white; border: 1px solid var(--border-color); outline: none;">
                 <button type="submit" class="btn" style="width: 100%; background: #334155; color: white;">Change Password</button>
             </form>
+
+            <!-- 💥 NEW: PHASE 70 VERIFICATION STORE 💥 -->
+            {% if not my_is_verified %}
+            <form method="POST" action="/buy_verification" style="margin-top: 15px; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 20px;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <h3 style="margin: 0 0 10px 0; font-size: 1.1rem; color: #38bdf8;">✅ Get Verified</h3>
+                <p style="margin: 0 0 10px 0; font-size: 0.85rem; color: var(--text-muted);">Stand out from the crowd. Costs 1000 🪙.</p>
+                <button type="submit" class="btn" style="width: 100%; background: rgba(56, 189, 248, 0.2); border: 1px solid #38bdf8; color: #38bdf8;">Buy Blue Tick</button>
+            </form>
+            {% endif %}
+
             {% endif %}
 
             {% if my_blocked_users %}
