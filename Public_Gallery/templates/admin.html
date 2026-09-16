@@ -40,7 +40,6 @@
             <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 20px; margin-bottom: 30px; flex-wrap: wrap; gap: 15px;">
                 <h1 style="color: var(--warning); margin: 0;">⚡ Commander HQ Dashboard</h1>
                 
-                <!-- NEW: THE PHANTOM ENGINE TRIGGER -->
                 <div style="display: flex; gap: 10px; align-items: center;">
                     <span style="color: var(--text-muted); font-size: 0.9rem;">Active Bots: {{ bot_count }}</span>
                     <form method="POST" action="{{ url_for('trigger_bots') }}">
@@ -64,6 +63,17 @@
                     <h3 style="margin: 0; color: var(--text-muted); font-size: 1rem;">Total Engagement</h3>
                     <p style="margin: 10px 0 0 0; font-size: 2rem; font-weight: 900; color: var(--danger);">❤️ {{ likes_count }}</p>
                 </div>
+            </div>
+
+            <!-- 💥 PHASE 73: SYSTEM BROADCAST 💥 -->
+            <div style="background: rgba(14, 165, 233, 0.1); border: 1px solid #0ea5e9; padding: 20px; border-radius: 12px; margin-bottom: 40px;">
+                <h3 style="color: #0ea5e9; margin: 0 0 10px 0;">📣 Megaphone Broadcast</h3>
+                <p style="color: var(--text-muted); margin: 0 0 15px 0; font-size: 0.9rem;">Send an instant push-notification to all real users on the platform.</p>
+                <form method="POST" action="{{ url_for('admin_broadcast') }}" style="display: flex; gap: 10px; align-items: center;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="text" name="broadcast_message" placeholder="Type system message here..." required style="flex: 1; padding: 12px; border-radius: 8px; background: rgba(8,17,31,0.8); color: white; border: 1px solid var(--border-color); outline: none;">
+                    <button type="submit" class="btn" style="background: #0ea5e9; color: white;">Broadcast</button>
+                </form>
             </div>
 
             <!-- REPORTED ASSETS -->
@@ -135,7 +145,6 @@
                 <table class="users-table">
                     <thead>
                         <tr>
-                            <th>Agent ID</th>
                             <th>Username</th>
                             <th>Role</th>
                             <th>Status</th>
@@ -145,7 +154,6 @@
                     <tbody>
                         {% for u in all_users %}
                         <tr>
-                            <td style="color: var(--text-muted);">#{{ u.id }}</td>
                             <td style="font-weight: bold; color: white;">
                                 {{ u.username or 'Unknown' }}
                                 {% if u.is_verified %}<span style="color: #38bdf8;" title="Verified">✅</span>{% endif %}
@@ -159,15 +167,15 @@
                                 {% endif %}
                             </td>
                             <td>
-                                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
                                     {% if (u.status or 'ACTIVE') == 'ACTIVE' and (u.role or 'user') != 'admin' %}
                                     <form method="POST" action="{{ url_for('admin_user_action', user_id=u.id, action='ban') }}" onsubmit="return confirm('Ban this user?');">
                                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                        <button type="submit" class="btn" style="background: transparent; border: 1px solid var(--danger); color: var(--danger); padding: 4px 10px; font-size: 0.8rem;">Ban</button>
+                                        <button type="submit" class="btn" style="background: transparent; border: 1px solid var(--warning); color: var(--warning); padding: 4px 10px; font-size: 0.8rem;">Ban</button>
                                     </form>
-                                    <form method="POST" action="{{ url_for('admin_user_action', user_id=u.id, action='make_admin') }}" onsubmit="return confirm('Make Admin? This gives them full control!');">
+                                    <form method="POST" action="{{ url_for('admin_user_action', user_id=u.id, action='make_admin') }}" onsubmit="return confirm('Make Admin? This gives them God Mode!');">
                                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                        <button type="submit" class="btn" style="background: transparent; border: 1px solid var(--warning); color: var(--warning); padding: 4px 10px; font-size: 0.8rem;">Make Admin</button>
+                                        <button type="submit" class="btn" style="background: transparent; border: 1px solid var(--accent); color: var(--accent); padding: 4px 10px; font-size: 0.8rem;">Make Admin</button>
                                     </form>
                                     {% elif (u.status or 'ACTIVE') == 'BANNED' %}
                                     <form method="POST" action="{{ url_for('admin_user_action', user_id=u.id, action='unban') }}">
@@ -185,6 +193,14 @@
                                     <form method="POST" action="{{ url_for('admin_user_action', user_id=u.id, action='unverify') }}">
                                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                         <button type="submit" class="btn" style="background: transparent; border: 1px solid var(--text-muted); color: var(--text-muted); padding: 4px 10px; font-size: 0.8rem;">Unverify</button>
+                                    </form>
+                                    {% endif %}
+                                    
+                                    <!-- 💥 THE DELETE BUTTON 💥 -->
+                                    {% if u.role != 'admin' %}
+                                    <form method="POST" action="{{ url_for('admin_user_action', user_id=u.id, action='delete_user') }}" onsubmit="return confirm('WARNING: This will permanently delete the user and ALL their data! Proceed?');">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn" style="background: rgba(239, 68, 68, 0.5); border: 1px solid var(--danger); color: white; padding: 4px 10px; font-size: 0.8rem;">Delete 🗑️</button>
                                     </form>
                                     {% endif %}
                                 </div>
