@@ -18,126 +18,20 @@
         </a>
     </div>
 
-    <div style="display: flex; flex-direction: column; gap: 40px;">
-        {% for post in posts %}
-        <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
-            
-            <div style="padding: 15px 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05);">
-                <a href="{{ url_for('agent_profile', username=post.uploaded_by) }}" style="display: flex; align-items: center; gap: 12px; text-decoration: none; color: inherit;">
-                    
-                    <!-- DYNAMIC AVATAR -->
-                    <img src="{{ get_avatar(post.profile_pic, post.uploaded_by) }}" style="width: 45px; height: 45px; border-radius: 50%; object-fit: cover; border: 2px solid var(--accent);">
-                    
-                    <div>
-                        <h3 style="margin: 0; display: flex; align-items: center; gap: 5px; font-size: 1.1rem;">
-                            {{ post.uploaded_by }}
-                            {% if post.role == 'admin' %}<span style="color: #38bdf8; font-size: 1.1rem;" title="Verified Admin">☑️</span>{% endif %}
-                        </h3>
-                        <span style="font-size: 0.8rem; color: var(--text-muted);">{{ post.created_at | timeago }}</span>
-                    </div>
-                </a>
-                
-                <div style="display: flex; gap: 10px; align-items: center;">
-                    {% if post.category == 'Photo' %}
-                    <span onclick="openLightbox('{{ post.filename }}', {{ post.id }})" style="background: rgba(255,255,255,0.1); padding: 5px 10px; border-radius: 6px; font-size: 1rem; color: white; cursor: pointer; transition: 0.2s;" title="View Fullscreen" onmouseover="this.style.background='var(--accent)'; this.style.color='#000';" onmouseout="this.style.background='rgba(255,255,255,0.1)'; this.style.color='white';">🔍</span>
-                    {% endif %}
-
-                    <a href="{{ post.filename }}" download target="_blank" style="background: rgba(255,255,255,0.1); padding: 5px 10px; border-radius: 6px; font-size: 1rem; color: white; text-decoration: none;" title="Download File">⬇️</a>
-                </div>
-            </div>
-
-            <div style="width: 100%; max-height: 500px; background: #000; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; cursor: pointer;" onclick="handleDoubleTap({{ post.id }}, this)">
-                <span class="heart-pop">❤️</span>
-                
-                {% if post.category == 'Photo' %}
-                    <img src="{{ post.filename }}" style="width: 100%; max-height: 500px; object-fit: contain;">
-                {% elif post.category == 'Video' %}
-                    <video src="{{ post.filename }}" controls style="width: 100%; max-height: 500px;"></video>
-                {% elif post.category == 'Music' %}
-                    <div style="width: 100%; padding: 60px 20px; text-align: center; background: linear-gradient(135deg, rgba(8,17,31,1), rgba(15,23,42,1)); box-sizing: border-box;">
-                        <span style="font-size: 5rem; display: block; margin-bottom: 25px; filter: drop-shadow(0 0 10px var(--accent));">🎵</span>
-                        <audio src="{{ post.filename }}" controls style="width: 100%; outline: none; border-radius: 30px;"></audio>
-                    </div>
-                {% else %}
-                    <a href="{{ post.filename }}" target="_blank" style="color: var(--accent); padding: 50px; text-decoration: none; font-size: 2rem;">📁 View Document</a>
-                {% endif %}
-            </div>
-
-            <div style="padding: 20px;">
-                <h3 style="margin: 0 0 15px 0; font-size: 1.2rem; line-height: 1.4;">{{ post.title | format_text | safe }}</h3>
-                
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
-                    <div style="display: flex; gap: 10px; align-items: center;">
-                        <button class="btn" id="like-btn-{{ post.id }}" onclick="toggleLike({{ post.id }})" style="background: transparent; border: 1px solid var(--danger); color: var(--danger); padding: 8px 15px;">
-                            ❤️ <span id="like-count-{{ post.id }}">{{ post.likes }}</span>
-                        </button>
-                        
-                        <span style="background: rgba(8,17,31,0.6); border: 1px solid var(--border-color); color: var(--text-main); padding: 8px 15px; border-radius: 8px; font-weight: bold;">
-                            👁️ <span id="view-count-{{ post.id }}">{{ post.views }}</span>
-                        </span>
-                        
-                        <button class="btn" onclick="sharePost('{{ post.title | escape }}', '{{ url_for('agent_profile', username=post.uploaded_by, _external=True) }}')" style="background: transparent; border: 1px solid var(--accent); color: var(--accent); padding: 8px 15px;">
-                            📤
-                        </button>
-                        
-                        {% if post.uploaded_by != session.username %}
-                        <button class="btn" onclick="reportAsset({{ post.id }})" style="background: transparent; border: none; color: var(--text-muted); font-size: 1.2rem; cursor: pointer; padding: 0 5px;" title="Report this post">
-                            🚩
-                        </button>
-                        {% endif %}
-                    </div>
-
-                    <button class="btn" id="bookmark-btn-{{ post.id }}" onclick="toggleBookmark({{ post.id }})" style="background: transparent; border: 1px solid var(--warning); color: var(--warning); padding: 8px 15px; font-size: 1.1rem;">
-                        {% if post.id in saved_ids %}📌 Saved{% else %}📍 Save{% endif %}
-                    </button>
-                </div>
-
-                <div style="background: rgba(8, 17, 31, 0.4); border-radius: 8px; padding: 15px;">
-                    <div style="max-height: 150px; overflow-y: auto; margin-bottom: 10px; font-size: 0.9rem; padding-right: 5px;">
-                        {% if comments and comments[post.id] %}
-                            {% for c in comments[post.id] %}
-                                <div style="margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
-                                    <strong style="color: var(--accent);">
-                                        {{ c.username }}
-                                        {% if c.role == 'admin' %} <span style="font-size: 0.9rem;">☑️</span> {% endif %}
-                                    </strong>: <span style="color: var(--text-main);">{{ c.comment_text | format_text | safe }}</span>
-                                    
-                                    <div style="margin-top: 5px; display: flex; justify-content: space-between; align-items: center;">
-                                        <div style="display: flex; gap: 15px;">
-                                            <span style="font-size: 0.8rem; color: var(--text-muted); cursor: pointer; transition: 0.2s;" onclick="likeComment({{ c.id }})" onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--text-muted)'">
-                                                ❤️ <span id="clike-count-{{ c.id }}">{{ c.likes or 0 }}</span>
-                                            </span>
-                                            <span style="font-size: 0.8rem; color: var(--text-muted); cursor: pointer; transition: 0.2s;" onclick="replyTo('{{ c.username }}', {{ post.id }})" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text-muted)'">
-                                                ↩️ Reply
-                                            </span>
-                                        </div>
-                                        <span style="font-size: 0.75rem; color: var(--text-muted);">{{ c.created_at | timeago }}</span>
-                                    </div>
-                                </div>
-                            {% endfor %}
-                        {% else %}
-                            <div style="color: var(--text-muted); font-style: italic;">Be the first to comment. Try tagging a friend using @username!</div>
-                        {% endif %}
-                    </div>
-                    <form method="POST" action="{{ url_for('add_comment', media_id=post.id) }}" style="display: flex; gap: 10px;">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <input type="text" name="comment_text" id="comment-input-{{ post.id }}" placeholder="Add a comment... use @ to tag." required style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(8, 17, 31, 0.8); color: white; outline: none;">
-                        <button type="submit" class="btn">Post</button>
-                    </form>
-                </div>
-            </div>
-
-        </div>
-        {% else %}
-        <div style="text-align: center; padding: 50px; background: var(--bg-card); border-radius: 16px; border: 1px solid var(--border-color);">
-            <span style="font-size: 4rem;">🕵️‍♂️</span>
-            <h2 style="color: var(--text-muted); margin-top: 15px;">It's quiet here.</h2>
-            <p style="color: var(--text-muted);">
-                {% if current_tab == 'foryou' %} You aren't following anyone who has posted recently. Try checking the <strong>Global</strong> tab! 
-                {% else %} Wait for agents to upload to see their posts here! {% endif %}
-            </p>
-        </div>
-        {% endfor %}
+    <!-- INFINITE SCROLL CONTAINER -->
+    <div id="feed-container" style="display: flex; flex-direction: column; gap: 40px;">
+        <!-- JS will inject posts here -->
+    </div>
+    
+    <div id="loading-spinner" style="text-align: center; padding: 30px; display: none;">
+        <span style="font-size: 2rem; display: inline-block; animation: spin 1s infinite linear;">🔄</span>
+        <p style="color: var(--text-muted); margin-top: 10px;">Loading more posts...</p>
+    </div>
+    
+    <div id="end-message" style="text-align: center; padding: 40px; display: none; background: var(--bg-card); border-radius: 16px; border: 1px solid var(--border-color); margin-top: 20px;">
+        <span style="font-size: 4rem;">🕵️‍♂️</span>
+        <h2 style="color: var(--text-muted); margin-top: 15px;">You've seen it all!</h2>
+        <p style="color: var(--text-muted);">You've caught up with the entire feed.</p>
     </div>
 </div>
 
@@ -146,45 +40,201 @@
     <img id="lightboxImgSrc" src="" style="max-width: 95%; max-height: 90vh; border-radius: 10px; box-shadow: 0 0 40px rgba(56, 189, 248, 0.3);">
 </div>
 
+<style>
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+</style>
+
 <script>
+let offset = 0;
+let loading = false;
+let hasMore = true;
+const currentTab = '{{ current_tab }}';
+const csrfToken = '{{ csrf_token() }}';
+const currentUser = '{{ session.username }}';
+
+// RENDER A SINGLE POST
+function createPostHTML(post) {
+    const verifiedBadge = post.is_verified ? '<span style="color: #38bdf8; font-size: 1.1rem;" title="Verified">✅</span>' : '';
+    const adminBadge = post.role === 'admin' ? '<span style="color: #38bdf8; font-size: 1.1rem;" title="Verified Admin">☑️</span>' : '';
+    
+    // Avatar Logic
+    let avatarUrl = post.profile_pic;
+    if (!avatarUrl || avatarUrl.trim() === '') {
+        avatarUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(post.uploaded_by)}&backgroundColor=1e293b`;
+    }
+
+    // Media Logic
+    let mediaHtml = '';
+    if(post.category === 'Photo') {
+        mediaHtml = `<img src="${post.filename}" style="width: 100%; max-height: 500px; object-fit: contain;">`;
+    } else if(post.category === 'Video') {
+        mediaHtml = `<video src="${post.filename}" controls style="width: 100%; max-height: 500px;"></video>`;
+    } else if(post.category === 'Music') {
+        mediaHtml = `<div style="width: 100%; padding: 60px 20px; text-align: center; background: linear-gradient(135deg, rgba(8,17,31,1), rgba(15,23,42,1)); box-sizing: border-box;"><span style="font-size: 5rem; display: block; margin-bottom: 25px; filter: drop-shadow(0 0 10px var(--accent));">🎵</span><audio src="${post.filename}" controls style="width: 100%; outline: none; border-radius: 30px;"></audio></div>`;
+    } else {
+        mediaHtml = `<a href="${post.filename}" target="_blank" style="color: var(--accent); padding: 50px; text-decoration: none; font-size: 2rem; text-align:center; display:block;">📁 View Document</a>`;
+    }
+
+    // Comments Logic
+    let commentsHtml = '';
+    if (post.comments && post.comments.length > 0) {
+        post.comments.forEach(c => {
+            const cAdminBadge = c.role === 'admin' ? '<span style="font-size: 0.9rem;">☑️</span>' : '';
+            commentsHtml += `
+            <div style="margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
+                <strong style="color: var(--accent);">${c.username} ${cAdminBadge}</strong>: <span style="color: var(--text-main);">${c.comment_text}</span>
+                <div style="margin-top: 5px; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; gap: 15px;">
+                        <span style="font-size: 0.8rem; color: var(--text-muted); cursor: pointer; transition: 0.2s;" onclick="likeComment(${c.id})" onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--text-muted)'">
+                            ❤️ <span id="clike-count-${c.id}">${c.likes || 0}</span>
+                        </span>
+                        <span style="font-size: 0.8rem; color: var(--text-muted); cursor: pointer; transition: 0.2s;" onclick="replyTo('${c.username}', ${post.id})" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text-muted)'">
+                            ↩️ Reply
+                        </span>
+                    </div>
+                    <span style="font-size: 0.75rem; color: var(--text-muted);">${c.created_at}</span>
+                </div>
+            </div>`;
+        });
+    } else {
+        commentsHtml = `<div style="color: var(--text-muted); font-style: italic;">Be the first to comment. Try tagging a friend using @username!</div>`;
+    }
+
+    let reportBtn = post.uploaded_by !== currentUser ? `<button class="btn" onclick="reportAsset(${post.id})" style="background: transparent; border: none; color: var(--text-muted); font-size: 1.2rem; cursor: pointer; padding: 0 5px;" title="Report this post">🚩</button>` : '';
+
+    return `
+    <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.3); animation: slideDown 0.5s ease-out;">
+        <div style="padding: 15px 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05);">
+            <a href="/agent/${post.uploaded_by}" style="display: flex; align-items: center; gap: 12px; text-decoration: none; color: inherit;">
+                <img src="${avatarUrl}" style="width: 45px; height: 45px; border-radius: 50%; object-fit: cover; border: 2px solid var(--accent);">
+                <div>
+                    <h3 style="margin: 0; display: flex; align-items: center; gap: 5px; font-size: 1.1rem;">
+                        ${post.uploaded_by} ${verifiedBadge} ${adminBadge}
+                    </h3>
+                    <span style="font-size: 0.8rem; color: var(--text-muted);">${post.created_at}</span>
+                </div>
+            </a>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                ${post.category === 'Photo' ? `<span onclick="openLightbox('${post.filename}', ${post.id})" style="background: rgba(255,255,255,0.1); padding: 5px 10px; border-radius: 6px; font-size: 1rem; color: white; cursor: pointer; transition: 0.2s;" title="View Fullscreen" onmouseover="this.style.background='var(--accent)'; this.style.color='#000';" onmouseout="this.style.background='rgba(255,255,255,0.1)'; this.style.color='white';">🔍</span>` : ''}
+                <a href="${post.filename}" download target="_blank" style="background: rgba(255,255,255,0.1); padding: 5px 10px; border-radius: 6px; font-size: 1rem; color: white; text-decoration: none;" title="Download File">⬇️</a>
+            </div>
+        </div>
+
+        <div style="width: 100%; max-height: 500px; background: #000; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; cursor: pointer;" onclick="handleDoubleTap(${post.id}, this)">
+            <span class="heart-pop">❤️</span>
+            ${mediaHtml}
+        </div>
+
+        <div style="padding: 20px;">
+            <h3 style="margin: 0 0 15px 0; font-size: 1.2rem; line-height: 1.4;">${post.title}</h3>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <button class="btn" id="like-btn-${post.id}" onclick="toggleLike(${post.id})" style="background: transparent; border: 1px solid var(--danger); color: var(--danger); padding: 8px 15px;">
+                        ❤️ <span id="like-count-${post.id}">${post.likes}</span>
+                    </button>
+                    <span style="background: rgba(8,17,31,0.6); border: 1px solid var(--border-color); color: var(--text-main); padding: 8px 15px; border-radius: 8px; font-weight: bold;">
+                        👁️ <span id="view-count-${post.id}">${post.views}</span>
+                    </span>
+                    <button class="btn" onclick="sharePost('${post.title.replace(/'/g, "\\'")}', window.location.origin + '/agent/${post.uploaded_by}')" style="background: transparent; border: 1px solid var(--accent); color: var(--accent); padding: 8px 15px;">
+                        📤
+                    </button>
+                    ${reportBtn}
+                </div>
+                <button class="btn" id="bookmark-btn-${post.id}" onclick="toggleBookmark(${post.id})" style="background: transparent; border: 1px solid var(--warning); color: var(--warning); padding: 8px 15px; font-size: 1.1rem;">
+                    ${post.is_saved ? '📌 Saved' : '📍 Save'}
+                </button>
+            </div>
+
+            <div style="background: rgba(8, 17, 31, 0.4); border-radius: 8px; padding: 15px;">
+                <div style="max-height: 150px; overflow-y: auto; margin-bottom: 10px; font-size: 0.9rem; padding-right: 5px;">
+                    ${commentsHtml}
+                </div>
+                <form method="POST" action="/add_comment/${post.id}" style="display: flex; gap: 10px;">
+                    <input type="hidden" name="csrf_token" value="${csrfToken}">
+                    <input type="text" name="comment_text" id="comment-input-${post.id}" placeholder="Add a comment... use @ to tag." required style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(8, 17, 31, 0.8); color: white; outline: none;">
+                    <button type="submit" class="btn">Post</button>
+                </form>
+            </div>
+        </div>
+    </div>`;
+}
+
+// FETCH DATA FUNCTION
+async function loadMorePosts() {
+    if (loading || !hasMore) return;
+    loading = true;
+    document.getElementById('loading-spinner').style.display = 'block';
+
+    try {
+        const response = await fetch(`/api/feed_data?tab=${currentTab}&offset=${offset}`);
+        const newPosts = await response.json();
+
+        if (newPosts.length === 0) {
+            hasMore = false;
+            document.getElementById('end-message').style.display = 'block';
+        } else {
+            const container = document.getElementById('feed-container');
+            newPosts.forEach(post => {
+                container.insertAdjacentHTML('beforeend', createPostHTML(post));
+            });
+            offset += newPosts.length;
+        }
+    } catch (e) { console.error("Error loading posts", e); }
+    
+    document.getElementById('loading-spinner').style.display = 'none';
+    loading = false;
+}
+
+// SCROLL LISTENER
+window.addEventListener('scroll', () => {
+    // Load more when user is near bottom
+    if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 500) {
+        loadMorePosts();
+    }
+});
+
+// INITIAL LOAD
+document.addEventListener("DOMContentLoaded", loadMorePosts);
+
+// UTILITY FUNCTIONS
 async function openLightbox(src, mediaId) {
     document.getElementById('imageLightbox').style.display = 'flex';
     document.getElementById('lightboxImgSrc').src = src;
-    
     try {
-        await fetch(`/api/view/${mediaId}`, { method: 'POST', headers: { 'X-CSRF-Token': '{{ csrf_token() }}' } });
+        await fetch(`/api/view/${mediaId}`, { method: 'POST', headers: { 'X-CSRF-Token': csrfToken } });
         let viewSpan = document.getElementById(`view-count-${mediaId}`);
         if(viewSpan) { viewSpan.innerText = parseInt(viewSpan.innerText) + 1; }
-    } catch(e) { console.error("View count error", e); }
+    } catch(e) {}
 }
 
 async function toggleLike(mediaId) {
     try {
-        const response = await fetch(`/like/${mediaId}`, { method: 'POST', headers: { 'X-CSRF-Token': '{{ csrf_token() }}' } });
+        const response = await fetch(`/like/${mediaId}`, { method: 'POST', headers: { 'X-CSRF-Token': csrfToken } });
         const data = await response.json();
         if (response.ok) { document.getElementById(`like-count-${mediaId}`).innerText = data.likes; }
-    } catch (e) { console.error("Like error:", e); }
+    } catch (e) {}
 }
 
 async function toggleBookmark(mediaId) {
     try {
-        const response = await fetch(`/bookmark/${mediaId}`, { method: 'POST', headers: { 'X-CSRF-Token': '{{ csrf_token() }}' } });
+        const response = await fetch(`/bookmark/${mediaId}`, { method: 'POST', headers: { 'X-CSRF-Token': csrfToken } });
         const data = await response.json();
         if (response.ok) {
             const btn = document.getElementById(`bookmark-btn-${mediaId}`);
             btn.innerHTML = data.bookmarked ? '📌 Saved' : '📍 Save';
         }
-    } catch (e) { console.error("Bookmark error:", e); }
+    } catch (e) {}
 }
 
 async function reportAsset(mediaId) {
     if(confirm("Report this post to Admins for inappropriate content?")) {
         try {
-            const response = await fetch(`/report/${mediaId}`, { method: 'POST', headers: { 'X-CSRF-Token': '{{ csrf_token() }}' } });
+            const response = await fetch(`/report/${mediaId}`, { method: 'POST', headers: { 'X-CSRF-Token': csrfToken } });
             const data = await response.json();
             if (response.ok) alert("Post reported. Admins will review it.");
             else alert(data.error);
-        } catch (e) { console.error("Report error", e); }
+        } catch (e) {}
     }
 }
 
@@ -220,10 +270,10 @@ function replyTo(username, postId) {
 
 async function likeComment(commentId) {
     try {
-        const response = await fetch(`/like_comment/${commentId}`, { method: 'POST', headers: { 'X-CSRF-Token': '{{ csrf_token() }}' } });
+        const response = await fetch(`/like_comment/${commentId}`, { method: 'POST', headers: { 'X-CSRF-Token': csrfToken } });
         const data = await response.json();
         if (response.ok) { document.getElementById(`clike-count-${commentId}`).innerText = data.likes; }
-    } catch (e) { console.error("Comment Like error:", e); }
+    } catch (e) {}
 }
 </script>
 {% endblock %}
