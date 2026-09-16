@@ -144,8 +144,6 @@ def upgrade_db():
     safe_alter(c, conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS cover_pic TEXT")
     safe_alter(c, conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS website TEXT")
     safe_alter(c, conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE")
-    
-    # 💥 UPGRADED WALLET SYSTEM (100 Coins Default) 💥
     safe_alter(c, conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS wallet_balance INTEGER DEFAULT 100")
     safe_alter(c, conn, "ALTER TABLE media ADD COLUMN IF NOT EXISTS tips_received INTEGER DEFAULT 0")
 
@@ -204,7 +202,7 @@ def cleanup_database():
     finally: conn.close()
 
 # =========================================================
-# THE SMART PHANTOM ENGINE (AI BOTS + TIPPING ABILITY)
+# THE SMART PHANTOM ENGINE (AI BOTS)
 # =========================================================
 def run_bot_engine():
     conn = get_db_connection()
@@ -225,7 +223,6 @@ def run_bot_engine():
         if bot_count < 10:
             name = f"{random.choice(bot_names)}_{random.randint(100, 9999)}"
             code = ''.join(secrets.choice("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ") for _ in range(10))
-            # Give bots 5000 coins so they can generously tip users!
             c.execute("INSERT INTO users (username, password, user_code, role, is_verified, bio, wallet_balance) VALUES (%s, %s, %s, 'bot', TRUE, 'Just roaming around the digital gallery ✨', 5000)", (name, "botpass123", code))
             conn.commit()
             bot_username = name
@@ -255,18 +252,17 @@ def run_bot_engine():
                 try: c.execute("INSERT INTO followers (follower, following) VALUES (%s, %s)", (bot_username, target['username']))
                 except: pass
         elif action > 75: 
-            # Bot explores media to Like or TIP!
             c.execute("SELECT id, uploaded_by, title, category FROM media WHERE uploaded_by != %s ORDER BY RANDOM() LIMIT 1", (bot_username,))
             media = c.fetchone()
             if media:
-                if random.random() > 0.5: # 50% chance to tip
+                if random.random() > 0.5: 
                     c.execute("UPDATE users SET wallet_balance = wallet_balance - 10 WHERE username = %s AND wallet_balance >= 10", (bot_username,))
                     if c.rowcount == 1:
                         c.execute("UPDATE users SET wallet_balance = wallet_balance + 10 WHERE username = %s", (media['uploaded_by'],))
                         c.execute("UPDATE media SET tips_received = COALESCE(tips_received, 0) + 10 WHERE id = %s", (media['id'],))
                         c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", 
                                   (media['uploaded_by'], f"💰 You received 10 Coins from {bot_username} for '{media['title'][:15]}...'", f"/profile"))
-                else: # 50% chance to like
+                else: 
                     try:
                         c.execute("INSERT INTO likes (media_id, username) VALUES (%s, %s) ON CONFLICT DO NOTHING", (media['id'], bot_username))
                         if c.rowcount == 1: 
@@ -381,7 +377,6 @@ def login():
             code = ''.join(secrets.choice("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ") for _ in range(10))
             conn = get_db_connection()
             c = conn.cursor()
-            # 💥 NEW GUEST GETS 100 COINS 💥
             c.execute("INSERT INTO users (username, password, user_code, role, wallet_balance) VALUES (%s, %s, %s, 'user', 100)", (guest_name, "guest", code))
             conn.commit()
             conn.close()
@@ -395,7 +390,6 @@ def login():
             try:
                 conn = get_db_connection()
                 c = conn.cursor()
-                # 💥 NEW USER GETS 100 COINS 💥
                 c.execute("INSERT INTO users (username, email, password, user_code, role, wallet_balance) VALUES (%s, %s, %s, %s, 'user', 100)", 
                           (username, email, generate_password_hash(password), code))
                 conn.commit()
@@ -514,6 +508,27 @@ def settings():
     conn.close()
     return redirect(request.referrer or url_for("dashboard"))
 
+# 💥 PHASE 70: VERIFICATION STORE (BUY BLUE TICK) 💥
+@app.route("/buy_verification", methods=["POST"])
+def buy_verification():
+    if "username" not in session: return redirect(url_for("login"))
+    conn = get_db_connection()
+    c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    c.execute("SELECT wallet_balance, is_verified FROM users WHERE username = %s", (session["username"],))
+    user = c.fetchone()
+    
+    if user['is_verified']:
+        flash("You are already verified! ✅", "success")
+    elif user['wallet_balance'] >= 1000:
+        c.execute("UPDATE users SET wallet_balance = wallet_balance - 1000, is_verified = TRUE WHERE username = %s", (session["username"],))
+        conn.commit()
+        flash("Congratulations! You bought the Verified Badge ✅", "success")
+    else:
+        flash("Not enough coins! You need 1000 🪙 to get verified.", "error")
+        
+    conn.close()
+    return redirect(request.referrer or url_for("dashboard"))
+
 # =========================================================
 # ASSET MANAGEMENT
 # =========================================================
@@ -552,6 +567,31 @@ def upload_asset():
         flash(f"Server Alert: {str(e)[:150]}", "error")
     return redirect(request.referrer or url_for("feed"))
 
+@app.route("/edit_post/<int:media_id>", methods=["POST"])
+def edit_post(media_id):
+    if "username" not in session: return redirect(url_for("login"))
+    new_title = request.form.get("title", "").strip()
+    if new_title:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("UPDATE media SET title = %s WHERE id = %s AND uploaded_by = %s", (new_title, media_id, session["username"]))
+        conn.commit()
+        conn.close()
+        flash("Post updated successfully!", "success")
+    return redirect(request.referrer or url_for("profile"))
+
+@app.route("/pin_post/<int:media_id>", methods=["POST"])
+def pin_post(media_id):
+    if "username" not in session: return redirect(url_for("login"))
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("UPDATE media SET is_pinned = FALSE WHERE uploaded_by = %s", (session["username"],))
+    c.execute("UPDATE media SET is_pinned = TRUE WHERE id = %s AND uploaded_by = %s", (media_id, session["username"]))
+    conn.commit()
+    conn.close()
+    flash("Post Pinned!", "success")
+    return redirect(request.referrer or url_for("profile"))
+
 @app.route("/api/view/<int:media_id>", methods=["POST"])
 def add_view(media_id):
     conn = get_db_connection()
@@ -561,7 +601,6 @@ def add_view(media_id):
     conn.close()
     return jsonify({"success": True})
 
-# 💥 NEW: CREATOR TIPPING SYSTEM (MONETIZATION) 💥
 @app.route("/tip/<int:media_id>", methods=["POST"])
 def tip_creator(media_id):
     if "username" not in session: return jsonify({"error": "Login required."}), 401
@@ -569,7 +608,6 @@ def tip_creator(media_id):
     conn = get_db_connection()
     c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     
-    # 1. Check if user has enough balance
     c.execute("SELECT wallet_balance FROM users WHERE username = %s", (tipper,))
     user_data = c.fetchone()
     balance = user_data['wallet_balance'] if user_data else 0
@@ -578,7 +616,6 @@ def tip_creator(media_id):
         conn.close()
         return jsonify({"error": "Insufficient Coins! You need at least 10 🪙."}), 400
         
-    # 2. Get media owner
     c.execute("SELECT uploaded_by, title FROM media WHERE id = %s", (media_id,))
     media = c.fetchone()
     if not media:
@@ -591,27 +628,21 @@ def tip_creator(media_id):
         return jsonify({"error": "You cannot tip your own post!"}), 400
         
     try:
-        # 3. Process Transaction safely
         c.execute("UPDATE users SET wallet_balance = wallet_balance - 10 WHERE username = %s", (tipper,))
         c.execute("UPDATE users SET wallet_balance = wallet_balance + 10 WHERE username = %s", (creator,))
         c.execute("UPDATE media SET tips_received = COALESCE(tips_received, 0) + 10 WHERE id = %s", (media_id,))
-        
-        # 4. Notify Creator
         title_snippet = (media['title'][:15] + '...') if media['title'] else 'your post'
         c.execute("INSERT INTO notifications (username, message, link) VALUES (%s, %s, %s)", 
                   (creator, f"💰 You received 10 Coins from {tipper} for '{title_snippet}'", f"/profile"))
         conn.commit()
         success = True
     except Exception as e:
-        print("Tip Error:", e)
         conn.rollback()
         success = False
         
-    # Get updated total tips for the post
     c.execute("SELECT tips_received FROM media WHERE id = %s", (media_id,))
     new_tips = c.fetchone()['tips_received']
     conn.close()
-    
     return jsonify({"success": success, "new_tips": new_tips})
 
 @app.route("/block/<username>", methods=["POST"])
@@ -632,8 +663,18 @@ def block_user(username):
     conn.close()
     return jsonify({"success": success})
 
+@app.route("/unblock/<username>", methods=["POST"])
+def unblock_user(username):
+    if "username" not in session: return jsonify({"error": "Login required"}), 401
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("DELETE FROM blocks WHERE blocker = %s AND blocked = %s", (session["username"], username))
+    conn.commit()
+    conn.close()
+    return jsonify({"success": True})
+
 # =========================================================
-# CORE ROUTES (PHASE 69: AI ALGORITHM FEED 🧠)
+# CORE ROUTES (FEED & AI ALGORITHM)
 # =========================================================
 @app.route("/")
 def index():
@@ -656,18 +697,15 @@ def api_feed_data():
     c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     block_filter = "m.uploaded_by NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) AND m.uploaded_by NOT IN (SELECT blocker FROM blocks WHERE blocked = %s)"
     
-    # 💥 AI ENGAGEMENT ALGORITHM: Ranks posts by: (Likes * 5) + Views + (Tips * 10) 💥
     ai_order_logic = "((m.likes * 5) + m.views + (COALESCE(m.tips_received, 0) * 10)) DESC, m.id DESC"
     
     if tab == "global":
         c.execute(f"SELECT m.*, u.profile_pic, u.role, u.is_verified FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' AND {block_filter} ORDER BY {ai_order_logic} LIMIT %s OFFSET %s", (session["username"], session["username"], limit, offset))
         feed_posts = [dict(row) for row in c.fetchall()]
     else:
-        # Chronological for Following
         c.execute(f"SELECT m.*, u.profile_pic, u.role, u.is_verified FROM media m JOIN users u ON m.uploaded_by = u.username JOIN followers f ON f.following = m.uploaded_by WHERE f.follower = %s AND m.approved = 1 AND m.visibility IN ('public', 'followers') AND m.filename != 'SHAYARI_TEXT' AND {block_filter} ORDER BY m.id DESC LIMIT %s OFFSET %s", (session["username"], session["username"], session["username"], limit, offset))
         feed_posts = [dict(row) for row in c.fetchall()]
         if not feed_posts and offset == 0:
-            # Fallback to AI Algorithm if no friends
             c.execute(f"SELECT m.*, u.profile_pic, u.role, u.is_verified FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' AND {block_filter} ORDER BY {ai_order_logic} LIMIT 10", (session["username"], session["username"]))
             feed_posts = [dict(row) for row in c.fetchall()]
 
@@ -698,13 +736,15 @@ def reels():
     conn.close()
     return render_template("reels.html", videos=videos)
 
+# 💥 RESTORED FULLY: EXPLORE ROUTE 💥
 @app.route("/explore")
 def explore():
     if "username" not in session: return redirect(url_for("login"))
     conn = get_db_connection()
-    c = conn.cursor()
+    c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    
     c.execute("SELECT m.id, m.filename, m.title, m.category, m.likes, m.views, m.uploaded_by FROM media m WHERE m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' AND m.uploaded_by NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) ORDER BY RANDOM() LIMIT 40", (session["username"],))
-    explore_posts = c.fetchall()
+    explore_posts = [dict(row) for row in c.fetchall()]
     
     c.execute("SELECT title FROM media WHERE approved = 1 AND visibility = 'public'")
     all_titles = c.fetchall()
@@ -716,6 +756,7 @@ def explore():
             tags = re.findall(r'#(\w+)', row['title'])
             for t in tags: tag_counts[t.lower()] += 1
     trending_tags = [tag for tag, count in sorted(tag_counts.items(), key=lambda x: x[1], reverse=True)[:6]]
+    
     return render_template("explore.html", posts=explore_posts, trending_tags=trending_tags)
 
 @app.route("/dashboard")
@@ -762,7 +803,6 @@ def profile():
     if "username" not in session: return redirect(url_for("login"))
     conn = get_db_connection()
     c = conn.cursor()
-
     if request.method == "POST":
         action = request.form.get("action")
         if action == "avatar" and "profile_pic" in request.files:
@@ -790,6 +830,9 @@ def profile():
     conn.close()
     return render_template("profile.html", user=user, my_uploads=my_uploads, saved_uploads=saved_uploads, post_count=len(my_uploads), followers_count=followers_count, following_count=following_count)
 
+# =========================================================
+# PUBLIC PORTFOLIO & FOLLOW SYSTEM
+# =========================================================
 @app.route("/agent/<username>")
 def agent_profile(username):
     if "username" not in session: return redirect(url_for("login"))
@@ -861,6 +904,9 @@ def api_network(action_type, username):
     conn.close()
     return jsonify(results)
 
+# =========================================================
+# DIRECT MESSAGING & STORY DM
+# =========================================================
 @app.route("/inbox")
 def inbox():
     if "username" not in session: return redirect(url_for("login"))
@@ -974,6 +1020,27 @@ def api_global_chat_history():
     formatted = [{"id": r['id'], "sender": r['sender'], "message": r['message'], "time": r['time'], "role": r['role'], "is_verified": r['is_verified']} for r in history]
     return jsonify(formatted)
 
+# =========================================================
+# SEARCH, GALLERY, AI STUDIO & ANALYTICS
+# =========================================================
+# 💥 RESTORED FULLY: SEARCH ROUTE 💥
+@app.route("/search")
+def search():
+    if "username" not in session: return redirect(url_for("login"))
+    query = request.args.get("q", "").strip()
+    if not query: return redirect(url_for("dashboard"))
+    conn = get_db_connection()
+    c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    clean_query = query.replace("#", "").replace("@", "")
+    search_term = f"%{clean_query}%"
+    c.execute("SELECT m.*, u.profile_pic, u.role, u.is_verified FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' AND (m.title ILIKE %s OR m.prompt ILIKE %s) AND m.uploaded_by NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) ORDER BY m.id DESC", (search_term, search_term, session["username"]))
+    media_files = [dict(row) for row in c.fetchall()]
+    c.execute("SELECT username, profile_pic, role, bio, is_verified FROM users WHERE username ILIKE %s AND username NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) LIMIT 20", (search_term, session["username"]))
+    found_users = [dict(row) for row in c.fetchall()]
+    conn.close()
+    return render_template("search.html", media_files=media_files, found_users=found_users, query=query)
+
+# 💥 RESTORED FULLY: SEARCH SUGGEST API 💥
 @app.route("/api/search_suggest")
 def api_search_suggest():
     if "username" not in session: return jsonify([])
@@ -995,6 +1062,97 @@ def api_search_suggest():
     conn.close()
     return jsonify(users + tags_list)
 
+@app.route("/gallery/<category>", methods=["GET", "POST"])
+def gallery(category):
+    if "username" not in session: return redirect(url_for("login"))
+    conn = get_db_connection()
+    c = conn.cursor()
+    if request.method == "POST":
+        try:
+            filename = "SHAYARI_TEXT"
+            if category != 'Shayari':
+                file = request.files.get("media")
+                if file and file.filename != "":
+                    filename = save_uploaded_file(file, category)
+                    if not filename:
+                        flash("Upload Failed! Check API keys.", "error")
+                        return redirect(url_for("gallery", category=category))
+            
+            is_approved = 1 if current_user_is_admin() else 0
+            visibility = request.form.get("visibility", "public")
+            c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved, visibility, views, is_pinned) VALUES (%s, %s, %s, %s, %s, %s, %s, 0, FALSE)",
+                      (filename, request.form.get("title", "Untitled"), category, "", session.get("username"), is_approved, visibility))
+            conn.commit()
+            flash("File live!" if is_approved else "Sent to Admin for approval.", "success")
+        except Exception as e:
+            conn.rollback()
+            flash(f"Upload System Fault: {str(e)[:100]}", "error")
+        return redirect(url_for("gallery", category=category))
+
+    c.execute("SELECT m.*, u.profile_pic, u.role, u.is_verified FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.category = %s AND m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' AND m.uploaded_by NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) ORDER BY m.id DESC", (category, session["username"]))
+    if category == 'Shayari': c.execute("SELECT m.*, u.role, u.is_verified FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.category = %s AND m.approved = 1 AND m.visibility = 'public' AND m.uploaded_by NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) ORDER BY m.id DESC", (category, session["username"]))
+    media_files = c.fetchall()
+    c.execute("SELECT c.*, u.role, u.is_verified FROM comments c JOIN users u ON c.username = u.username ORDER BY c.id ASC")
+    comments_db = c.fetchall()
+    conn.close()
+    comments = defaultdict(list)
+    for comment in comments_db: comments[comment["media_id"]].append(comment)
+    return render_template("gallery.html", media_files=media_files, category=category, comments=comments)
+
+@app.route("/bookmark/<int:media_id>", methods=["POST"])
+def bookmark(media_id):
+    if "username" not in session: return jsonify({"error": "Login required."}), 401
+    username = session["username"]
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT id FROM bookmarks WHERE username = %s AND media_id = %s", (username, media_id))
+    if c.fetchone():
+        c.execute("DELETE FROM bookmarks WHERE username = %s AND media_id = %s", (username, media_id))
+        bookmarked = False
+    else:
+        c.execute("INSERT INTO bookmarks (username, media_id) VALUES (%s, %s)", (username, media_id))
+        bookmarked = True
+    conn.commit()
+    conn.close()
+    return jsonify({"bookmarked": bookmarked})
+
+@app.route("/api/ai", methods=["POST"])
+def ai_endpoint():
+    query = request.get_json(silent=True).get("query", "")[:1000]
+    try: reply = get_ai_response(query).replace('"', '').replace("'", "")
+    except: reply = "Beautiful day! #vibes #nature"
+    return jsonify({"reply": reply})
+
+@app.route("/ai-studio", methods=["GET", "POST"])
+def ai_studio():
+    if "username" not in session: return redirect(url_for("login"))
+    if request.method == "POST":
+        prompt = request.form.get("prompt", "").strip()
+        if not prompt: return redirect(url_for("ai_studio"))
+        trigger_words = ["create", "generate", "draw", "make an image", "paint"]
+        wants_image = any(word in prompt.lower() for word in trigger_words)
+        
+        if wants_image:
+            encoded_prompt = urllib.parse.quote(prompt)
+            image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?nologo=true"
+            try:
+                r = requests.get(image_url, timeout=15)
+                secure_url = cloudinary.uploader.upload(r.content, resource_type="image")["secure_url"] if r.status_code == 200 else image_url
+                conn = get_db_connection()
+                c = conn.cursor()
+                c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved, visibility, views, is_pinned) VALUES (%s, %s, %s, %s, %s, 1, 'public', 0, FALSE)",
+                          (secure_url, f"AI: {prompt[:20]}...", "Photo", prompt, session["username"]))
+                conn.commit()
+                conn.close()
+                flash("Image created successfully! (100% Free)", "success")
+                return redirect(url_for("gallery", category="Photo"))
+            except: flash("Image generation failed.", "error")
+        else:
+            try: reply = get_ai_response(prompt)
+            except: reply = "I am currently offline."
+            return render_template("ai_studio.html", chat_reply=reply, user_prompt=prompt, hide_navbar=True)
+    return render_template("ai_studio.html", hide_navbar=True)
+
 @app.route("/analytics")
 def analytics():
     if "username" not in session: return redirect(url_for("login"))
@@ -1007,6 +1165,9 @@ def analytics():
     conn.close()
     return render_template("analytics.html", stats=stats, top_posts=top_posts, hide_navbar=True)
 
+# =========================================================
+# ADMIN CONTROLS
+# =========================================================
 @app.route("/admin", methods=["GET", "POST"])
 def admin():
     if request.method == "POST":
