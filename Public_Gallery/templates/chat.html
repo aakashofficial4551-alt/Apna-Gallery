@@ -10,11 +10,7 @@
             
             <a href="{{ url_for('agent_profile', username=contact.username) }}" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit;">
                 <div style="position: relative;">
-                    {% if contact.profile_pic %}
-                        <img src="{{ contact.profile_pic }}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid var(--accent);">
-                    {% else %}
-                        <div style="width: 40px; height: 40px; border-radius: 50%; background: #1e293b; display: grid; place-items: center; border: 2px solid var(--accent);">👤</div>
-                    {% endif %}
+                    <img src="{{ get_avatar(contact.profile_pic, contact.username) }}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid var(--accent);">
                     
                     {% if contact.last_active | is_online %}
                         <div style="position: absolute; bottom: 0; right: 0; width: 10px; height: 10px; background: #22c55e; border-radius: 50%; border: 2px solid var(--bg-card);"></div>
@@ -24,6 +20,7 @@
                 <div>
                     <h3 style="margin: 0; display: flex; align-items: center; gap: 5px; font-size: 1.1rem;">
                         {{ contact.username }}
+                        {% if contact.is_verified %}<span style="color: #38bdf8; font-size: 1rem;">✅</span>{% endif %}
                         {% if contact.role == 'admin' %}<span style="color: #38bdf8; font-size: 1rem;">☑️</span>{% endif %}
                     </h3>
                     {% if contact.last_active | is_online %}
@@ -53,7 +50,6 @@
     const contactUsername = "{{ contact.username }}";
     const myUsername = "{{ session.username }}";
     
-    // UNSEND FUNCTION
     async function unsendMessage(msgId) {
         if(confirm("Unsend this message?")) {
             await fetch(`/unsend_message/${msgId}`, { method: 'POST', headers: { 'X-CSRF-Token': '{{ csrf_token() }}' } });
@@ -71,12 +67,15 @@
                 const isMe = (msg.sender === myUsername);
                 
                 if(isMe) {
+                    // 💥 NEW: BLUE TICK SYSTEM 💥
+                    let seenTick = msg.is_read ? '<span style="color:#0ea5e9; font-weight:bold; font-size:0.8rem; margin-left:5px;">✓✓</span>' : '<span style="color:rgba(0,0,0,0.5); font-size:0.8rem; margin-left:5px;">✓</span>';
+                    
                     html += `
                     <div style="align-self: flex-end; display: flex; align-items: center; gap: 8px;">
                         <span onclick="unsendMessage(${msg.id})" style="cursor: pointer; font-size: 0.9rem; opacity: 0.6;" title="Unsend">🗑️</span>
                         <div style="background: var(--accent); color: #000; padding: 10px 15px; border-radius: 15px 15px 0 15px; max-width: 70%; word-wrap: break-word; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
                             <p style="margin: 0; font-size: 1rem; font-weight: 500;">${msg.message}</p>
-                            <span style="font-size: 0.7rem; color: rgba(0,0,0,0.6); display: block; text-align: right; margin-top: 5px;">${msg.time}</span>
+                            <span style="font-size: 0.7rem; color: rgba(0,0,0,0.6); display: block; text-align: right; margin-top: 5px;">${msg.time} ${seenTick}</span>
                         </div>
                     </div>`;
                 } else {
