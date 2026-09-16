@@ -1,55 +1,60 @@
 {% extends "base.html" %}
-{% block title %}Top Agents | Apna Gallery{% endblock %}
-
-{% block head %}
-<style>
-    .rank-table { width: 100%; border-collapse: collapse; margin-top: 20px; background: var(--bg-card); border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
-    .rank-table th, .rank-table td { padding: 18px; text-align: left; border-bottom: 1px solid var(--border-color); }
-    .rank-table th { background: rgba(8, 17, 31, 0.8); color: var(--accent); text-transform: uppercase; letter-spacing: 1px; font-size: 0.9rem; }
-    .rank-table tr:hover { background: rgba(255,255,255,0.02); }
-    .rank-1 { color: #fbbf24; font-weight: 900; font-size: 1.2rem; text-shadow: 0 0 10px rgba(251, 191, 36, 0.5); }
-    .rank-2 { color: #94a3b8; font-weight: bold; font-size: 1.1rem; }
-    .rank-3 { color: #b45309; font-weight: bold; font-size: 1.1rem; }
-</style>
-{% endblock %}
+{% block title %}Leaderboards | Apna Gallery{% endblock %}
 
 {% block content %}
-<div style="text-align: center; margin-bottom: 40px;">
-    <span style="font-size: 4rem;">🏆</span>
-    <h1 style="color: var(--success); margin: 10px 0;">Global Leaderboard</h1>
-    <p style="color: var(--text-muted);">Top agents ranked by total engagement (Likes).</p>
-</div>
+<div style="display: flex; flex-direction: column; height: 100vh; width: 100%; background: #0f172a; position: absolute; top: 0; left: 0; overflow-y: auto;">
+    
+    <div style="background: rgba(15,23,42,0.95); padding: 15px 20px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; z-index: 100; position: sticky; top: 0; backdrop-filter: blur(10px);">
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <a href="{{ url_for('dashboard') }}" style="color: white; text-decoration: none; font-size: 1.5rem; font-weight: bold;">&larr;</a>
+            <h1 style="color: var(--warning); margin: 0; font-size: 1.3rem;">🏆 Top Creators</h1>
+        </div>
+    </div>
 
-<table class="rank-table">
-    <thead>
-        <tr>
-            <th>Rank</th>
-            <th>Agent Name</th>
-            <th>Assets Uploaded</th>
-            <th>Total Engagement</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for leader in leaders %}
-        <tr>
-            <td class="{% if loop.index == 1 %}rank-1{% elif loop.index == 2 %}rank-2{% elif loop.index == 3 %}rank-3{% else %}style='color: white;'{% endif %}">
-                #{{ loop.index }}
-            </td>
-            <td style="font-weight: bold; font-size: 1.1rem;">
-                <!-- Link to public agent profile -->
-                <a href="{{ url_for('agent_profile', username=leader.username) }}" style="color: white; text-decoration: none; display: flex; align-items: center; gap: 5px;">
-                    {{ leader.username }}
-                    {% if leader.role in ['pro', 'admin'] %}
-                        <span style="color: #38bdf8;" title="Verified PRO">☑️</span>
-                    {% endif %}
-                </a>
-            </td>
-            <td style="color: var(--text-muted);">{{ leader.total_uploads }}</td>
-            <td style="color: var(--danger); font-weight: bold;">❤️ {{ leader.total_likes }}</td>
-        </tr>
-        {% else %}
-        <tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 30px;">No agents found.</td></tr>
-        {% endfor %}
-    </tbody>
-</table>
+    <div style="padding: 20px; max-width: 800px; margin: 0 auto; width: 100%; box-sizing: border-box;">
+        
+        <!-- TOP WEALTHY (COINS) -->
+        <h2 style="color: var(--warning); margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">🪙 Richest Creators (Wallet)</h2>
+        <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 40px;">
+            {% for u in wealthy %}
+            <a href="{{ url_for('agent_profile', username=u.username) }}" style="background: var(--bg-card); border: 1px solid var(--border-color); padding: 15px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; text-decoration: none; color: inherit; transition: 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <div style="font-size: 1.5rem; color: var(--text-muted); font-weight: bold; width: 30px; text-align: center;">#{{ loop.index }}</div>
+                    <img src="{{ get_avatar(u.profile_pic, u.username) }}" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid var(--warning);">
+                    <div>
+                        <h3 style="margin: 0; display: flex; align-items: center; gap: 5px; color: white;">
+                            {{ u.username }} {% if u.is_verified %}<span style="color: #38bdf8; font-size: 0.9rem;">✅</span>{% endif %}
+                        </h3>
+                        <span style="font-size: 0.8rem; color: var(--warning); font-weight: bold;">{{ u.wallet_balance }} Coins</span>
+                    </div>
+                </div>
+            </a>
+            {% else %}
+            <p style="color: var(--text-muted);">No wealthy creators yet.</p>
+            {% endfor %}
+        </div>
+
+        <!-- TOP FOLLOWED -->
+        <h2 style="color: var(--accent); margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">👥 Most Followed</h2>
+        <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 40px;">
+            {% for u in famous %}
+            <a href="{{ url_for('agent_profile', username=u.username) }}" style="background: var(--bg-card); border: 1px solid var(--border-color); padding: 15px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; text-decoration: none; color: inherit; transition: 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <div style="font-size: 1.5rem; color: var(--text-muted); font-weight: bold; width: 30px; text-align: center;">#{{ loop.index }}</div>
+                    <img src="{{ get_avatar(u.profile_pic, u.username) }}" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid var(--accent);">
+                    <div>
+                        <h3 style="margin: 0; display: flex; align-items: center; gap: 5px; color: white;">
+                            {{ u.username }} {% if u.is_verified %}<span style="color: #38bdf8; font-size: 0.9rem;">✅</span>{% endif %}
+                        </h3>
+                        <span style="font-size: 0.8rem; color: var(--success); font-weight: bold;">{{ u.follower_count }} Followers</span>
+                    </div>
+                </div>
+            </a>
+            {% else %}
+            <p style="color: var(--text-muted);">No famous creators yet.</p>
+            {% endfor %}
+        </div>
+
+    </div>
+</div>
 {% endblock %}
