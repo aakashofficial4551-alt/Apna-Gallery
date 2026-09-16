@@ -64,7 +64,7 @@ def security_firewall_and_session_check():
     ip = request.remote_addr or "127.0.0.1"
     now = time.time()
     
-    # Anti-DDoS
+    # 1. Anti-DDoS
     request_tracker[ip] = [t for t in request_tracker[ip] if now - t < 60]
     if len(request_tracker[ip]) > 200:
         BANNED_IPS.add(ip)
@@ -72,10 +72,10 @@ def security_firewall_and_session_check():
         return "Your IP has been permanently blocked for malicious activity. (Error 429)", 429
     request_tracker[ip].append(now)
 
-    if request.endpoint in ['index', 'login', 'verify_otp', 'logout', 'static', 'api_search_suggest', 'privacy_policy', 'terms', 'about'] or (request.path and request.path.startswith('/static/')):
+    if request.endpoint in ['index', 'login', 'verify_otp', 'logout', 'static', 'api_search_suggest', 'privacy_policy', 'terms', 'about', 'dynamic_manifest'] or (request.path and request.path.startswith('/static/')):
         return
 
-    # Strict CSRF Verification
+    # 2. Strict CSRF Verification
     if request.method in ["POST", "PUT", "DELETE"]:
         token = request.form.get("csrf_token") or request.headers.get("X-CSRF-Token")
         session_token = session.get("csrf_token")
@@ -85,7 +85,7 @@ def security_firewall_and_session_check():
                 flash("Security Firewall Blocked Your Request: Invalid Validation Token.", "error")
                 return redirect(request.referrer or url_for('feed'))
 
-    # GUILLOTINE ENGINE: SESSION TERMINATION
+    # 3. GUILLOTINE ENGINE: SESSION TERMINATION
     if "username" in session:
         conn = get_db_connection()
         c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
@@ -147,7 +147,7 @@ def hijack_bot_post(media_id, interactor_username):
     finally: conn.close()
 
 # =========================================================
-# BACKUP & FILTERS
+# DATABASE, BACKUP & FILTERS
 # =========================================================
 def create_database_backup():
     try:
@@ -189,9 +189,6 @@ def timeago(dt):
     elif seconds < 86400: return f"{int(seconds/3600)}h ago"
     else: return f"{int(seconds/86400)}d ago"
 
-# =========================================================
-# 💥 FIX: ADDED MISSING DATABASE AUTO-HEALER (safe_alter) 💥
-# =========================================================
 def safe_alter(c, conn, query):
     try: 
         c.execute(query)
@@ -275,7 +272,6 @@ def cleanup_database():
         c.execute("DELETE FROM users WHERE role = 'user' AND username NOT LIKE 'Guest-%%' AND last_active < NOW() - INTERVAL '90 days'")
         c.execute("DELETE FROM users WHERE deletion_requested IS NOT NULL AND deletion_requested < NOW() - INTERVAL '7 days'")
         
-        # The 1-Hour Purge for Unengaged Bot Posts
         c.execute("""
             DELETE FROM media 
             WHERE uploaded_by IN (SELECT username FROM users WHERE role = 'bot') 
@@ -299,15 +295,13 @@ def cleanup_database():
     finally: conn.close()
 
 # =========================================================
-# THE SMART PHANTOM ENGINE (AI SUPER PROMPTS + HINGLISH) 🤖
+# THE SMART PHANTOM ENGINE (AI SUPER PROMPTS + HINGLISH)
 # =========================================================
 def run_bot_engine():
     conn = get_db_connection()
     c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     try:
         bot_names = ["Aria_Cyber", "Neo_Vibes", "Luna_Arts", "Zenith_Pro", "Kai_X", "Nova_King", "Echo_World", "Sage_Pixel", "Atlas_Lens", "Orion_Sky", "Lyra_Mood"]
-        
-        # 💥 Updated to Hinglish + English for real Indian Gen-Z vibe 💥
         bot_chats = [
             "Hey everyone! Kya haal hain? 👋", 
             "Koi active hai kya abhi? 🤔 Let's chat!", 
@@ -344,16 +338,13 @@ def run_bot_engine():
                     "Ethereal fantasy landscape with glowing mushrooms and a starry night sky, digital art",
                     "A sleek futuristic sports car on a neon-lit bridge, 4k, octane render"
                 ]
-                
                 if random.random() > 0.5:
                     prompt = random.choice(high_end_prompts)
                     encoded_prompt = urllib.parse.quote(prompt)
                     img_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?nologo=true"
-                    # 💥 Hinglish Caption for AI Gen 💥
                     caption = f"Just generated this! Kaisa laga? ✨ #AIArt #Aesthetics #{bot_username}"
                 else:
                     img_url = f"https://picsum.photos/800/1000?random={random.randint(1, 100000)}"
-                    # 💥 Hinglish Caption for Normal Pics 💥
                     caption = random.choice([
                         "Nature's beauty 🌲 #nature #peace #sukoon", 
                         "Vibes ✨ #chill #mood #aesthetic", 
@@ -468,7 +459,7 @@ def sync_admin_session():
             session["is_admin"] = (user["role"] == "admin")
 
 # =========================================================
-# PUBLIC ROUTES
+# 💥 PUBLIC & ADSENSE ROUTES (ONLY ONCE) 💥
 # =========================================================
 @app.route("/")
 def index():
@@ -485,6 +476,21 @@ def about():
 @app.route("/privacy")
 def privacy_policy():
     return render_template("privacy.html", hide_navbar=True)
+
+@app.route("/manifest.json")
+def dynamic_manifest():
+    app_name = "VibeX"
+    manifest_data = {
+        "name": app_name,
+        "short_name": app_name,
+        "description": "The ultimate creator ecosystem and social vault.",
+        "start_url": "/",
+        "display": "standalone",
+        "background_color": "#0f172a",
+        "theme_color": "#0f172a",
+        "icons": [{"src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png"}, {"src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png"}]
+    }
+    return jsonify(manifest_data)
 
 # =========================================================
 # ROUTES: AUTHENTICATION & SETTINGS
@@ -879,7 +885,7 @@ def report_asset(media_id):
     finally: conn.close()
 
 # =========================================================
-# CORE ROUTES (VIEWS)
+# CORE ROUTES (FEED & LEADERBOARD)
 # =========================================================
 @app.route("/feed")
 def feed():
@@ -1503,33 +1509,6 @@ def mystery():
     if hmac.compare_digest(request.form.get("passcode", ""), os.environ.get("MYSTERY_CODE", "SOCHO")): return render_template("mystery.html")
     flash("Incorrect code.", "error")
     return redirect(url_for("dashboard"))
-
-@app.route("/privacy")
-def privacy_policy():
-    return render_template("privacy.html", hide_navbar=True)
-
-@app.route("/terms")
-def terms():
-    return render_template("terms.html", hide_navbar=True)
-
-@app.route("/about")
-def about():
-    return render_template("about.html", hide_navbar=True)
-
-@app.route("/manifest.json")
-def dynamic_manifest():
-    app_name = "VibeX"
-    manifest_data = {
-        "name": app_name,
-        "short_name": app_name,
-        "description": "The ultimate creator ecosystem and social vault.",
-        "start_url": "/",
-        "display": "standalone",
-        "background_color": "#0f172a",
-        "theme_color": "#0f172a",
-        "icons": [{"src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png"}, {"src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png"}]
-    }
-    return jsonify(manifest_data)
 
 @app.errorhandler(404)
 def not_found_error(error): return render_template("404.html"), 404
