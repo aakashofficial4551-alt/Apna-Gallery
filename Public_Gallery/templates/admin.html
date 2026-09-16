@@ -37,8 +37,17 @@
     {% else %}
         <div class="admin-card" style="max-width: 100%; width: 100%; text-align: left; box-sizing: border-box;">
             
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 20px; margin-bottom: 30px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 20px; margin-bottom: 30px; flex-wrap: wrap; gap: 15px;">
                 <h1 style="color: var(--warning); margin: 0;">⚡ Commander HQ Dashboard</h1>
+                
+                <!-- NEW: THE PHANTOM ENGINE TRIGGER -->
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <span style="color: var(--text-muted); font-size: 0.9rem;">Active Bots: {{ bot_count }}</span>
+                    <form method="POST" action="{{ url_for('trigger_bots') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn" style="background: #a855f7; color: white;" title="Spawn an AI Bot to upload, follow, or chat randomly!">🤖 Trigger AI Bot</button>
+                    </form>
+                </div>
             </div>
 
             <!-- Stats -->
@@ -167,7 +176,6 @@
                                     </form>
                                     {% endif %}
                                     
-                                    <!-- NEW: VERIFY BUTTON -->
                                     {% if not u.is_verified %}
                                     <form method="POST" action="{{ url_for('admin_user_action', user_id=u.id, action='verify') }}">
                                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
