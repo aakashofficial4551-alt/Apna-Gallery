@@ -10,6 +10,7 @@ import random
 import smtplib
 import re
 import json
+import html  # 💥 NEW: For Extreme Input Sanitization (Anti-XSS)
 
 import psycopg2
 import psycopg2.extras
@@ -42,31 +43,69 @@ cloudinary.config(
 app = Flask(__name__)
 init_db()
 
-app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "development-only-secret-change-me")
-app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
+# 💥 PHASE 78: EXTREME COOKIE SECURITY 💥
+app.config.update(
+    SECRET_KEY=os.environ.get("SECRET_KEY", "development-only-secret-change-me"),
+    MAX_CONTENT_LENGTH=50 * 1024 * 1024,
+    SESSION_COOKIE_HTTPONLY=True,  # Blocks JS from stealing session
+    SESSION_COOKIE_SAMESITE='Lax', # Prevents cross-site token theft
+)
 
 # =========================================================
-# SECURITY & BACKUP ENGINE
+# 🛡️ THE TITANIUM FIREWALL (ANTI-DDOS & CSRF ENFORCEMENT) 🛡️
 # =========================================================
+request_tracker = defaultdict(list)
+BANNED_IPS = set()
+
+@app.before_request
+def security_firewall():
+    ip = request.remote_addr or "127.0.0.1"
+    now = time.time()
+    
+    # 1. Anti-DDoS & Brute Force Monitor
+    request_tracker[ip] = [t for t in request_tracker[ip] if now - t < 60]
+    if len(request_tracker[ip]) > 200: # Limit: 200 requests per minute
+        BANNED_IPS.add(ip)
+        
+    if ip in BANNED_IPS:
+        return "Your IP has been permanently blocked by Apna Gallery Security System for malicious activity. (Error 429)", 429
+        
+    request_tracker[ip].append(now)
+
+    # 2. Strict CSRF Verification for ALL Data Modifications
+    if request.method in ["POST", "PUT", "DELETE"]:
+        # Bypass login/register routes to avoid locking users out
+        if request.endpoint not in ['login', 'verify_otp', 'logout', 'api_search_suggest']:
+            token = request.form.get("csrf_token") or request.headers.get("X-CSRF-Token")
+            session_token = session.get("csrf_token")
+            
+            if not token or not session_token or not hmac.compare_digest(token, session_token):
+                if request.path.startswith('/api/'):
+                    return jsonify({"error": "Security Firewall: Invalid CSRF Token"}), 403
+                else:
+                    flash("Security Firewall Blocked Your Request: Invalid Validation Token.", "error")
+                    return redirect(request.referrer or url_for('feed'))
+
 @app.after_request
 def set_security_headers(response):
     response.headers["X-Frame-Options"] = "SAMEORIGIN"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response
 
+# =========================================================
+# BACKUP ENGINE
+# =========================================================
 def create_database_backup():
     try:
         conn = get_db_connection()
         c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
         backup_data = {"timestamp": str(datetime.datetime.now()), "users": [], "media": [], "notifications": []}
-        
         c.execute("SELECT username, email, role, is_verified, created_at, wallet_balance FROM users")
         backup_data["users"] = [dict(row) for row in c.fetchall()]
-        
         c.execute("SELECT id, title, category, uploaded_by, likes, views, tips_received, visibility, created_at FROM media")
         backup_data["media"] = [dict(row) for row in c.fetchall()]
-        
         backup_dir = os.path.join(BASE_DIR, "backups")
         os.makedirs(backup_dir, exist_ok=True)
         file_path = os.path.join(backup_dir, f"backup_{datetime.date.today()}.json")
@@ -81,6 +120,7 @@ def create_database_backup():
 @app.template_filter('format_text')
 def format_text(text):
     if not text: return ""
+    text = html.escape(text) # 💥 ANTI-XSS: Converts <script> to safe text!
     text = re.sub(r'#(\w+)', r'<a href="/search?q=\1" style="color: var(--accent); text-decoration: none; font-weight: bold;">#\1</a>', text)
     text = re.sub(r'@(\w+)', r'<a href="/agent/\1" style="color: var(--warning); text-decoration: none; font-weight: bold;">@\1</a>', text)
     return text
@@ -365,7 +405,7 @@ def login():
     if session.get("username"): return redirect(url_for("feed"))
     if request.method == "POST":
         action = request.form.get("action")
-        username = request.form.get("username", "").strip()
+        username = html.escape(request.form.get("username", "").strip()) # Anti-XSS
         password = request.form.get("password", "")
         
         if action == "guest":
@@ -382,7 +422,7 @@ def login():
             return redirect(url_for("feed"))
 
         if action == "register":
-            email = request.form.get("email", "").strip()
+            email = html.escape(request.form.get("email", "").strip())
             code = ''.join(secrets.choice("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ") for _ in range(10))
             try:
                 conn = get_db_connection()
@@ -435,8 +475,11 @@ def settings():
     c = conn.cursor()
     
     if action == "update_profile":
+        bio = html.escape(request.form.get("bio", ""))
+        website = html.escape(request.form.get("website", ""))
+        theme = request.form.get("theme", "cyan")
         c.execute("UPDATE users SET bio = %s, theme = %s, website = %s WHERE username = %s", 
-                  (request.form.get("bio", ""), request.form.get("theme", "cyan"), request.form.get("website", ""), session["username"]))
+                  (bio, theme, website, session["username"]))
         flash("Profile Settings Updated!", "success")
         
     elif action == "change_password":
@@ -445,8 +488,8 @@ def settings():
         flash("Password Changed Successfully!", "success")
         
     elif action == "upgrade_guest":
-        new_username = request.form.get("new_username", "").strip()
-        email = request.form.get("email", "").strip()
+        new_username = html.escape(request.form.get("new_username", "").strip())
+        email = html.escape(request.form.get("email", "").strip())
         password = request.form.get("password", "")
         old_username = session["username"]
         c.execute("SELECT id FROM users WHERE username = %s OR email = %s", (new_username, email))
@@ -517,7 +560,7 @@ def upload_asset():
     if "username" not in session: return redirect(url_for("login"))
     try:
         category = request.form.get("category", "Photo")
-        title = request.form.get("title", "Untitled")
+        title = html.escape(request.form.get("title", "Untitled")) # ANTI-XSS
         visibility = request.form.get("visibility", "public")
         file = request.files.get("media")
         filename = "SHAYARI_TEXT"
@@ -597,11 +640,10 @@ def add_view(media_id):
     conn.close()
     return jsonify({"success": True})
 
-# 💥 RESTORED: ADD COMMENT ROUTE 💥
 @app.route("/add_comment/<int:media_id>", methods=["POST"])
 def add_comment(media_id):
     if "username" not in session: return redirect(url_for("login"))
-    text = request.form.get("comment_text", "").strip()
+    text = html.escape(request.form.get("comment_text", "").strip()) # ANTI-XSS
     if text:
         conn = get_db_connection()
         c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
@@ -669,7 +711,7 @@ def like_comment(comment_id):
 @app.route("/edit_post/<int:media_id>", methods=["POST"])
 def edit_post(media_id):
     if "username" not in session: return redirect(url_for("login"))
-    new_title = request.form.get("title", "").strip()
+    new_title = html.escape(request.form.get("title", "").strip()) # ANTI-XSS
     if new_title:
         conn = get_db_connection()
         c = conn.cursor()
@@ -819,7 +861,6 @@ def explore():
     conn.close()
     return render_template("explore.html", posts=explore_posts, trending_tags=trending_tags, spotlight=spotlight)
 
-# 💥 RESTORED FULLY: DASHBOARD ROUTE 💥
 @app.route("/dashboard")
 def dashboard():
     if "username" not in session: return redirect(url_for("login"))
@@ -1002,7 +1043,7 @@ def chat(username):
         conn.close()
         return redirect(url_for("inbox"))
     if request.method == "POST":
-        msg = request.form.get("message", "").strip()
+        msg = html.escape(request.form.get("message", "").strip()) # ANTI-XSS
         if msg:
             c.execute("INSERT INTO messages (sender, receiver, message) VALUES (%s, %s, %s)", (me, username, msg))
             conn.commit()
@@ -1039,13 +1080,26 @@ def unsend_message(msg_id):
     conn.close()
     return jsonify({"success": True})
 
+@app.route("/reply_story/<username>", methods=["POST"])
+def reply_story(username):
+    if "username" not in session: return jsonify({"error": "Login required"}), 401
+    msg = html.escape(request.form.get("message", "").strip())
+    if msg:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("INSERT INTO messages (sender, receiver, message) VALUES (%s, %s, %s)", (session["username"], username, f"Replying to your story: {msg}"))
+        conn.commit()
+        conn.close()
+        return jsonify({"success": True})
+    return jsonify({"error": "Empty message"}), 400
+
 @app.route("/global_chat", methods=["GET", "POST"])
 def global_chat():
     if "username" not in session: return redirect(url_for("login"))
     conn = get_db_connection()
     c = conn.cursor()
     if request.method == "POST":
-        msg = request.form.get("message", "").strip()
+        msg = html.escape(request.form.get("message", "").strip()) # ANTI-XSS
         if msg:
             c.execute("INSERT INTO global_chat (sender, message) VALUES (%s, %s)", (session["username"], msg[:500]))
             conn.commit()
@@ -1064,45 +1118,6 @@ def api_global_chat_history():
     formatted = [{"id": r['id'], "sender": r['sender'], "message": r['message'], "time": r['time'], "role": r['role'], "is_verified": r['is_verified']} for r in history]
     return jsonify(formatted)
 
-# 💥 RESTORED FULLY: GALLERY ROUTE 💥
-@app.route("/gallery/<category>", methods=["GET", "POST"])
-def gallery(category):
-    if "username" not in session: return redirect(url_for("login"))
-    conn = get_db_connection()
-    c = conn.cursor()
-    if request.method == "POST":
-        try:
-            filename = "SHAYARI_TEXT"
-            if category != 'Shayari':
-                file = request.files.get("media")
-                if file and file.filename != "":
-                    filename = save_uploaded_file(file, category)
-                    if not filename:
-                        flash("Upload Failed! Check API keys.", "error")
-                        return redirect(url_for("gallery", category=category))
-            
-            is_approved = 1 if current_user_is_admin() else 0
-            visibility = request.form.get("visibility", "public")
-            c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved, visibility, views, is_pinned) VALUES (%s, %s, %s, %s, %s, %s, %s, 0, FALSE)",
-                      (filename, request.form.get("title", "Untitled"), category, "", session.get("username"), is_approved, visibility))
-            conn.commit()
-            flash("File live!" if is_approved else "Sent to Admin for approval.", "success")
-        except Exception as e:
-            conn.rollback()
-            flash(f"Upload System Fault: {str(e)[:100]}", "error")
-        return redirect(url_for("gallery", category=category))
-
-    c.execute("SELECT m.*, u.profile_pic, u.role, u.is_verified FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.category = %s AND m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' AND m.uploaded_by NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) ORDER BY m.id DESC", (category, session["username"]))
-    if category == 'Shayari': c.execute("SELECT m.*, u.role, u.is_verified FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.category = %s AND m.approved = 1 AND m.visibility = 'public' AND m.uploaded_by NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) ORDER BY m.id DESC", (category, session["username"]))
-    media_files = c.fetchall()
-    c.execute("SELECT c.*, u.role, u.is_verified FROM comments c JOIN users u ON c.username = u.username ORDER BY c.id ASC")
-    comments_db = c.fetchall()
-    conn.close()
-    comments = defaultdict(list)
-    for comment in comments_db: comments[comment["media_id"]].append(comment)
-    return render_template("gallery.html", media_files=media_files, category=category, comments=comments)
-
-# 💥 RESTORED FULLY: SEARCH ROUTE & SUGGESTIONS 💥
 @app.route("/search")
 def search():
     if "username" not in session: return redirect(url_for("login"))
@@ -1146,9 +1161,7 @@ def ai_studio():
     if request.method == "POST":
         prompt = request.form.get("prompt", "").strip()
         if not prompt: return redirect(url_for("ai_studio"))
-        trigger_words = ["create", "generate", "draw", "make an image", "paint"]
-        wants_image = any(word in prompt.lower() for word in trigger_words)
-        
+        wants_image = any(word in prompt.lower() for word in ["create", "generate", "draw", "make an image", "paint"])
         if wants_image:
             encoded_prompt = urllib.parse.quote(prompt)
             image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?nologo=true"
@@ -1162,7 +1175,7 @@ def ai_studio():
                 conn.commit()
                 conn.close()
                 flash("Image created successfully! (100% Free)", "success")
-                return redirect(url_for("gallery", category="Photo"))
+                return redirect(url_for("gallery", Photo))
             except: flash("Image generation failed.", "error")
         else:
             try: reply = get_ai_response(prompt)
@@ -1231,7 +1244,7 @@ def trigger_bots():
 @app.route("/admin/broadcast", methods=["POST"])
 def admin_broadcast():
     if not current_user_is_admin(): return redirect(url_for("admin"))
-    msg = request.form.get("broadcast_message", "").strip()
+    msg = html.escape(request.form.get("broadcast_message", "").strip())
     if msg:
         conn = get_db_connection()
         c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
