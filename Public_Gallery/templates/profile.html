@@ -3,36 +3,12 @@
 
 {% block head %}
 <style>
-    /* 💥 INSTAGRAM STYLE PROFILE GRID 💥 */
-    .profile-grid {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 5px; /* Small gap like Insta */
-        margin-bottom: 50px;
-    }
-    .profile-grid-item {
-        aspect-ratio: 1; /* Makes it a perfect square */
-        background: #000;
-        overflow: hidden;
-        position: relative;
-        cursor: pointer;
-    }
-    .profile-grid-item img, .profile-grid-item video {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        transition: 0.3s;
-    }
+    .profile-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-bottom: 50px; }
+    .profile-grid-item { aspect-ratio: 1; background: #000; overflow: hidden; position: relative; cursor: pointer; }
+    .profile-grid-item img, .profile-grid-item video { width: 100%; height: 100%; object-fit: cover; transition: 0.3s; }
     .profile-grid-item:hover img { opacity: 0.8; transform: scale(1.05); }
-    
-    .grid-overlay {
-        position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-        background: rgba(0,0,0,0.5); opacity: 0; display: flex;
-        justify-content: center; align-items: center; gap: 15px; color: white;
-        font-weight: bold; transition: 0.3s; pointer-events: none;
-    }
+    .grid-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); opacity: 0; display: flex; justify-content: center; align-items: center; gap: 15px; color: white; font-weight: bold; transition: 0.3s; pointer-events: none; }
     .profile-grid-item:hover .grid-overlay { opacity: 1; }
-    
     @media (max-width: 600px) { .profile-grid { gap: 2px; } }
 </style>
 {% endblock %}
@@ -71,20 +47,14 @@
     </div>
 </div>
 
-<!-- 💥 THE NEW INSTAGRAM GRID 💥 -->
 <div style="display: flex; justify-content: center; gap: 20px; border-bottom: 1px solid var(--border-color); margin-bottom: 20px;">
     <h3 style="color: var(--accent); margin: 0; padding-bottom: 10px; border-bottom: 2px solid var(--accent); cursor: pointer;">🖼️ Posts</h3>
-    <h3 style="color: var(--text-muted); margin: 0; padding-bottom: 10px; cursor: pointer;">📌 Saved</h3>
 </div>
 
 <div class="profile-grid">
     {% for item in my_uploads %}
     <div class="profile-grid-item" onclick="openEditModal({{ item.id }}, '{{ item.title | escape }}')">
-        
-        {% if item.is_pinned %}
-            <div style="position: absolute; top: 5px; right: 5px; background: var(--warning); color: #000; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; z-index: 10;">📌</div>
-        {% endif %}
-
+        {% if item.is_pinned %} <div style="position: absolute; top: 5px; right: 5px; background: var(--warning); color: #000; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; z-index: 10;">📌</div> {% endif %}
         {% if item.category == 'Photo' %}<img src="{{ item.filename }}">
         {% elif item.category == 'Video' %}
             <video src="{{ item.filename }}"></video>
@@ -94,40 +64,43 @@
         {% else %}
             <div style="width: 100%; height: 100%; background: #1e293b; display: grid; place-items: center; font-size: 3rem;">📁</div>
         {% endif %}
-        
-        <div class="grid-overlay">
-            <span>❤️ {{ item.likes }}</span>
-            <span>👁️ {{ item.views }}</span>
-        </div>
+        <div class="grid-overlay"><span>❤️ {{ item.likes }}</span><span>👁️ {{ item.views }}</span></div>
     </div>
     {% else %}
     <p style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 50px;">No posts yet.</p>
     {% endfor %}
 </div>
 
-<!-- EDIT POST MODAL -->
+<!-- 💥 ALL MODALS RESTORED (Edit, Delete, PIN, NETWORK) 💥 -->
 <div id="editModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
     <div style="background: var(--bg-card); padding: 30px; border-radius: 20px; border: 1px solid var(--border-color); width: 90%; max-width: 400px; position: relative;">
         <span onclick="document.getElementById('editModal').style.display='none'" style="position: absolute; top: 15px; right: 20px; font-size: 2rem; color: white; cursor: pointer;">&times;</span>
         <h2 style="color: var(--accent); margin-top: 0; margin-bottom: 20px;">✏️ Manage Post</h2>
-        
         <form id="editForm" method="POST" action="">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="text" name="title" id="editTitleInput" required style="width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 8px; background: rgba(8,17,31,0.8); color: white; border: 1px solid var(--border-color); outline: none;">
             <button type="submit" class="btn" style="width: 100%;">Save Caption</button>
         </form>
-        
         <form id="pinForm" method="POST" action="" style="margin-top: 10px;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn" style="width: 100%; background: rgba(251, 191, 36, 0.2); border: 1px solid var(--warning); color: var(--warning);">📌 Pin to Top</button>
         </form>
-        
         <form id="deleteForm" method="POST" action="" onsubmit="return confirm('Delete this asset forever?');" style="margin-top: 10px;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn" style="width: 100%; background: rgba(239, 68, 68, 0.2); border: 1px solid var(--danger); color: var(--danger);">🗑️ Delete</button>
         </form>
     </div>
 </div>
+
+<div id="networkModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
+    <div style="background: var(--bg-card); padding: 30px; border-radius: 20px; border: 1px solid var(--border-color); width: 90%; max-width: 400px; position: relative; box-shadow: 0 10px 40px rgba(0,0,0,0.5); max-height: 80vh; display: flex; flex-direction: column;">
+        <span onclick="document.getElementById('networkModal').style.display='none'" style="position: absolute; top: 15px; right: 20px; font-size: 2rem; color: white; cursor: pointer;">&times;</span>
+        <h2 id="networkTitle" style="color: var(--accent); margin-top: 0; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">Network</h2>
+        <div id="networkList" style="overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 15px; padding-right: 10px;"></div>
+    </div>
+</div>
+
+<div id="toast" style="visibility: hidden; min-width: 250px; background-color: var(--success); color: white; text-align: center; border-radius: 8px; padding: 16px; position: fixed; z-index: 10000; left: 50%; bottom: 30px; transform: translateX(-50%); font-weight: bold;">✅ Link Copied!</div>
 
 <script>
 function openEditModal(mediaId, currentTitle) {
@@ -136,6 +109,39 @@ function openEditModal(mediaId, currentTitle) {
     document.getElementById('editForm').action = '/edit_post/' + mediaId;
     document.getElementById('pinForm').action = '/pin_post/' + mediaId;
     document.getElementById('deleteForm').action = '/delete_own/' + mediaId;
+}
+
+function shareProfile() {
+    const profileUrl = window.location.origin + "/agent/{{ user.username }}";
+    navigator.clipboard.writeText(profileUrl).then(() => {
+        var toast = document.getElementById("toast");
+        toast.style.visibility = "visible";
+        setTimeout(function(){ toast.style.visibility = "hidden"; }, 3000);
+    });
+}
+
+async function openNetworkModal(type, username) {
+    document.getElementById('networkModal').style.display = 'flex';
+    document.getElementById('networkTitle').innerText = type === 'followers' ? 'Followers' : 'Following';
+    const listDiv = document.getElementById('networkList');
+    listDiv.innerHTML = '<p style="text-align:center; color: var(--text-muted);">Loading...</p>';
+    
+    try {
+        const res = await fetch(`/api/network/${type}/${username}`);
+        const data = await res.json();
+        let html = '';
+        data.forEach(user => {
+            const pic = user.profile_pic ? `<img src="${user.profile_pic}" style="width:40px; height:40px; border-radius:50%; object-fit:cover; border:2px solid var(--accent);">` : `<div style="width:40px; height:40px; border-radius:50%; background:#1e293b; border:2px solid var(--accent); display:grid; place-items:center; font-size: 1.2rem;">👤</div>`;
+            const badge = user.is_verified ? '<span style="color:#38bdf8; font-size:0.9rem;" title="Verified">✅</span>' : '';
+            html += `
+            <a href="/agent/${user.username}" style="display:flex; align-items:center; gap:15px; text-decoration:none; color:inherit; padding:10px; background:rgba(8,17,31,0.5); border-radius:10px; border:1px solid rgba(255,255,255,0.05); transition: 0.2s;" onmouseover="this.style.background='rgba(8,17,31,0.9)'" onmouseout="this.style.background='rgba(8,17,31,0.5)'">
+                ${pic}
+                <div style="font-weight:bold; font-size:1.1rem; display:flex; align-items:center; gap:5px;">${user.username} ${badge}</div>
+            </a>`;
+        });
+        if(data.length === 0) { html = `<p style="text-align:center; color: var(--text-muted); font-style: italic;">No users found.</p>`; }
+        listDiv.innerHTML = html;
+    } catch(e) { listDiv.innerHTML = `<p style="text-align:center; color: var(--danger);">Failed to load data.</p>`; }
 }
 </script>
 {% endblock %}
