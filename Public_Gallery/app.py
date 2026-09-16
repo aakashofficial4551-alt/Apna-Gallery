@@ -516,7 +516,6 @@ def upload_asset():
         c = conn.cursor()
         c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved, visibility, views, is_pinned) VALUES (%s, %s, %s, %s, %s, %s, %s, 0, FALSE)",
                   (filename, title, category, "", session.get("username"), is_approved, visibility))
-        
         mentions = set(re.findall(r'@(\w+)', title))
         for m in mentions:
             if m != session["username"]:
@@ -529,6 +528,31 @@ def upload_asset():
         conn.rollback()
         flash(f"Server Alert: {str(e)[:150]}", "error")
     return redirect(request.referrer or url_for("feed"))
+
+@app.route("/edit_post/<int:media_id>", methods=["POST"])
+def edit_post(media_id):
+    if "username" not in session: return redirect(url_for("login"))
+    new_title = request.form.get("title", "").strip()
+    if new_title:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("UPDATE media SET title = %s WHERE id = %s AND uploaded_by = %s", (new_title, media_id, session["username"]))
+        conn.commit()
+        conn.close()
+        flash("Post updated successfully!", "success")
+    return redirect(request.referrer or url_for("profile"))
+
+@app.route("/pin_post/<int:media_id>", methods=["POST"])
+def pin_post(media_id):
+    if "username" not in session: return redirect(url_for("login"))
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("UPDATE media SET is_pinned = FALSE WHERE uploaded_by = %s", (session["username"],))
+    c.execute("UPDATE media SET is_pinned = TRUE WHERE id = %s AND uploaded_by = %s", (media_id, session["username"]))
+    conn.commit()
+    conn.close()
+    flash("Post Pinned!", "success")
+    return redirect(request.referrer or url_for("profile"))
 
 @app.route("/api/view/<int:media_id>", methods=["POST"])
 def add_view(media_id):
@@ -558,7 +582,7 @@ def block_user(username):
     return jsonify({"success": success})
 
 # =========================================================
-# CORE ROUTES (100% FIXED EXPLORE & DASHBOARD DATA) 💥
+# CORE ROUTES
 # =========================================================
 @app.route("/")
 def index():
@@ -618,13 +642,11 @@ def reels():
     conn.close()
     return render_template("reels.html", videos=videos)
 
-# 💥 FIX: EXPLORE ROUTE FULLY RESTORED 💥
 @app.route("/explore")
 def explore():
     if "username" not in session: return redirect(url_for("login"))
     conn = get_db_connection()
     c = conn.cursor()
-    
     c.execute("SELECT m.id, m.filename, m.title, m.category, m.likes, m.views, m.uploaded_by FROM media m WHERE m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' AND m.uploaded_by NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) ORDER BY RANDOM() LIMIT 40", (session["username"],))
     explore_posts = c.fetchall()
     
@@ -639,10 +661,8 @@ def explore():
             for t in tags: tag_counts[t.lower()] += 1
             
     trending_tags = [tag for tag, count in sorted(tag_counts.items(), key=lambda x: x[1], reverse=True)[:6]]
-    
     return render_template("explore.html", posts=explore_posts, trending_tags=trending_tags)
 
-# 💥 FIX: DASHBOARD ROUTE FULLY RESTORED 💥
 @app.route("/dashboard")
 def dashboard():
     if "username" not in session: return redirect(url_for("login"))
@@ -906,7 +926,7 @@ def api_global_chat_history():
     return jsonify(formatted)
 
 # =========================================================
-# LIKES, COMMENTS, SEARCH, & GALLERY
+# LIKES, COMMENTS, SEARCH (LIVE SEARCH API) & GALLERY
 # =========================================================
 @app.route("/search")
 def search():
@@ -923,6 +943,32 @@ def search():
     found_users = c.fetchall()
     conn.close()
     return render_template("search.html", media_files=media_files, found_users=found_users, query=query)
+
+# 💥 PHASE 67: LIVE SEARCH SUGGESTIONS API 💥
+@app.route("/api/search_suggest")
+def api_search_suggest():
+    if "username" not in session: return jsonify([])
+    q = request.args.get("q", "").strip()
+    if not q: return jsonify([])
+    
+    clean_q = q.replace("#", "").replace("@", "").lower()
+    conn = get_db_connection()
+    c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    
+    c.execute("SELECT username, profile_pic, is_verified FROM users WHERE username ILIKE %s AND username NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) LIMIT 5", (f"%{clean_q}%", session["username"]))
+    users = [{"type": "user", "username": r['username'], "pic": r['profile_pic'], "verified": r['is_verified']} for r in c.fetchall()]
+    
+    c.execute("SELECT title FROM media WHERE title ILIKE %s LIMIT 10", (f"%#{clean_q}%",))
+    tags = set()
+    for r in c.fetchall():
+        if r['title']:
+            found_tags = re.findall(r'#(\w+)', r['title'])
+            for t in found_tags:
+                if clean_q in t.lower(): tags.add(t)
+    
+    tags_list = [{"type": "tag", "tag": t} for t in list(tags)[:4]]
+    conn.close()
+    return jsonify(users + tags_list)
 
 @app.route("/gallery/<category>", methods=["GET", "POST"])
 def gallery(category):
@@ -988,6 +1034,31 @@ def ai_endpoint():
 @app.route("/ai-studio", methods=["GET", "POST"])
 def ai_studio():
     if "username" not in session: return redirect(url_for("login"))
+    if request.method == "POST":
+        prompt = request.form.get("prompt", "").strip()
+        if not prompt: return redirect(url_for("ai_studio"))
+        trigger_words = ["create", "generate", "draw", "make an image", "paint"]
+        wants_image = any(word in prompt.lower() for word in trigger_words)
+        
+        if wants_image:
+            encoded_prompt = urllib.parse.quote(prompt)
+            image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?nologo=true"
+            try:
+                r = requests.get(image_url, timeout=15)
+                secure_url = cloudinary.uploader.upload(r.content, resource_type="image")["secure_url"] if r.status_code == 200 else image_url
+                conn = get_db_connection()
+                c = conn.cursor()
+                c.execute("INSERT INTO media (filename, title, category, prompt, uploaded_by, approved, visibility, views, is_pinned) VALUES (%s, %s, %s, %s, %s, 1, 'public', 0, FALSE)",
+                          (secure_url, f"AI: {prompt[:20]}...", "Photo", prompt, session["username"]))
+                conn.commit()
+                conn.close()
+                flash("Image created successfully! (100% Free)", "success")
+                return redirect(url_for("gallery", category="Photo"))
+            except: flash("Image generation failed.", "error")
+        else:
+            try: reply = get_ai_response(prompt)
+            except: reply = "I am currently offline."
+            return render_template("ai_studio.html", chat_reply=reply, user_prompt=prompt, hide_navbar=True)
     return render_template("ai_studio.html", hide_navbar=True)
 
 @app.route("/like/<int:media_id>", methods=["POST"])
@@ -1006,7 +1077,6 @@ def like(media_id):
         conn.commit()
         liked_now = True
     else: liked_now = False
-    
     c.execute("SELECT likes FROM media WHERE id = %s", (media_id,))
     likes = c.fetchone()["likes"]
     conn.close()
@@ -1084,6 +1154,21 @@ def report_asset(media_id):
     finally: conn.close()
 
 # =========================================================
+# CREATOR STUDIO ANALYTICS (PHASE 66 📊)
+# =========================================================
+@app.route("/analytics")
+def analytics():
+    if "username" not in session: return redirect(url_for("login"))
+    conn = get_db_connection()
+    c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    c.execute("SELECT COUNT(id) as total_posts, SUM(views) as total_views, SUM(likes) as total_likes FROM media WHERE uploaded_by = %s", (session["username"],))
+    stats = c.fetchone()
+    c.execute("SELECT title, views, likes, category, filename FROM media WHERE uploaded_by = %s ORDER BY views DESC LIMIT 5", (session["username"],))
+    top_posts = c.fetchall()
+    conn.close()
+    return render_template("analytics.html", stats=stats, top_posts=top_posts, hide_navbar=True)
+
+# =========================================================
 # ADMIN CONTROLS
 # =========================================================
 @app.route("/admin", methods=["GET", "POST"])
@@ -1150,7 +1235,6 @@ def admin_user_action(user_id, action):
     elif action == "unverify":
         c.execute("UPDATE users SET is_verified = FALSE WHERE id = %s", (user_id,))
         flash("Verification Removed.", "success")
-        
     conn.commit()
     conn.close()
     return redirect(url_for("admin"))
