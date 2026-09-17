@@ -1,362 +1,121 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <!-- Viewport adjusted for native mobile app feel (prevents zooming on tap) -->
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Apna Gallery{% endblock %}</title>
-    <meta name="description" content="Join Apna Gallery - The Ultimate AI-Powered Creator Economy and Social Network.">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>{% block title %}PHANTX{% endblock %}</title>
     
-    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
-    <meta name="theme-color" content="#050505">
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0f172a">
     
-    <!-- 💥 PREMIUM UI UPGRADE: DEEP OBSIDIAN THEME 💥 -->
-    <style>
-        :root {
-            --bg-main: #050505; /* Deep premium black */
-            --bg-card: rgba(20, 20, 24, 0.75); /* Glassy dark grey */
-            --border-color: rgba(255, 255, 255, 0.08); /* Subtle premium borders */
-            --text-main: #f8fafc; 
-            --text-muted: #94a3b8;
-            --accent: {% if my_theme == 'gold' %}#fbbf24{% elif my_theme == 'rose' %}#f43f5e{% elif my_theme == 'matrix' %}#22c55e{% else %}#0ea5e9{% endif %} !important;
-            --danger: #ef4444; --success: #10b981; --warning: #f59e0b;
-        }
-        
-        body { 
-            margin: 0; 
-            font-family: system-ui, -apple-system, sans-serif; 
-            background-color: var(--bg-main); 
-            /* Premium Ambient Glow Background */
-            background-image: 
-                radial-gradient(circle at 15% 50%, rgba(14, 165, 233, 0.04) 0%, transparent 50%), 
-                radial-gradient(circle at 85% 30%, rgba(168, 85, 247, 0.04) 0%, transparent 50%);
-            background-attachment: fixed;
-            color: var(--text-main); 
-            min-height: 100vh; 
-            display: flex; 
-            flex-direction: column; 
-        }
-        
-        .navbar-top { 
-            background: rgba(5, 5, 5, 0.85); 
-            backdrop-filter: blur(15px); 
-            -webkit-backdrop-filter: blur(15px);
-            display: flex; 
-            flex-direction: column; 
-            border-bottom: 1px solid var(--border-color); 
-            position: sticky; 
-            top: 0; 
-            z-index: 1000; 
-            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
-        }
-        
-        .header-row { display: flex; justify-content: space-between; align-items: center; padding: 15px 30px; }
-        .logo { font-size: 1.6rem; font-weight: 900; color: white; text-decoration: none; letter-spacing: 1px; }
-        .logo span { color: var(--accent); transition: color 0.3s; text-shadow: 0 0 10px rgba(14, 165, 233, 0.3); }
-        
-        .desktop-icons { display: flex; align-items: center; gap: 15px; }
-        
-        .nav-scroller { display: flex; gap: 20px; overflow-x: auto; padding: 12px 30px; background: transparent; white-space: nowrap; scrollbar-width: none; }
-        .nav-scroller::-webkit-scrollbar { display: none; }
-        .nav-scroller a { color: var(--text-muted); text-decoration: none; font-weight: 600; font-size: 0.95rem; transition: 0.3s; padding: 5px 12px; border-radius: 20px; }
-        .nav-scroller a.active, .nav-scroller a:hover { color: #fff; background: rgba(255,255,255,0.08); }
-        
-        .search-container { position: relative; display: flex; align-items: center; flex: 1; max-width: 400px; margin: 0 20px; }
-        .search-container input { width: 100%; padding: 10px 18px; border-radius: 25px; border: 1px solid var(--border-color); background: rgba(255, 255, 255, 0.03); color: white; outline: none; transition: 0.3s; }
-        .search-container input:focus { background: rgba(255, 255, 255, 0.06); border-color: var(--accent); box-shadow: 0 0 15px rgba(14, 165, 233, 0.1); }
-        
-        .search-dropdown { display: none; position: absolute; top: 110%; left: 0; width: 100%; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; margin-top: 5px; box-shadow: 0 15px 40px rgba(0,0,0,0.6); overflow: hidden; z-index: 10001; backdrop-filter: blur(20px); }
-        .search-item { padding: 12px 15px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--border-color); text-decoration: none; color: white; transition: 0.2s; }
-        .search-item:hover { background: rgba(255,255,255,0.05); }
-        
-        .btn { background: var(--accent); color: #000; border: none; padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.3s; text-decoration: none; display: inline-block; }
-        .btn:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(14, 165, 233, 0.3); }
-        
-        .flash-messages { padding: 15px 20px; max-width: 1200px; margin: 0 auto; width: 100%; box-sizing: border-box; }
-        .container { flex: 1; width: 100%; box-sizing: border-box; {% if not hide_navbar %} max-width: 1200px; margin: 0 auto; padding: 20px; {% endif %} }
-        .notif-badge { position: absolute; top: -5px; right: -10px; background: var(--danger); color: white; border-radius: 50%; padding: 2px 6px; font-size: 0.7rem; font-weight: bold; border: 2px solid var(--bg-main); }
-
-        @media (max-width: 768px) {
-            .header-row { padding: 15px; flex-wrap: wrap; gap: 10px; }
-            .search-container { order: 3; max-width: 100%; margin: 0; margin-top: 5px; }
-            .nav-scroller { padding: 10px 15px; }
-        }
-
-        #splash-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-main); z-index: 999999; display: flex; flex-direction: column; justify-content: center; align-items: center; transition: opacity 0.5s ease-out; }
-        #splash-screen.hidden { opacity: 0; pointer-events: none; }
-        
-        #liveToast { visibility: hidden; min-width: 250px; background: linear-gradient(135deg, var(--accent), var(--success)); color: #000; text-align: center; border-radius: 12px; padding: 16px; position: fixed; z-index: 10000; right: 20px; bottom: 80px; transform: translateX(120%); transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); font-weight: bold; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); }
-        #liveToast.show { visibility: visible; transform: translateX(0); }
-    </style>
-    {% block head %}{% endblock %}
+    <!-- Core CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet">
 </head>
 <body>
 
-    <a href="{{ url_for('notifications') }}" id="liveToast" style="text-decoration: none;">
-        🔔 You have a new notification!
-    </a>
+    <!-- FLASH MESSAGES -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div style="position: fixed; top: 10px; right: 10px; z-index: 10000; width: 90%; max-width: 350px;">
+          {% for category, message in messages %}
+            <div style="background: {% if category == 'error' %}#e76f51{% else %}#00b4d8{% endif %}; color: white; padding: 15px; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); font-weight: 600; animation: fadeUp 0.3s ease-out;">
+              {{ message }}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
 
+    <!-- DESKTOP TOP NAVBAR -->
     {% if not hide_navbar %}
-    <nav class="navbar-top">
-        <div class="header-row">
-            <a href="{{ url_for('feed') }}" class="logo">APNA <span>GALLERY</span></a>
-            
-            {% if session.get('username') %}
-            <div class="search-container">
-                <form action="{{ url_for('search') }}" method="GET" style="width: 100%;">
-                    <input type="text" name="q" id="live-search" placeholder="Search #tags or users..." onkeyup="fetchSuggestions(this.value)" autocomplete="off">
-                </form>
-                <div class="search-dropdown" id="search-dropdown"></div>
-            </div>
-
-            <div class="desktop-icons">
-                <div style="background: rgba(251, 191, 36, 0.1); color: var(--warning); padding: 6px 12px; border-radius: 20px; font-size: 0.9rem; font-weight: bold; display: flex; align-items: center; gap: 5px; border: 1px solid rgba(251, 191, 36, 0.3);" title="Your Wallet Balance">
-                    🪙 {{ my_wallet }}
-                </div>
-                <a href="{{ url_for('inbox') }}" style="color: white; text-decoration: none; position: relative; font-size: 1.3rem;">✉️ <span class="notif-badge" id="badge-msg" style="{% if unread_messages == 0 %}display:none;{% endif %}">{{ unread_messages }}</span></a>
-                <a href="{{ url_for('notifications') }}" style="color: white; text-decoration: none; position: relative; font-size: 1.3rem;">🔔 <span class="notif-badge" id="badge-notif" style="{% if unread_notifications == 0 %}display:none;{% endif %}">{{ unread_notifications }}</span></a>
-                <span onclick="document.getElementById('settingsModal').style.display='flex'" style="font-size: 1.3rem; cursor: pointer; margin-left: 5px; transition: 0.2s;" onmouseover="this.style.transform='rotate(45deg)'" onmouseout="this.style.transform='rotate(0)'">⚙️</span>
-            </div>
-            {% else %}
-                <a href="{{ url_for('login') }}" class="btn">Login</a>
-            {% endif %}
+    <header class="glass-header">
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <a href="{{ url_for('feed') }}" style="font-size: 1.5rem; font-weight: 800; color: var(--text-primary); text-decoration: none;">PHANTX</a>
         </div>
-
+        
         {% if session.get('username') %}
-        <div class="nav-scroller">
-            <a href="{{ url_for('feed') }}" class="{% if request.endpoint == 'feed' %}active{% endif %}">📰 Feed</a>
-            <a href="{{ url_for('explore') }}" class="{% if request.endpoint == 'explore' %}active{% endif %}">🌍 Explore</a>
-            <a href="{{ url_for('reels') }}" class="{% if request.endpoint == 'reels' %}active{% endif %}" style="color: var(--accent);">🎬 Reels</a>
-            <a href="{{ url_for('leaderboard') }}" class="{% if request.endpoint == 'leaderboard' %}active{% endif %}" style="color: var(--warning);">🏆 Top Ranks</a>
-            <a href="{{ url_for('global_chat') }}" style="color: var(--success);">🌐 Chatroom</a>
-            <a href="{{ url_for('dashboard') }}" class="{% if request.endpoint == 'dashboard' %}active{% endif %}">🎛️ HQ</a>
-            <a href="{{ url_for('profile') }}" class="{% if request.endpoint == 'profile' %}active{% endif %}" style="color: var(--accent);">👤 Profile</a>
-            {% if session.get('role') == 'admin' %} <a href="{{ url_for('admin') }}" style="color: var(--danger);">🛡️ Admin</a> {% endif %}
-        </div>
+        <nav class="nav-links">
+            <a href="{{ url_for('feed') }}" class="nav-link">Feed</a>
+            <a href="{{ url_for('explore') }}" class="nav-link">Explore</a>
+            <a href="#" onclick="openUploadModal()" class="nav-link btn" style="color: white;">+ Upload</a>
+            <a href="{{ url_for('inbox') }}" class="nav-link">Inbox 
+                {% if unread_messages > 0 %}<span style="background:red; color:white; border-radius:50%; padding:2px 6px; font-size:10px;">{{ unread_messages }}</span>{% endif %}
+            </a>
+            <a href="{{ url_for('notifications') }}" class="nav-link">🔔
+                {% if unread_notifications > 0 %}<span style="background:red; color:white; border-radius:50%; padding:2px 6px; font-size:10px;">{{ unread_notifications }}</span>{% endif %}
+            </a>
+            <a href="{{ url_for('profile') }}" class="nav-link">
+                <img src="{{ get_avatar(my_profile_pic, session.username) }}" style="width:30px; height:30px; border-radius:50%; vertical-align:middle; border:2px solid var(--accent-primary);">
+            </a>
+        </nav>
         {% endif %}
+    </header>
+    {% endif %}
+
+    <!-- MAIN CONTENT -->
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- 💥 MOBILE BOTTOM NAVIGATION (Visible only on phones via CSS) 💥 -->
+    {% if session.get('username') and not hide_navbar %}
+    <nav class="mobile-bottom-nav">
+        <div class="nav-icons-container">
+            <!-- Home / Feed -->
+            <a href="{{ url_for('feed') }}" class="nav-icon {% if request.endpoint == 'feed' %}active{% endif %}">🏠</a>
+            
+            <!-- Explore -->
+            <a href="{{ url_for('explore') }}" class="nav-icon {% if request.endpoint == 'explore' %}active{% endif %}">🔍</a>
+            
+            <!-- Upload (Center Plus) -->
+            <a href="#" onclick="openUploadModal()" class="nav-icon nav-plus-btn">➕</a>
+            
+            <!-- Inbox / Notifications -->
+            <a href="{{ url_for('notifications') }}" class="nav-icon {% if request.endpoint == 'notifications' %}active{% endif %}">
+                🔔{% if unread_notifications > 0 %}<span style="position:absolute; top:-5px; right:-10px; background:red; color:white; border-radius:50%; padding:2px 5px; font-size:10px;">{{ unread_notifications }}</span>{% endif %}
+            </a>
+            
+            <!-- Profile -->
+            <a href="{{ url_for('profile') }}" class="nav-icon {% if request.endpoint == 'profile' %}active{% endif %}">👤</a>
+        </div>
     </nav>
     {% endif %}
 
-    {% if not hide_navbar %}
-    <div class="flash-messages">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div style="padding: 15px; border-radius: 12px; margin-bottom: 10px; font-weight: bold; background: rgba(34, 197, 94, 0.1); border: 1px solid var(--success); color: var(--success); backdrop-filter: blur(5px);">{{ message }}</div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-    </div>
-    {% endif %}
-
-    <div class="container">
-        {% block content %}{% endblock %}
-    </div>
-
-    {% if session.get('username') and not hide_navbar %}
-    <button onclick="document.getElementById('uploadModal').style.display='flex'" style="position: fixed; bottom: 30px; right: 30px; width: 65px; height: 65px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), #3b82f6); color: #000; border: none; font-size: 2.5rem; box-shadow: 0 10px 25px rgba(14, 165, 233, 0.4); cursor: pointer; z-index: 9000; display: grid; place-items: center; transition: 0.3s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">+</button>
-
-    <div id="uploadModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 10000; justify-content: center; align-items: center; backdrop-filter: blur(10px);">
-        <div style="background: var(--bg-card); padding: 35px; border-radius: 24px; border: 1px solid var(--border-color); width: 90%; max-width: 450px; position: relative; box-shadow: 0 20px 50px rgba(0,0,0,0.6);">
-            <span onclick="document.getElementById('uploadModal').style.display='none'" style="position: absolute; top: 15px; right: 20px; font-size: 2rem; color: white; cursor: pointer;">&times;</span>
-            <h2 style="color: var(--accent); margin-top: 0;">✨ Create Post</h2>
-            <form method="POST" action="{{ url_for('upload_asset') }}" enctype="multipart/form-data" style="display: flex; flex-direction: column; gap: 15px; margin-top: 20px;">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <select name="category" id="vaultCategory" required style="padding: 14px; border-radius: 12px; background: rgba(255,255,255,0.05); color: white; border: 1px solid var(--border-color); outline: none;">
-                    <option value="Photo">📸 Photo</option>
-                    <option value="Video">🎥 Video</option>
-                    <option value="Music">🎵 Music</option>
-                    <option value="Shayari">✍️ Shayari</option>
-                </select>
-                <select name="visibility" required style="padding: 14px; border-radius: 12px; background: rgba(255,255,255,0.05); color: white; border: 1px solid var(--border-color); outline: none;">
-                    <option value="public">🌍 Public</option>
-                    <option value="followers">👥 Followers Only</option>
-                    <option value="private">🔒 Private</option>
-                </select>
-                <div style="display: flex; gap: 10px; align-items: center;">
-                    <input type="text" name="title" id="uploadCaption" placeholder="Write caption..." required style="flex: 1; padding: 14px; border-radius: 12px; background: rgba(255,255,255,0.05); color: white; border: 1px solid var(--border-color); outline: none;">
-                    <button type="button" onclick="generateAICaption()" class="btn" style="padding: 14px; background: var(--warning); border-radius: 12px;">✨</button>
-                </div>
-                <input type="file" name="media" style="padding: 14px; border-radius: 12px; background: rgba(255,255,255,0.05); color: white; border: 1px solid var(--border-color);">
-                <button type="submit" class="btn" style="width: 100%; font-size: 1.1rem; padding: 14px; border-radius: 12px; margin-top: 10px;">Upload</button>
-            </form>
-        </div>
-    </div>
-    {% endif %}
-
-    {% if session.get('username') %}
-    <div id="settingsModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 10000; justify-content: center; align-items: center; backdrop-filter: blur(10px);">
-        <div style="background: var(--bg-card); padding: 35px; border-radius: 24px; border: 1px solid var(--border-color); width: 90%; max-width: 450px; position: relative; box-shadow: 0 20px 50px rgba(0,0,0,0.6); max-height: 85vh; overflow-y: auto;">
-            <span onclick="document.getElementById('settingsModal').style.display='none'" style="position: absolute; top: 15px; right: 20px; font-size: 2rem; color: white; cursor: pointer;">&times;</span>
-            <h2 style="color: var(--accent); margin-top: 0; margin-bottom: 25px;">⚙️ Settings Hub</h2>
+    <!-- UPLOAD MODAL (Global) -->
+    <div id="uploadModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
+        <div style="background: var(--surface); padding: 30px; border-radius: var(--radius-lg); width: 90%; max-width: 400px; position: relative;">
+            <span onclick="document.getElementById('uploadModal').style.display='none'" style="position: absolute; top: 15px; right: 20px; font-size: 1.5rem; cursor: pointer; color: var(--text-primary);">&times;</span>
+            <h3 style="color: var(--text-primary); margin-bottom: 20px;">Upload to Vault</h3>
             
-            {% if not session.is_registered %}
-            <form method="POST" action="/settings" style="display: flex; flex-direction: column; gap: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 20px; background: rgba(251, 191, 36, 0.05); padding: 20px; border-radius: 16px; border: 1px solid rgba(251, 191, 36, 0.2);">
+            <form method="POST" action="/upload_asset" enctype="multipart/form-data">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <input type="hidden" name="action" value="upgrade_guest">
-                <h3 style="margin: 0; font-size: 1.1rem; color: var(--warning);">⭐ Save Your Account</h3>
-                <input type="text" name="new_username" placeholder="Choose new Username" required style="padding: 12px; border-radius: 10px; background: rgba(255,255,255,0.05); color: white; border: 1px solid var(--border-color); outline: none;">
-                <input type="email" name="email" placeholder="Enter Email" required style="padding: 12px; border-radius: 10px; background: rgba(255,255,255,0.05); color: white; border: 1px solid var(--border-color); outline: none;">
-                <input type="password" name="password" placeholder="Create Password" required style="padding: 12px; border-radius: 10px; background: rgba(255,255,255,0.05); color: white; border: 1px solid var(--border-color); outline: none;">
-                <button type="submit" class="btn" style="width: 100%; background: var(--warning); color: #000; border-radius: 10px;">Upgrade to Permanent Account</button>
-            </form>
-            {% else %}
-            <form method="POST" action="/settings" style="display: flex; flex-direction: column; gap: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 25px;">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <input type="hidden" name="action" value="update_profile">
-                <h3 style="margin: 0; font-size: 1.1rem; color: var(--text-main);">Profile Settings</h3>
-                <input type="text" name="bio" value="{{ my_bio }}" placeholder="Bio..." style="padding: 12px; border-radius: 10px; background: rgba(255,255,255,0.05); color: white; border: 1px solid var(--border-color); outline: none;">
-                <input type="url" name="website" value="{{ my_website }}" placeholder="https://your-link.com" style="padding: 12px; border-radius: 10px; background: rgba(255,255,255,0.05); color: white; border: 1px solid var(--border-color); outline: none;">
-                <select name="theme" style="padding: 12px; border-radius: 10px; background: rgba(255,255,255,0.05); color: white; border: 1px solid var(--border-color); outline: none;">
-                    <option value="cyan" {% if my_theme == 'cyan' %}selected{% endif %}>Cyan (Default)</option>
-                    <option value="gold" {% if my_theme == 'gold' %}selected{% endif %}>Gold</option>
-                    <option value="rose" {% if my_theme == 'rose' %}selected{% endif %}>Rose Pink</option>
-                    <option value="matrix" {% if my_theme == 'matrix' %}selected{% endif %}>Matrix Green</option>
+                
+                <input type="file" name="media" accept="image/*,video/*" required class="form-input" style="margin-bottom: 15px;">
+                <input type="text" name="title" placeholder="Caption (use #tags or @mentions)" required class="form-input" style="margin-bottom: 15px;">
+                
+                <select name="category" class="form-input" style="margin-bottom: 15px;">
+                    <option value="Photo">Photo / Art</option>
+                    <option value="Video">Short Video (Reel)</option>
                 </select>
-                <button type="submit" class="btn" style="width: 100%; border-radius: 10px;">Save Profile</button>
+                
+                <select name="visibility" class="form-input" style="margin-bottom: 20px;">
+                    <option value="public">🌍 Public (Global Feed)</option>
+                    <option value="followers">👥 Followers Only</option>
+                </select>
+
+                <button type="submit" class="btn" style="width: 100%;">Upload Asset</button>
             </form>
-
-            <form method="POST" action="/settings" style="display: flex; flex-direction: column; gap: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 25px; margin-top: 25px;">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <input type="hidden" name="action" value="change_password">
-                <h3 style="margin: 0; font-size: 1.1rem; color: var(--text-main);">Security</h3>
-                <input type="password" name="new_password" placeholder="Enter new password" required style="padding: 12px; border-radius: 10px; background: rgba(255,255,255,0.05); color: white; border: 1px solid var(--border-color); outline: none;">
-                <button type="submit" class="btn" style="width: 100%; background: #334155; color: white; border-radius: 10px;">Change Password</button>
-            </form>
-
-            {% if not my_is_verified %}
-            <form method="POST" action="/buy_verification" style="margin-top: 25px; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 25px;">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <h3 style="margin: 0 0 10px 0; font-size: 1.1rem; color: #38bdf8;">✅ Get Verified</h3>
-                <p style="margin: 0 0 15px 0; font-size: 0.85rem; color: var(--text-muted);">Stand out from the crowd. Costs 1000 🪙.</p>
-                <button type="submit" class="btn" style="width: 100%; background: rgba(56, 189, 248, 0.1); border: 1px solid #38bdf8; color: #38bdf8; border-radius: 10px;">Buy Blue Tick</button>
-            </form>
-            {% endif %}
-
-            {% endif %}
-
-            {% if my_blocked_users %}
-            <div style="margin-top: 25px; border-bottom: 1px solid var(--border-color); padding-bottom: 25px;">
-                <h3 style="margin: 0 0 15px 0; font-size: 1.1rem; color: var(--danger);">🚫 Blocked Users</h3>
-                <div style="display: flex; flex-direction: column; gap: 10px; max-height: 120px; overflow-y: auto; padding-right: 5px;">
-                    {% for blocked_user in my_blocked_users %}
-                    <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.03); padding: 10px 15px; border-radius: 10px; border: 1px solid var(--border-color);">
-                        <span style="color: white; font-weight: bold;">{{ blocked_user }}</span>
-                        <form method="POST" action="/settings" style="margin: 0;">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="action" value="unblock_user">
-                            <input type="hidden" name="blocked_username" value="{{ blocked_user }}">
-                            <button type="submit" class="btn" style="padding: 6px 12px; font-size: 0.8rem; background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981;">Unblock</button>
-                        </form>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-            {% endif %}
-
-            <form method="POST" action="/settings" onsubmit="return confirm('Account will be deleted in 7 days. Proceed?');" style="margin-top: 25px;">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <input type="hidden" name="action" value="delete_account">
-                <button type="submit" class="btn" style="width: 100%; background: rgba(239, 68, 68, 0.1); border: 1px solid var(--danger); color: var(--danger); border-radius: 10px;">⚠️ Request Account Deletion</button>
-            </form>
-            <a href="{{ url_for('logout') }}" class="btn" style="width: 100%; text-align: center; display: block; margin-top: 15px; background: var(--danger); color: white; border-radius: 10px;">Logout</a>
         </div>
     </div>
-    {% endif %}
 
+    <!-- SCRIPT FOR MODAL & PWA -->
     <script>
-        window.addEventListener('load', () => { setTimeout(() => { const splash = document.getElementById('splash-screen'); if(splash) splash.classList.add('hidden'); }, 600); });
-        
-        let deferredPrompt;
-        window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault();
-            deferredPrompt = e;
-        });
-
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register("{{ url_for('static', filename='js/service-worker.js') }}").catch(()=>{});
-            });
+        function openUploadModal() {
+            document.getElementById('uploadModal').style.display = 'flex';
         }
-
-        if ("Notification" in window) {
-            if (Notification.permission !== "granted" && Notification.permission !== "denied") {
-                Notification.requestPermission();
-            }
-        }
-        
-        async function generateAICaption() {
-            const cat = document.getElementById('vaultCategory').value;
-            const input = document.getElementById('uploadCaption');
-            input.value = "Generating ✨...";
-            try {
-                const res = await fetch('/api/ai', { method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': '{{ csrf_token() }}'}, body: JSON.stringify({query: `Write a short social media caption for a ${cat} post.`}) });
-                if(res.status === 401) { window.location.href = '/login'; return; }
-                const data = await res.json();
-                input.value = data.reply;
-            } catch(e) { input.value = "Epic moment! 🔥"; }
-        }
-
-        async function fetchSuggestions(query) {
-            const dropdown = document.getElementById('search-dropdown');
-            if(query.length < 2) { dropdown.style.display = 'none'; return; }
-            try {
-                const res = await fetch(`/api/search_suggest?q=${encodeURIComponent(query)}`);
-                if(res.status === 401) { window.location.href = '/login'; return; }
-                const data = await res.json();
-                if(data.length === 0) { dropdown.style.display = 'none'; return; }
-                let html = '';
-                data.forEach(item => {
-                    if(item.type === 'user') {
-                        let pic = item.pic ? `<img src="${item.pic}" style="width:30px; height:30px; border-radius:50%; object-fit:cover;">` : `<div style="width:30px; height:30px; border-radius:50%; background:#1e293b; display:grid; place-items:center;">👤</div>`;
-                        let badge = item.verified ? '<span style="color:#38bdf8; font-size:0.8rem;">✅</span>' : '';
-                        html += `<a href="/agent/${item.username}" class="search-item">${pic} <strong>${item.username}</strong> ${badge}</a>`;
-                    } else { html += `<a href="/search?q=${encodeURIComponent(item.tag)}" class="search-item"><span style="font-size:1.5rem; color:var(--accent);">#</span> <strong>${item.tag}</strong></a>`; }
-                });
-                dropdown.innerHTML = html;
-                dropdown.style.display = 'block';
-            } catch(e) { console.error(e); }
-        }
-        document.addEventListener('click', function(event) {
-            const dropdown = document.getElementById('search-dropdown');
-            const searchInput = document.getElementById('live-search');
-            if (dropdown && !dropdown.contains(event.target) && event.target !== searchInput) { dropdown.style.display = 'none'; }
-        });
-
-        {% if session.get('username') %}
-        let currentUnread = {{ unread_notifications }};
-        setInterval(async () => {
-            try {
-                const res = await fetch('/api/unread_notifs');
-                if (res.status === 401) { window.location.href = '/login'; return; } 
-                
-                const data = await res.json();
-                if(data.unread > currentUnread) {
-                    if (Notification.permission === "granted") {
-                        if ('serviceWorker' in navigator) {
-                            navigator.serviceWorker.ready.then(function(registration) {
-                                registration.showNotification("Apna Gallery", { body: "🔔 You have a new message or tip!", vibrate: [200, 100, 200] });
-                            });
-                        } else {
-                            new Notification("Apna Gallery", { body: "🔔 You have a new message or tip!" });
-                        }
-                    }
-
-                    const toast = document.getElementById("liveToast");
-                    toast.classList.add("show");
-                    setTimeout(() => { toast.classList.remove("show"); }, 4000);
-                    currentUnread = data.unread;
-                    
-                    const badge = document.getElementById('badge-notif');
-                    if(badge) {
-                        badge.innerText = currentUnread;
-                        badge.style.display = 'inline-block';
-                    }
-                } else if (data.unread < currentUnread) {
-                    currentUnread = data.unread;
-                }
-            } catch(e) {}
-        }, 10000);
-        {% endif %}
     </script>
 </body>
 </html>
