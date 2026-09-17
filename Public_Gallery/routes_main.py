@@ -5,11 +5,19 @@ import random
 from collections import defaultdict
 import requests
 import psycopg2.extras
-from flask import request, render_template, redirect, url_for, flash, session, jsonify
+from flask import request, render_template, redirect, url_for, flash, session, jsonify, send_from_directory, make_response
 from database import get_db_connection
 from core_utils import get_ist_time, save_uploaded_file, hijack_bot_post, current_user_is_admin, sync_admin_session, ZERO_TOLERANCE_WORDS
+import os
 
 def init_main_routes(app):
+    # 💥 THE PWA SERVICE WORKER ROUTE 💥
+    @app.route('/sw.js')
+    def sw():
+        response = make_response(send_from_directory('static', 'sw.js'))
+        response.headers['Content-Type'] = 'application/javascript'
+        return response
+
     @app.route("/")
     def index(): return render_template("index.html")
 
@@ -24,7 +32,7 @@ def init_main_routes(app):
 
     @app.route("/manifest.json")
     def dynamic_manifest():
-        return jsonify({"name": "PHANTX", "short_name": "PHANTX", "display": "standalone", "start_url": "/", "background_color": "#0f172a", "theme_color": "#0f172a", "icons": [{"src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png"}, {"src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png"}]})
+        return jsonify({"name": "PHANTX", "short_name": "PHANTX", "display": "standalone", "start_url": "/", "background_color": "#0B0F19", "theme_color": "#0B0F19", "icons": [{"src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png"}, {"src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png"}]})
 
     @app.route("/upload_asset", methods=["POST"])
     def upload_asset():
@@ -291,7 +299,6 @@ def init_main_routes(app):
             return jsonify({"error": "Already reported"}), 400
         finally: conn.close()
 
-    # 💥 THE MISSING NOTIFICATION ROUTES (RESTORED) 💥
     @app.route("/notifications")
     def notifications():
         if "username" not in session: return redirect(url_for("login"))
