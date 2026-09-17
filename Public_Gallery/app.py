@@ -24,7 +24,6 @@ from flask import (
 )
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from ai_service import get_ai_response
 from database import init_db, get_db_connection
 
 # =========================================================
@@ -64,6 +63,7 @@ def security_firewall_and_session_check():
     ip = request.remote_addr or "127.0.0.1"
     now = time.time()
     
+    # Anti-DDoS
     request_tracker[ip] = [t for t in request_tracker[ip] if now - t < 60]
     if len(request_tracker[ip]) > 200:
         BANNED_IPS.add(ip)
@@ -74,6 +74,7 @@ def security_firewall_and_session_check():
     if request.endpoint in ['index', 'login', 'verify_otp', 'logout', 'static', 'api_search_suggest', 'privacy_policy', 'terms', 'about', 'dynamic_manifest'] or (request.path and request.path.startswith('/static/')):
         return
 
+    # Strict CSRF Verification
     if request.method in ["POST", "PUT", "DELETE"]:
         token = request.form.get("csrf_token") or request.headers.get("X-CSRF-Token")
         session_token = session.get("csrf_token")
@@ -83,6 +84,7 @@ def security_firewall_and_session_check():
                 flash("Security Firewall Blocked Your Request: Invalid Validation Token.", "error")
                 return redirect(request.referrer or url_for('feed'))
 
+    # GUILLOTINE ENGINE: SESSION TERMINATION
     if "username" in session:
         conn = get_db_connection()
         c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
@@ -306,7 +308,6 @@ def run_bot_engine():
             "Just uploaded a new pic, check it out guys!",
             "Admin ne kya mast features banaye hain 👏",
             "Need some coins yaar, tip kardo koi 😂🪙",
-            "Exploring the AI studio... crazy results!",
             "Mausam kaisa hai tum logo ki taraf? 🌧️",
             "Anyone into cyberpunk aesthetics here? 🏙️",
             "Can't stop scrolling this feed ngl 🚀",
@@ -346,16 +347,16 @@ def run_bot_engine():
                 if random.random() > 0.5:
                     prompt = random.choice(high_end_prompts)
                     encoded_prompt = urllib.parse.quote(prompt)
-                    seed_val = random.randint(1, 999999) # FIX: Prevents caching!
+                    seed_val = random.randint(1, 999999) 
                     img_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?nologo=true&seed={seed_val}&width=800&height=1000"
                     
                     caption = random.choice([
                         f"Just generated this masterpiece! Kaisa laga? ✨ #AIArt #Aesthetics",
-                        f"AI Studio is blowing my mind 🤯 What do you think? #Generated #{bot_username}",
+                        f"Generated this cool aesthetic 🔥 What do you think? #{bot_username}",
                         f"Speechless... AI art is the future 🔥 #DigitalArt"
                     ])
                 else:
-                    seed_val = random.randint(1, 999999) # FIX: Prevents caching!
+                    seed_val = random.randint(1, 999999)
                     img_url = f"https://picsum.photos/seed/{seed_val}/800/1000"
                     caption = random.choice([
                         "Nature ki vibe hi alag hai 🌲 #peace #sukoon", 
@@ -901,7 +902,7 @@ def report_asset(media_id):
     finally: conn.close()
 
 # =========================================================
-# CORE ROUTES (VIEWS)
+# CORE ROUTES (FEED & LEADERBOARD)
 # =========================================================
 @app.route("/feed")
 def feed():
@@ -1287,7 +1288,7 @@ def api_global_chat_history():
     if "username" not in session: return jsonify([])
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute(f"SELECT gc.id, gc.sender, gc.message, TO_CHAR(gc.created_at, 'HH12:MI AM') as time, u.role, u.is_verified FROM global_chat gc JOIN u ON gc.sender = u.username WHERE gc.sender NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) ORDER BY gc.created_at ASC", (session["username"],))
+    c.execute(f"SELECT gc.id, gc.sender, gc.message, TO_CHAR(gc.created_at, 'HH12:MI AM') as time, u.role, u.is_verified FROM global_chat gc JOIN users u ON gc.sender = u.username WHERE gc.sender NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) ORDER BY gc.created_at ASC", (session["username"],))
     history = c.fetchall()
     conn.close()
     formatted = [{"id": r['id'], "sender": r['sender'], "message": r['message'], "time": r['time'], "role": r['role'], "is_verified": r['is_verified']} for r in history]
@@ -1330,16 +1331,19 @@ def api_search_suggest():
     conn.close()
     return jsonify(users + tags_list)
 
+# 💥 AI STUDIO UPDATED: CHAT DISABLED, ONLY IMAGES ENABLED 💥
 @app.route("/ai-studio", methods=["GET", "POST"])
 def ai_studio():
     if "username" not in session: return redirect(url_for("login"))
     if request.method == "POST":
         prompt = request.form.get("prompt", "").strip()
         if not prompt: return redirect(url_for("ai_studio"))
+        
         wants_image = any(word in prompt.lower() for word in ["create", "generate", "draw", "make an image", "paint", "banao"])
+        
         if wants_image:
             encoded_prompt = urllib.parse.quote(prompt)
-            seed_val = random.randint(1, 999999) # 💥 Prevents caching here too! 💥
+            seed_val = random.randint(1, 999999) 
             image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?nologo=true&seed={seed_val}&width=800&height=1000"
             try:
                 r = requests.get(image_url, timeout=15)
@@ -1354,9 +1358,10 @@ def ai_studio():
                 return redirect(url_for("gallery", category="Photo"))
             except: flash("Image generation failed.", "error")
         else:
-            try: reply = get_ai_response(prompt)
-            except: reply = "I am currently offline."
+            # 💥 Chat feature hard-disabled with a maintenance message 💥
+            reply = "⚠️ AI Chatting feature has been temporarily disabled for maintenance. We will bring it back during the official launch! (You can still generate images by typing 'Create an image of...')"
             return render_template("ai_studio.html", chat_reply=reply, user_prompt=prompt, hide_navbar=True)
+            
     return render_template("ai_studio.html", hide_navbar=True)
 
 @app.route("/analytics")
