@@ -265,7 +265,7 @@ def upgrade_db():
     except: conn.rollback()
     
     try:
-        c.execute("SELECT id FROM users WHERE user_code IS NULL")
+        c.execute("SELECT id, user_code FROM users WHERE user_code IS NULL")
         for row in c.fetchall():
             code = ''.join(secrets.choice("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ") for _ in range(10))
             c.execute("UPDATE users SET user_code = %s WHERE id = %s", (code, row['id']))
@@ -369,9 +369,13 @@ def run_bot_engine():
             c.execute("INSERT INTO media (filename, title, category, uploaded_by, approved, visibility, views, tips_received, created_at, allow_comments) VALUES (%s, %s, %s, %s, 1, 'public', %s, 0, %s, TRUE)",
                       (img_url, caption, cat, bot_username, random.randint(5, 50), get_ist_time()))
         
-        # 20% chance to DELETE their own 0-like posts (Bot Intelligence)
+        # 💥 ANTI-CRASH FIX 💥 20% chance to DELETE their own 0-like posts
         elif 40 < action <= 60:
-            c.execute("DELETE FROM media WHERE uploaded_by = %s AND likes = 0 AND tips_received = 0 ORDER BY RANDOM() LIMIT 1", (bot_username,))
+            c.execute("""
+                DELETE FROM media WHERE id IN (
+                    SELECT id FROM media WHERE uploaded_by = %s AND likes = 0 AND tips_received = 0 ORDER BY RANDOM() LIMIT 1
+                )
+            """, (bot_username,))
                       
         elif 60 < action <= 70:
             c.execute("INSERT INTO global_chat (sender, message, created_at) VALUES (%s, %s, %s)", (bot_username, random.choice(bot_chats), get_ist_time()))
@@ -422,7 +426,9 @@ def inject_global_vars():
     if session.get("username"):
         try:
             conn = get_db_connection()
-            c = conn.cursor()
+            c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+            
+            # 💥 ANTI-CRASH FIX 💥 Changed index [0] to explicit dict keys ['cnt']
             c.execute("SELECT COUNT(id) as cnt FROM notifications WHERE username = %s AND is_read = FALSE", (session.get("username"),))
             res1 = c.fetchone()
             if res1: vars_dict["unread_notifications"] = res1['cnt']
@@ -434,18 +440,18 @@ def inject_global_vars():
             c.execute("SELECT theme, bio, profile_pic, website, is_verified, wallet_balance, nickname FROM users WHERE username = %s", (session.get("username"),))
             u_data = c.fetchone()
             if u_data:
-                vars_dict["my_theme"] = u_data[0]
-                vars_dict["my_bio"] = u_data[1]
-                vars_dict["my_profile_pic"] = u_data[2]
-                vars_dict["my_website"] = u_data[3] or ""
-                vars_dict["my_is_verified"] = u_data[4] or False
-                vars_dict["my_wallet"] = u_data[5] or 0
-                vars_dict["my_nickname"] = u_data[6] or session.get("username")
+                vars_dict["my_theme"] = u_data['theme']
+                vars_dict["my_bio"] = u_data['bio']
+                vars_dict["my_profile_pic"] = u_data['profile_pic']
+                vars_dict["my_website"] = u_data['website'] or ""
+                vars_dict["my_is_verified"] = u_data['is_verified'] or False
+                vars_dict["my_wallet"] = u_data['wallet_balance'] or 0
+                vars_dict["my_nickname"] = u_data['nickname'] or session.get("username")
                 
             c.execute("SELECT blocked FROM blocks WHERE blocker = %s", (session.get("username"),))
-            vars_dict["my_blocked_users"] = [r[0] for r in c.fetchall()]
+            vars_dict["my_blocked_users"] = [r['blocked'] for r in c.fetchall()]
             conn.close()
-        except: pass
+        except Exception as e: print("Global Inject Error:", e)
     return vars_dict
 
 def save_uploaded_file(file, category="Photo"):
@@ -466,13 +472,13 @@ def current_user_is_admin():
 def sync_admin_session():
     if "username" in session:
         conn = get_db_connection()
-        c = conn.cursor()
+        c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
         c.execute("SELECT role FROM users WHERE username = %s", (session["username"],))
         user = c.fetchone()
         conn.close()
         if user:
-            session["role"] = user[0]
-            session["is_admin"] = (user[0] == "admin")
+            session["role"] = user['role']
+            session["is_admin"] = (user['role'] == "admin")
 
 # =========================================================
 # 7. PUBLIC ROUTES
@@ -507,7 +513,6 @@ def dynamic_manifest():
 # 8. PASSWORDLESS OTP LOGIN & DAILY COIN SYSTEM
 # =========================================================
 def send_otp_email(receiver_email, otp):
-    # FALLBACK PRINT (Useful before Email is set up on Render)
     print(f"==========================================")
     print(f"🔒 SECURE OTP FOR {receiver_email} : {otp}")
     print(f"==========================================")
@@ -539,7 +544,7 @@ def request_otp():
     expiry = get_ist_time() + datetime.timedelta(minutes=5)
     
     conn = get_db_connection()
-    c = conn.cursor()
+    c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     c.execute("SELECT id FROM users WHERE email = %s", (email,))
     user = c.fetchone()
     
@@ -850,17 +855,17 @@ def like_comment(comment_id):
     if "username" not in session: return jsonify({"error": "Login required."}), 401
     username = session["username"]
     conn = get_db_connection()
-    c = conn.cursor()
+    c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     c.execute("INSERT INTO comment_likes (comment_id, username) VALUES (%s, %s) ON CONFLICT (comment_id, username) DO NOTHING", (comment_id, username))
     if c.rowcount == 1:
         c.execute("UPDATE comments SET likes = COALESCE(likes, 0) + 1 WHERE id = %s", (comment_id,))
         c.execute("SELECT username, media_id FROM comments WHERE id = %s", (comment_id,))
         comment_info = c.fetchone()
-        if comment_info and comment_info[0] != username:
-            c.execute("INSERT INTO notifications (username, message, link, created_at) VALUES (%s, %s, %s, %s)", (comment_info[0], f"❤️ {username} liked your comment!", f"/post/{comment_info[1]}", get_ist_time()))
+        if comment_info and comment_info['username'] != username:
+            c.execute("INSERT INTO notifications (username, message, link, created_at) VALUES (%s, %s, %s, %s)", (comment_info['username'], f"❤️ {username} liked your comment!", f"/post/{comment_info['media_id']}", get_ist_time()))
         conn.commit()
     c.execute("SELECT likes FROM comments WHERE id = %s", (comment_id,))
-    likes = c.fetchone()[0]
+    likes = c.fetchone()['likes']
     conn.close()
     return jsonify({"likes": likes or 0})
 
@@ -983,7 +988,7 @@ def leaderboard():
 def reels():
     if "username" not in session: return redirect(url_for("login"))
     conn = get_db_connection()
-    c = conn.cursor()
+    c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     c.execute("SELECT m.*, u.profile_pic, u.nickname, u.role, u.is_verified FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.approved = 1 AND m.visibility = 'public' AND m.category = 'Video' AND m.uploaded_by NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) ORDER BY RANDOM() LIMIT 20", (session["username"],))
     videos = c.fetchall()
     conn.close()
@@ -1015,7 +1020,7 @@ def explore():
 def gallery(category):
     if "username" not in session: return redirect(url_for("login"))
     conn = get_db_connection()
-    c = conn.cursor()
+    c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     if request.method == "POST":
         try:
             filename = "SHAYARI_TEXT"
@@ -1041,11 +1046,12 @@ def gallery(category):
     c.execute("SELECT m.*, u.profile_pic, u.nickname, u.role, u.is_verified FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.category = %s AND m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' AND m.uploaded_by NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) ORDER BY m.id DESC", (category, session["username"]))
     if category == 'Shayari': c.execute("SELECT m.*, u.role, u.nickname, u.is_verified FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.category = %s AND m.approved = 1 AND m.visibility = 'public' AND m.uploaded_by NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) ORDER BY m.id DESC", (category, session["username"]))
     media_files = c.fetchall()
+    
     c.execute("SELECT c.*, u.role, u.nickname, u.is_verified FROM comments c JOIN users u ON c.username = u.username ORDER BY c.id ASC")
     comments_db = c.fetchall()
     conn.close()
     comments = defaultdict(list)
-    for comment in comments_db: comments[comment[1]].append(comment)
+    for comment in comments_db: comments[comment['media_id']].append(comment)
     return render_template("gallery.html", media_files=media_files, category=category, comments=comments)
 
 @app.route("/dashboard")
@@ -1054,7 +1060,7 @@ def dashboard():
     sync_admin_session()
     try:
         conn = get_db_connection()
-        c = conn.cursor()
+        c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
         c.execute("SELECT id, title, filename, category, likes, views FROM media WHERE approved = 1 AND visibility = 'public' AND filename != 'SHAYARI_TEXT' ORDER BY likes DESC LIMIT 3")
         trending = c.fetchall()
         c.execute("SELECT s.id, s.username, s.filename, s.created_at, u.profile_pic, u.role, u.is_verified, u.nickname FROM stories s JOIN users u ON s.username = u.username WHERE s.created_at >= %s - INTERVAL '12 hours' AND s.username NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) ORDER BY s.id DESC", (get_ist_time(), session["username"]))
@@ -1068,7 +1074,7 @@ def dashboard():
 def notifications():
     if "username" not in session: return redirect(url_for("login"))
     conn = get_db_connection()
-    c = conn.cursor()
+    c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     c.execute("SELECT * FROM notifications WHERE username = %s ORDER BY id DESC LIMIT 50", (session["username"],))
     notifs = c.fetchall()
     c.execute("UPDATE notifications SET is_read = TRUE WHERE username = %s AND is_read = FALSE", (session["username"],))
@@ -1080,10 +1086,12 @@ def notifications():
 def api_unread_notifs():
     if "username" not in session: return jsonify({"unread": 0})
     conn = get_db_connection()
-    c = conn.cursor()
+    c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    
+    # 💥 ANTI-CRASH FIX 💥 Changed index [0] to explicit dict keys ['cnt']
     c.execute("SELECT COUNT(id) as cnt FROM notifications WHERE username = %s AND is_read = FALSE", (session["username"],))
     res = c.fetchone()
-    unread = res[0] if res else 0
+    unread = res['cnt'] if res else 0
     conn.close()
     return jsonify({"unread": unread})
 
@@ -1181,7 +1189,7 @@ def follow(username):
     current_user = session["username"]
     if current_user == username: return jsonify({"error": "Cannot follow yourself"}), 400
     conn = get_db_connection()
-    c = conn.cursor()
+    c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     c.execute("SELECT id FROM users WHERE username = %s", (username,))
     if not c.fetchone(): return jsonify({"error": "User not found"}), 404
     c.execute("SELECT id FROM followers WHERE follower = %s AND following = %s", (current_user, username))
@@ -1194,8 +1202,10 @@ def follow(username):
         c.execute("INSERT INTO notifications (username, message, link, created_at) VALUES (%s, %s, %s, %s)", (username, f"👤 {current_user} started following you!", f"/agent/{current_user}", get_ist_time()))
         following_now = True
     conn.commit()
+    
+    # 💥 ANTI-CRASH FIX 💥 Changed [0] to ['cnt']
     c.execute("SELECT COUNT(*) as cnt FROM followers WHERE following = %s", (username,))
-    followers_count = c.fetchone()[0]
+    followers_count = c.fetchone()['cnt']
     conn.close()
     return jsonify({"followers": followers_count, "following_now": following_now})
 
@@ -1415,12 +1425,13 @@ def admin_broadcast():
     msg = html.escape(request.form.get("broadcast_message", "").strip())
     if msg:
         conn = get_db_connection()
-        c = conn.cursor()
+        c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
         c.execute("SELECT username FROM users WHERE role != 'bot'")
         users = c.fetchall()
         for u in users:
+            # 💥 ANTI-CRASH FIX 💥 Changed index [0] to dict key ['username']
             c.execute("INSERT INTO notifications (username, message, link, created_at) VALUES (%s, %s, %s, %s)",
-                      (u[0], f"📣 <b>SYSTEM BROADCAST:</b> {msg}", "/dashboard", get_ist_time()))
+                      (u['username'], f"📣 <b>SYSTEM BROADCAST:</b> {msg}", "/dashboard", get_ist_time()))
         conn.commit()
         conn.close()
         flash("Broadcast sent to all agents! 📢", "success")
@@ -1430,7 +1441,7 @@ def admin_broadcast():
 def admin_user_action(user_id, action):
     if not session.get("is_admin"): return redirect(url_for("admin"))
     conn = get_db_connection()
-    c = conn.cursor()
+    c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     if action == "ban": 
         c.execute("UPDATE users SET status = 'BANNED' WHERE id = %s", (user_id,))
         flash("Agent Suspended!", "success")
@@ -1447,7 +1458,8 @@ def admin_user_action(user_id, action):
         c.execute("SELECT username FROM users WHERE id = %s", (user_id,))
         u = c.fetchone()
         if u:
-            uname = u[0]
+            # 💥 ANTI-CRASH FIX 💥
+            uname = u['username']
             tables = ["media", "comments", "likes", "stories", "global_chat", "notifications"]
             for table in tables:
                 c.execute(f"DELETE FROM {table} WHERE {'uploaded_by' if table=='media' else 'sender' if table=='global_chat' else 'username'} = %s", (uname,))
@@ -1464,11 +1476,12 @@ def admin_user_action(user_id, action):
 def approve(id):
     if not session.get("is_admin"): return redirect(url_for("admin"))
     conn = get_db_connection()
-    c = conn.cursor()
+    c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     c.execute("UPDATE media SET approved = 1 WHERE id = %s", (id,))
     c.execute("SELECT uploaded_by, title FROM media WHERE id = %s", (id,))
     media_info = c.fetchone()
-    if media_info: c.execute("INSERT INTO notifications (username, message, link, created_at) VALUES (%s, %s, %s, %s)", (media_info[0], f"✅ Approved! '{media_info[1][:15]}' is now live.", f"/post/{id}", get_ist_time()))
+    # 💥 ANTI-CRASH FIX 💥 Changed indices to dict keys
+    if media_info: c.execute("INSERT INTO notifications (username, message, link, created_at) VALUES (%s, %s, %s, %s)", (media_info['uploaded_by'], f"✅ Approved! '{media_info['title'][:15]}' is now live.", f"/post/{id}", get_ist_time()))
     conn.commit()
     conn.close()
     flash("Approved!", "success")
