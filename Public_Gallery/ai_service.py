@@ -1,34 +1,31 @@
 import os
-from google import genai
-from google.genai import types
+import google.generativeai as genai
 
 def get_ai_response(prompt):
     api_key = os.environ.get("GEMINI_API_KEY")
-    # Failsafe: Agar key missing hai toh app crash nahi hogi, fallback caption degi.
-    if not api_key:
-        return "Enjoying the little things! ✨ #vibes #trending"
     
+    # Security Fallback: Agar Admin ne key nahi daali toh warning dega
+    if not api_key or api_key.strip() == "":
+        return "⚠️ System Alert: Admin ne abhi tak Gemini API Key add nahi ki hai. Please .env file mein GEMINI_API_KEY setup karein."
+        
     try:
-        client = genai.Client(api_key=api_key)
+        # Gemini setup
+        genai.configure(api_key=api_key)
         
-        # System instruction to support Hinglish, Hindi, and English seamlessly
-        system_instruction = (
-            "You are an AI for Apna Gallery. "
-            "Write highly engaging social media captions, short shayaris, or answers. "
-            "IMPORTANT: Reply in the exact same language as the user's prompt (Hinglish, Hindi, or English). "
-            "Always include 3 trending hashtags. Keep it concise, friendly, and natural."
-        )
+        # Hum AI ko uski personality de rahe hain!
+        system_instruction = """
+        You are VibeX AI, an advanced, friendly, and cool AI assistant built into the Apna Gallery app. 
+        You speak in a mix of English and Indian Gen-Z Hinglish (e.g., 'Kya haal hai bhai?', 'This is lit 🔥'). 
+        Keep your answers concise, helpful, and creative. You are an expert in photography, aesthetic vibes, and coding.
+        """
         
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                system_instruction=system_instruction,
-                temperature=0.7,
-            ),
-        )
-        return response.text.replace('"', '').replace("'", "")
+        # Using the fast and free Gemini model
+        model = genai.GenerativeModel('gemini-1.5-flash', system_instruction=system_instruction)
+        
+        # Get response
+        response = model.generate_content(prompt)
+        return response.text
+        
     except Exception as e:
-        print(f"AI Service Error: {e}")
-        # Ultimate Failsafe: Agar internet ya AI down hai, toh upload mat roko!
-        return "Epic moment! 🔥 #amazing #life"
+        print("Gemini API Error:", e)
+        return "Oops! 🛠️ Main thoda overloaded hu ya API me koi issue aagaya hai. Kuch der baad try karo!"
