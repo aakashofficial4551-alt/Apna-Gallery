@@ -32,8 +32,32 @@ def init_main_routes(app):
 
     @app.route("/manifest.json")
     def dynamic_manifest():
-        return jsonify({"name": "PHANTX", "short_name": "PHANTX", "display": "standalone", "start_url": "/", "background_color": "#0B0F19", "theme_color": "#0B0F19", "icons": [{"src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png"}, {"src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png"}]})
-
+        return jsonify({
+            "name": "PHANTX - The Creator Vault",
+            "short_name": "PHANTX",
+            "description": "Premium stealth ecosystem for creators to share photos, reels, and ideas globally.",
+            "start_url": "/",
+            "display": "standalone",
+            "orientation": "portrait-primary",
+            "background_color": "#0B0F19",
+            "theme_color": "#00F2FE",
+            "icons": [
+                {
+                    "src": "/static/icon-192.png",
+                    "sizes": "192x192",
+                    "type": "image/png",
+                    "purpose": "any maskable"
+                },
+                {
+                    "src": "/static/icon-512.png",
+                    "sizes": "512x512",
+                    "type": "image/png",
+                    "purpose": "any maskable"
+                }
+            ],
+            "categories": ["social", "photography", "entertainment"]
+        })
+        
     @app.route("/upload_asset", methods=["POST"])
     def upload_asset():
         if "username" not in session: return redirect(url_for("login"))
