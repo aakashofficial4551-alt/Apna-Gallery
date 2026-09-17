@@ -1,47 +1,32 @@
 {% extends "base.html" %}
-{% block title %}Feed | Apna Gallery{% endblock %}
+{% block title %}Feed | PHANTX{% endblock %}
 
 {% block content %}
-<div style="max-width: 650px; margin: 0 auto;">
+<div style="max-width: 600px; margin: 0 auto; padding-bottom: 80px;">
     
-    <div style="text-align: center; margin-bottom: 20px;">
-        <h1 style="color: var(--accent); margin: 0;">📰 Timeline</h1>
-    </div>
-
-    <div style="display: flex; justify-content: center; gap: 20px; margin-bottom: 30px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
-        <a href="{{ url_for('feed', tab='foryou') }}" style="text-decoration: none; color: {% if current_tab == 'foryou' %}var(--accent){% else %}var(--text-muted){% endif %}; font-size: 1.2rem; font-weight: bold; padding-bottom: 5px; {% if current_tab == 'foryou' %}border-bottom: 3px solid var(--accent);{% endif %}">
-            👥 Following
+    <div style="display: flex; justify-content: center; gap: 30px; margin-bottom: 20px; border-bottom: 1px solid var(--accent-light); padding-bottom: 10px;">
+        <a href="{{ url_for('feed', tab='foryou') }}" style="text-decoration: none; color: {% if current_tab == 'foryou' %}var(--text-primary){% else %}var(--text-secondary){% endif %}; font-weight: 800; font-size: 1.1rem; {% if current_tab == 'foryou' %}border-bottom: 3px solid var(--accent-primary);{% endif %}">
+            Following
         </a>
-        <a href="{{ url_for('feed', tab='global') }}" style="text-decoration: none; color: {% if current_tab == 'global' %}var(--accent){% else %}var(--text-muted){% endif %}; font-size: 1.2rem; font-weight: bold; padding-bottom: 5px; {% if current_tab == 'global' %}border-bottom: 3px solid var(--accent);{% endif %}">
-            🌍 For You <span style="font-size:0.8rem; background:rgba(168,85,247,0.2); color:#a855f7; padding:2px 6px; border-radius:10px;">AI</span>
+        <a href="{{ url_for('feed', tab='global') }}" style="text-decoration: none; color: {% if current_tab == 'global' %}var(--text-primary){% else %}var(--text-secondary){% endif %}; font-weight: 800; font-size: 1.1rem; {% if current_tab == 'global' %}border-bottom: 3px solid var(--accent-primary);{% endif %}">
+            Global Hub
         </a>
     </div>
 
     <!-- INFINITE SCROLL CONTAINER -->
-    <div id="feed-container" style="display: flex; flex-direction: column; gap: 40px;">
-        <!-- JS will inject posts here -->
+    <div id="feed-container" style="display: flex; flex-direction: column; gap: 25px;">
+        <!-- JS injects here -->
     </div>
     
-    <div id="loading-spinner" style="text-align: center; padding: 30px; display: none;">
-        <span style="font-size: 2rem; display: inline-block; animation: spin 1s infinite linear;">🔄</span>
-        <p style="color: var(--text-muted); margin-top: 10px;">Loading algorithm feed...</p>
-    </div>
-    
-    <div id="end-message" style="text-align: center; padding: 40px; display: none; background: var(--bg-card); border-radius: 16px; border: 1px solid var(--border-color); margin-top: 20px;">
-        <span style="font-size: 4rem;">🕵️‍♂️</span>
-        <h2 style="color: var(--text-muted); margin-top: 15px;">You've seen it all!</h2>
-        <p style="color: var(--text-muted);">You've caught up with the entire feed.</p>
+    <div id="loading-spinner" style="text-align: center; padding: 20px; display: none;">
+        <span style="font-size: 1.5rem; display: inline-block; animation: spin 1s infinite linear;">⚙️</span>
     </div>
 </div>
 
-<div id="imageLightbox" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 10000; justify-content: center; align-items: center; backdrop-filter: blur(10px);">
-    <span onclick="document.getElementById('imageLightbox').style.display='none'" style="position: absolute; top: 20px; right: 30px; font-size: 3rem; color: white; cursor: pointer; text-shadow: 0 2px 5px #000;">&times;</span>
-    <img id="lightboxImgSrc" src="" style="max-width: 95%; max-height: 90vh; border-radius: 10px; box-shadow: 0 0 40px rgba(56, 189, 248, 0.3);">
-</div>
+<!-- 💥 THE NEW FLOATING UPLOAD BUTTON 💥 -->
+<a href="#" onclick="openUploadModal()" class="floating-upload-btn" title="Upload Post">+</a>
 
-<style>
-    @keyframes spin { 100% { transform: rotate(360deg); } }
-</style>
+<style>@keyframes spin { 100% { transform: rotate(360deg); } }</style>
 
 <script>
 let offset = 0;
@@ -52,246 +37,119 @@ const csrfToken = '{{ csrf_token() }}';
 const currentUser = '{{ session.username }}';
 
 function createPostHTML(post) {
-    const verifiedBadge = post.is_verified ? '<span style="color: #38bdf8; font-size: 1.1rem;" title="Verified">✅</span>' : '';
-    const adminBadge = post.role === 'admin' ? '<span style="color: #38bdf8; font-size: 1.1rem;" title="Verified Admin">☑️</span>' : '';
-    
-    let avatarUrl = post.profile_pic;
-    if (!avatarUrl || avatarUrl.trim() === '') {
-        avatarUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(post.uploaded_by)}&backgroundColor=1e293b`;
-    }
+    const verifiedBadge = post.is_verified ? '<span style="color: #00b4d8; font-size: 0.9rem;">✅</span>' : '';
+    const avatarUrl = post.profile_pic || `https://api.dicebear.com/7.x/avataaars/svg?seed=${post.uploaded_by}&backgroundColor=e0f7fa`;
 
     let mediaHtml = '';
     if(post.category === 'Photo') {
-        mediaHtml = `<img src="${post.filename}" style="width: 100%; max-height: 500px; object-fit: contain;">`;
+        mediaHtml = `<img src="${post.filename}" style="width: 100%; max-height: 500px; object-fit: contain; background: #000;">`;
     } else if(post.category === 'Video') {
-        mediaHtml = `<video src="${post.filename}" controls style="width: 100%; max-height: 500px;"></video>`;
-    } else if(post.category === 'Music') {
-        mediaHtml = `<div style="width: 100%; padding: 60px 20px; text-align: center; background: linear-gradient(135deg, rgba(8,17,31,1), rgba(15,23,42,1)); box-sizing: border-box;"><span style="font-size: 5rem; display: block; margin-bottom: 25px; filter: drop-shadow(0 0 10px var(--accent));">🎵</span><audio src="${post.filename}" controls style="width: 100%; outline: none; border-radius: 30px;"></audio></div>`;
-    } else {
-        mediaHtml = `<a href="${post.filename}" target="_blank" style="color: var(--accent); padding: 50px; text-decoration: none; font-size: 2rem; text-align:center; display:block;">📁 View Document</a>`;
+        mediaHtml = `<video src="${post.filename}" controls style="width: 100%; max-height: 500px; background: #000;"></video>`;
     }
 
-    let commentsHtml = '';
-    if (post.comments && post.comments.length > 0) {
-        post.comments.forEach(c => {
-            const cAdminBadge = c.role === 'admin' ? '<span style="font-size: 0.9rem;">☑️</span>' : '';
-            commentsHtml += `
-            <div style="margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
-                <strong style="color: var(--accent);">${c.username} ${cAdminBadge}</strong>: <span style="color: var(--text-main);">${c.comment_text}</span>
-                <div style="margin-top: 5px; display: flex; justify-content: space-between; align-items: center;">
-                    <div style="display: flex; gap: 15px;">
-                        <span style="font-size: 0.8rem; color: var(--text-muted); cursor: pointer; transition: 0.2s;" onclick="likeComment(${c.id})" onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--text-muted)'">
-                            ❤️ <span id="clike-count-${c.id}">${c.likes || 0}</span>
-                        </span>
-                        <span style="font-size: 0.8rem; color: var(--text-muted); cursor: pointer; transition: 0.2s;" onclick="replyTo('${c.username}', ${post.id})" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text-muted)'">
-                            ↩️ Reply
-                        </span>
-                    </div>
-                    <span style="font-size: 0.75rem; color: var(--text-muted);">${c.created_at}</span>
-                </div>
-            </div>`;
-        });
-    } else {
-        commentsHtml = `<div style="color: var(--text-muted); font-style: italic;">Be the first to comment. Try tagging a friend using @username!</div>`;
-    }
-
-    let reportBtn = post.uploaded_by !== currentUser ? `<button class="btn" onclick="reportAsset(${post.id})" style="background: transparent; border: none; color: var(--text-muted); font-size: 1.2rem; cursor: pointer; padding: 0 5px;" title="Report this post">🚩</button>` : '';
-    
-    // 💥 NEW: TIPPING BUTTON UI 💥
-    let tipBtn = post.uploaded_by !== currentUser ? `
-        <button class="btn" onclick="tipCreator(${post.id}, '${post.uploaded_by}')" style="background: rgba(251, 191, 36, 0.2); border: 1px solid var(--warning); color: var(--warning); padding: 8px 15px; display:flex; align-items:center; gap:5px;" title="Send 10 Coins to Creator">
-            🪙 Tip <span id="tip-count-${post.id}" style="color: white; background: #000; padding: 2px 6px; border-radius: 6px; font-size:0.8rem;">${post.tips_received || 0}</span>
-        </button>
-    ` : `
-        <span style="background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.5); color: var(--text-muted); padding: 8px 15px; border-radius: 8px; display:flex; align-items:center; gap:5px;">
-            🪙 Tips <span style="color: white; background: #000; padding: 2px 6px; border-radius: 6px; font-size:0.8rem;">${post.tips_received || 0}</span>
-        </span>
-    `;
-
+    // 💥 Notice the id="post-${post.id}" for Explore anchor links 💥
     return `
-    <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.3); animation: slideDown 0.5s ease-out;">
-        <div style="padding: 15px 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05);">
-            <a href="/agent/${post.uploaded_by}" style="display: flex; align-items: center; gap: 12px; text-decoration: none; color: inherit;">
-                <img src="${avatarUrl}" style="width: 45px; height: 45px; border-radius: 50%; object-fit: cover; border: 2px solid var(--accent);">
+    <div id="post-${post.id}" style="background: var(--surface); border: 1px solid var(--accent-light); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow-sm);">
+        
+        <!-- COMPACT HEADER -->
+        <div style="padding: 10px 15px; display: flex; justify-content: space-between; align-items: center;">
+            <a href="/agent/${post.uploaded_by}" style="display: flex; align-items: center; gap: 10px; text-decoration: none;">
+                <img src="${avatarUrl}" class="post-header-avatar" style="border-radius: 50%; border: 2px solid var(--accent-primary);">
                 <div>
-                    <h3 style="margin: 0; display: flex; align-items: center; gap: 5px; font-size: 1.1rem;">
-                        ${post.uploaded_by} ${verifiedBadge} ${adminBadge}
-                    </h3>
-                    <span style="font-size: 0.8rem; color: var(--text-muted);">${post.created_at}</span>
+                    <h4 style="margin: 0; font-size: 1rem; color: var(--text-primary);">${post.nickname || post.uploaded_by} ${verifiedBadge}</h4>
+                    <span style="font-size: 0.75rem; color: var(--text-tertiary);">${post.created_at}</span>
                 </div>
             </a>
-            <div style="display: flex; gap: 10px; align-items: center;">
-                ${post.category === 'Photo' ? `<span onclick="openLightbox('${post.filename}', ${post.id})" style="background: rgba(255,255,255,0.1); padding: 5px 10px; border-radius: 6px; font-size: 1rem; color: white; cursor: pointer; transition: 0.2s;" title="View Fullscreen" onmouseover="this.style.background='var(--accent)'; this.style.color='#000';" onmouseout="this.style.background='rgba(255,255,255,0.1)'; this.style.color='white';">🔍</span>` : ''}
-                <a href="${post.filename}" download target="_blank" style="background: rgba(255,255,255,0.1); padding: 5px 10px; border-radius: 6px; font-size: 1rem; color: white; text-decoration: none;" title="Download File">⬇️</a>
-            </div>
+            ${post.uploaded_by !== currentUser ? `<button class="compact-action-btn" onclick="reportAsset(${post.id})" style="border:none; font-size:1.2rem;">🚩</button>` : ''}
         </div>
 
-        <div style="width: 100%; max-height: 500px; background: #000; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; cursor: pointer;" onclick="handleDoubleTap(${post.id}, this)">
-            <span class="heart-pop">❤️</span>
+        <!-- MEDIA -->
+        <div style="width: 100%; cursor: pointer;" onclick="handleDoubleTap(${post.id}, this)">
             ${mediaHtml}
         </div>
 
-        <div style="padding: 20px;">
-            <h3 style="margin: 0 0 15px 0; font-size: 1.2rem; line-height: 1.4;">${post.title}</h3>
+        <!-- COMPACT ACTION BAR & CONTENT -->
+        <div style="padding: 12px 15px;">
+            <h4 style="margin: 0 0 10px 0; font-size: 1.05rem; color: var(--text-primary);">${post.title}</h4>
             
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
-                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                    <button class="btn" id="like-btn-${post.id}" onclick="toggleLike(${post.id})" style="background: transparent; border: 1px solid var(--danger); color: var(--danger); padding: 8px 15px;">
-                        ❤️ <span id="like-count-${post.id}">${post.likes}</span>
-                    </button>
-                    <span style="background: rgba(8,17,31,0.6); border: 1px solid var(--border-color); color: var(--text-main); padding: 8px 15px; border-radius: 8px; font-weight: bold;">
-                        👁️ <span id="view-count-${post.id}">${post.views}</span>
-                    </span>
-                    ${tipBtn}
-                </div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <button id="like-btn-${post.id}" class="compact-action-btn" onclick="toggleLike(${post.id})" style="color: var(--danger); border-color: var(--danger);">
+                    ❤️ <span id="like-count-${post.id}">${post.likes}</span>
+                </button>
                 
-                <div style="display: flex; gap: 10px; align-items: center;">
-                    <button class="btn" id="bookmark-btn-${post.id}" onclick="toggleBookmark(${post.id})" style="background: transparent; border: 1px solid var(--accent); color: var(--accent); padding: 8px 15px; font-size: 1.1rem;">
-                        ${post.is_saved ? '📌 Saved' : '📍 Save'}
-                    </button>
-                    <button class="btn" onclick="sharePost('${post.title.replace(/'/g, "\\'")}', window.location.origin + '/agent/${post.uploaded_by}')" style="background: transparent; border: none; font-size: 1.5rem; padding: 0 5px;" title="Share">
-                        📤
-                    </button>
-                    ${reportBtn}
-                </div>
+                ${post.uploaded_by !== currentUser ? `
+                <button class="compact-action-btn" onclick="tipCreator(${post.id}, '${post.uploaded_by}')" style="color: var(--warning); border-color: var(--warning); background: rgba(255,152,0,0.1);">
+                    🪙 Tip <span id="tip-count-${post.id}">${post.tips_received || 0}</span>
+                </button>` : ''}
+                
+                <button class="compact-action-btn" onclick="document.getElementById('comment-input-${post.id}').focus()">
+                    💬 Comment
+                </button>
             </div>
 
-            <div style="background: rgba(8, 17, 31, 0.4); border-radius: 8px; padding: 15px;">
-                <div style="max-height: 150px; overflow-y: auto; margin-bottom: 10px; font-size: 0.9rem; padding-right: 5px;">
-                    ${commentsHtml}
-                </div>
-                <form method="POST" action="/add_comment/${post.id}" style="display: flex; gap: 10px;">
-                    <input type="hidden" name="csrf_token" value="${csrfToken}">
-                    <input type="text" name="comment_text" id="comment-input-${post.id}" placeholder="Add a comment... use @ to tag." required style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(8, 17, 31, 0.8); color: white; outline: none;">
-                    <button type="submit" class="btn">Post</button>
-                </form>
-            </div>
+            <!-- COMPACT COMMENTS -->
+            <form method="POST" action="/add_comment/${post.id}" style="display: flex; gap: 8px; margin-top: 12px;">
+                <input type="hidden" name="csrf_token" value="${csrfToken}">
+                <input type="text" name="comment_text" id="comment-input-${post.id}" placeholder="Add a comment..." required style="flex: 1; padding: 8px; border-radius: 6px; border: 1px solid var(--accent-light); outline:none;">
+                <button type="submit" class="btn" style="padding: 8px 12px; font-size: 12px;">Post</button>
+            </form>
         </div>
     </div>`;
 }
 
 async function loadMorePosts() {
     if (loading || !hasMore) return;
-    loading = true;
-    document.getElementById('loading-spinner').style.display = 'block';
-
+    loading = true; document.getElementById('loading-spinner').style.display = 'block';
     try {
         const response = await fetch(`/api/feed_data?tab=${currentTab}&offset=${offset}`);
         const newPosts = await response.json();
-
-        if (newPosts.length === 0) {
-            hasMore = false;
-            document.getElementById('end-message').style.display = 'block';
-        } else {
+        if (newPosts.length === 0) { hasMore = false; } 
+        else {
             const container = document.getElementById('feed-container');
-            newPosts.forEach(post => {
-                container.insertAdjacentHTML('beforeend', createPostHTML(post));
-            });
+            newPosts.forEach(post => container.insertAdjacentHTML('beforeend', createPostHTML(post)));
             offset += newPosts.length;
         }
-    } catch (e) { console.error("Error loading posts", e); }
-    
+    } catch (e) { console.error(e); }
     document.getElementById('loading-spinner').style.display = 'none';
     loading = false;
 }
 
-window.addEventListener('scroll', () => {
-    if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 500) { loadMorePosts(); }
-});
+window.addEventListener('scroll', () => { if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 500) loadMorePosts(); });
 document.addEventListener("DOMContentLoaded", loadMorePosts);
-
-async function openLightbox(src, mediaId) {
-    document.getElementById('imageLightbox').style.display = 'flex';
-    document.getElementById('lightboxImgSrc').src = src;
-    try {
-        await fetch(`/api/view/${mediaId}`, { method: 'POST', headers: { 'X-CSRF-Token': csrfToken } });
-        let viewSpan = document.getElementById(`view-count-${mediaId}`);
-        if(viewSpan) { viewSpan.innerText = parseInt(viewSpan.innerText) + 1; }
-    } catch(e) {}
-}
 
 async function toggleLike(mediaId) {
     try {
-        const response = await fetch(`/like/${mediaId}`, { method: 'POST', headers: { 'X-CSRF-Token': csrfToken } });
-        const data = await response.json();
-        if (response.ok) { document.getElementById(`like-count-${mediaId}`).innerText = data.likes; }
+        const res = await fetch(`/like/${mediaId}`, { method: 'POST', headers: { 'X-CSRF-Token': csrfToken } });
+        const data = await res.json();
+        if (res.ok) document.getElementById(`like-count-${mediaId}`).innerText = data.likes;
     } catch (e) {}
 }
 
-// 💥 NEW: CREATOR TIP API TRIGGER 💥
-async function tipCreator(mediaId, creatorName) {
-    if(confirm(`Send 10 🪙 from your Wallet to support ${creatorName}?`)) {
+async function tipCreator(mediaId, creator) {
+    if(confirm(`Send 10 🪙 from Wallet to ${creator}?`)) {
         try {
-            const response = await fetch(`/tip/${mediaId}`, { method: 'POST', headers: { 'X-CSRF-Token': csrfToken } });
-            const data = await response.json();
-            if (response.ok && data.success) {
-                document.getElementById(`tip-count-${mediaId}`).innerText = data.new_tips;
-                alert(`Sent 10 Coins to ${creatorName}! 🎉 (Refresh page to update your balance)`);
-            } else {
-                alert(data.error || "Failed to send tip.");
-            }
-        } catch (e) { alert("Network Error"); }
+            const res = await fetch(`/tip/${mediaId}`, { method: 'POST', headers: { 'X-CSRF-Token': csrfToken } });
+            const data = await res.json();
+            if (res.ok && data.success) { document.getElementById(`tip-count-${mediaId}`).innerText = data.new_tips; alert(`Sent 10 Coins! 🎉`); } 
+            else { alert(data.error); }
+        } catch (e) {}
     }
 }
 
-async function toggleBookmark(mediaId) {
-    try {
-        const response = await fetch(`/bookmark/${mediaId}`, { method: 'POST', headers: { 'X-CSRF-Token': csrfToken } });
-        const data = await response.json();
-        if (response.ok) {
-            const btn = document.getElementById(`bookmark-btn-${mediaId}`);
-            btn.innerHTML = data.bookmarked ? '📌 Saved' : '📍 Save';
-        }
-    } catch (e) {}
-}
-
 async function reportAsset(mediaId) {
-    if(confirm("Report this post to Admins for inappropriate content?")) {
+    if(confirm("Report this post?")) {
         try {
-            const response = await fetch(`/report/${mediaId}`, { method: 'POST', headers: { 'X-CSRF-Token': csrfToken } });
-            const data = await response.json();
-            if (response.ok) alert("Post reported. Admins will review it.");
-            else alert(data.error);
+            const res = await fetch(`/report/${mediaId}`, { method: 'POST', headers: { 'X-CSRF-Token': csrfToken } });
+            if (res.ok) alert("Post reported.");
         } catch (e) {}
     }
 }
 
 let lastTap = 0;
 function handleDoubleTap(mediaId, element) {
-    const currentTime = new Date().getTime();
-    const tapLength = currentTime - lastTap;
-    if (tapLength < 500 && tapLength > 0) {
-        toggleLike(mediaId);
-        const heart = element.querySelector('.heart-pop');
-        if(heart) {
-            heart.classList.add('active');
-            setTimeout(() => heart.classList.remove('active'), 800);
-        }
-    }
-    lastTap = currentTime;
-}
-
-function sharePost(title, url) {
-    if (navigator.share) {
-        navigator.share({ title: 'Apna Gallery', text: 'Check out this post: ' + title, url: url }).catch(console.error);
-    } else {
-        navigator.clipboard.writeText(url);
-        alert("Link copied to clipboard! Share it anywhere.");
-    }
-}
-
-function replyTo(username, postId) {
-    const input = document.getElementById(`comment-input-${postId}`);
-    input.value = `@${username} ` + input.value;
-    input.focus();
-}
-
-async function likeComment(commentId) {
-    try {
-        const response = await fetch(`/like_comment/${commentId}`, { method: 'POST', headers: { 'X-CSRF-Token': csrfToken } });
-        const data = await response.json();
-        if (response.ok) { document.getElementById(`clike-count-${commentId}`).innerText = data.likes; }
-    } catch (e) {}
+    const tapLength = new Date().getTime() - lastTap;
+    if (tapLength < 500 && tapLength > 0) toggleLike(mediaId);
+    lastTap = new Date().getTime();
 }
 </script>
 {% endblock %}
