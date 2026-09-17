@@ -10,8 +10,8 @@ def get_ai_response(prompt):
     try:
         api_key = api_key.strip()
         
-        # 💥 DIRECT REST API CALL (No SDK needed, bypasses all version errors!) 💥
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+        # 💥 THE REAL FIX: URL mein officially 'gemini-pro' set kar diya hai 💥
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={api_key}"
         
         headers = {'Content-Type': 'application/json'}
         
