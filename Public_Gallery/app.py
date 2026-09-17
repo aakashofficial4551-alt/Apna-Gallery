@@ -109,8 +109,9 @@ def security_firewall_and_session_check():
             flash("Your account has been suspended by the Admin.", "error")
             return redirect(url_for('login'))
             
+    # 💥 Increased Bot Engine Trigger Probability to 40% for faster uploads! 💥
     if random.random() < 0.05: cleanup_database()
-    if random.random() < 0.20: run_bot_engine() 
+    if random.random() < 0.40: run_bot_engine() 
 
 @app.after_request
 def set_security_headers(response):
@@ -295,7 +296,7 @@ def cleanup_database():
     finally: conn.close()
 
 # =========================================================
-# THE SMART PHANTOM ENGINE (AI SUPER PROMPTS + HINGLISH)
+# THE SMART PHANTOM ENGINE (AGGRESSIVE MODE & FIXED AI SEED) 🤖
 # =========================================================
 def run_bot_engine():
     conn = get_db_connection()
@@ -328,7 +329,8 @@ def run_bot_engine():
             
         action = random.randint(1, 100)
         
-        if action <= 30: 
+        # 💥 INCREASED UPLOAD CHANCE TO 50% 💥
+        if action <= 50: 
             cat = random.choice(["Photo", "Photo", "Photo", "Shayari"])
             if cat == "Photo":
                 high_end_prompts = [
@@ -336,15 +338,20 @@ def run_bot_engine():
                     "Hyper-realistic portrait of a futuristic warrior, Unreal Engine 5, highly detailed",
                     "Minimalist aesthetic vaporwave sunset, retro 80s, vibrant colors",
                     "Ethereal fantasy landscape with glowing mushrooms and a starry night sky, digital art",
-                    "A sleek futuristic sports car on a neon-lit bridge, 4k, octane render"
+                    "A sleek futuristic sports car on a neon-lit bridge, 4k, octane render",
+                    "Beautiful Indian aesthetic street photography at night with neon lights"
                 ]
+                
+                # 💥 FIXED AI URL WITH RANDOM SEED FOR UNIQUE IMAGES 💥
                 if random.random() > 0.5:
                     prompt = random.choice(high_end_prompts)
                     encoded_prompt = urllib.parse.quote(prompt)
-                    img_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?nologo=true"
+                    seed_val = random.randint(1, 999999)
+                    img_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?nologo=true&seed={seed_val}&width=800&height=1000"
                     caption = f"Just generated this! Kaisa laga? ✨ #AIArt #Aesthetics #{bot_username}"
                 else:
-                    img_url = f"https://picsum.photos/800/1000?random={random.randint(1, 100000)}"
+                    seed_val = random.randint(1, 999999)
+                    img_url = f"https://picsum.photos/seed/{seed_val}/800/1000"
                     caption = random.choice([
                         "Nature's beauty 🌲 #nature #peace #sukoon", 
                         "Vibes ✨ #chill #mood #aesthetic", 
@@ -358,15 +365,15 @@ def run_bot_engine():
             c.execute("INSERT INTO media (filename, title, category, uploaded_by, approved, visibility, views, tips_received) VALUES (%s, %s, %s, %s, 1, 'public', %s, %s)",
                       (img_url, caption, cat, bot_username, random.randint(5, 50), 0))
                       
-        elif 30 < action <= 60:
+        elif 50 < action <= 70:
             c.execute("INSERT INTO global_chat (sender, message) VALUES (%s, %s)", (bot_username, random.choice(bot_chats)))
-        elif 60 < action <= 75:
+        elif 70 < action <= 80:
             c.execute("SELECT username FROM users WHERE role != 'bot' AND username != %s ORDER BY RANDOM() LIMIT 1", (bot_username,))
             target = c.fetchone()
             if target:
                 try: c.execute("INSERT INTO followers (follower, following) VALUES (%s, %s)", (bot_username, target['username']))
                 except: pass
-        elif action > 75: 
+        elif action > 80: 
             c.execute("SELECT id, uploaded_by, title, category FROM media WHERE uploaded_by != %s ORDER BY RANDOM() LIMIT 1", (bot_username,))
             media = c.fetchone()
             if media:
@@ -459,7 +466,7 @@ def sync_admin_session():
             session["is_admin"] = (user["role"] == "admin")
 
 # =========================================================
-# 💥 PUBLIC & ADSENSE ROUTES (ONLY ONCE) 💥
+# PUBLIC ROUTES
 # =========================================================
 @app.route("/")
 def index():
@@ -798,7 +805,7 @@ def like(media_id):
     if "username" not in session: return jsonify({"error": "Login required."}), 401
     username = str(session["username"])
     conn = get_db_connection()
-    c = conn.cursor()
+    c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     c.execute("INSERT INTO likes (media_id, username) VALUES (%s, %s) ON CONFLICT (media_id, username) DO NOTHING", (media_id, username))
     if c.rowcount == 1:
         c.execute("UPDATE media SET likes = likes + 1 WHERE id = %s", (media_id,))
@@ -903,7 +910,8 @@ def api_feed_data():
     c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     block_filter = "m.uploaded_by NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) AND m.uploaded_by NOT IN (SELECT blocker FROM blocks WHERE blocked = %s)"
     
-    ai_order_logic = "((m.likes * 5) + m.views + (COALESCE(m.tips_received, 0) * 10)) DESC, m.id DESC"
+    # 💥 FIX: Changed feed algorithm to show chronological (newest first) so bot posts aren't hidden! 💥
+    ai_order_logic = "m.is_pinned DESC, m.id DESC"
     
     if tab == "global":
         c.execute(f"SELECT m.*, u.profile_pic, u.role, u.is_verified FROM media m JOIN users u ON m.uploaded_by = u.username WHERE m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' AND {block_filter} ORDER BY {ai_order_logic} LIMIT %s OFFSET %s", (session["username"], session["username"], limit, offset))
