@@ -1,16 +1,37 @@
-const CACHE_NAME = 'apna-gallery-v1';
-const urlsToCache = ['/', '/static/manifest.json'];
+const CACHE_NAME = 'phantx-v1';
+const STATIC_ASSETS = [
+    '/',
+    '/static/css/style.css',
+    '/manifest.json'
+];
 
-self.addEventListener('install', event => {
+// Install Event - Caches critical files
+self.addEventListener('install', (event) => {
     event.waitUntil(
-        caches.open(CACHE_NAME)
-            .then(cache => cache.addAll(urlsToCache))
+        caches.open(CACHE_NAME).then((cache) => {
+            console.log('Caching offline assets');
+            return cache.addAll(STATIC_ASSETS);
+        })
     );
+    self.skipWaiting();
 });
 
-self.addEventListener('fetch', event => {
+// Activate Event - Clears old caches
+self.addEventListener('activate', (event) => {
+    event.waitUntil(
+        caches.keys().then((cacheNames) => {
+            return Promise.all(
+                cacheNames.filter((name) => name !== CACHE_NAME).map((name) => caches.delete(name))
+            );
+        })
+    );
+    self.clients.claim();
+});
+
+// Fetch Event - Network first, fallback to cache
+self.addEventListener('fetch', (event) => {
+    if (event.request.method !== 'GET') return;
     event.respondWith(
-        caches.match(event.request)
-            .then(response => response || fetch(event.request))
+        fetch(event.request).catch(() => caches.match(event.request))
     );
 });
