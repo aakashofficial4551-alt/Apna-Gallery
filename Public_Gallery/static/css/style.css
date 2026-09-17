@@ -46,25 +46,23 @@ body {
 
 /* 💥 NEW UI COMPONENTS 💥 */
 
-/* 1. Facebook Style Dual DP */
+/* 1. Ultra-Compact Facebook Style Profile */
 .profile-cover-container {
     position: relative;
-    width: 100%; height: 180px;
+    width: 100%; 
+    height: 120px; /* Chhota kar diya (Pehle 180px tha) */
     background: var(--accent-light);
-    border-radius: var(--radius-lg);
-    margin-bottom: 55px;
-    box-shadow: var(--shadow-sm);
+    margin-bottom: 45px; /* Space kam kar diya */
 }
 .profile-cover-img {
     width: 100%; height: 100%; object-fit: cover;
-    border-radius: var(--radius-lg);
 }
 .profile-dp-wrapper {
     position: absolute;
-    bottom: -45px; left: 30px;
-    width: 100px; height: 100px;
+    bottom: -40px; left: 20px;
+    width: 80px; height: 80px; /* DP choti kar di */
     border-radius: 50%;
-    border: 4px solid var(--surface);
+    border: 3px solid var(--surface);
     background: var(--surface);
     overflow: hidden;
     box-shadow: var(--shadow-md);
@@ -72,6 +70,18 @@ body {
 }
 .profile-dp-img {
     width: 100%; height: 100%; object-fit: cover;
+}
+.profile-info-compact {
+    padding: 0 20px;
+}
+.profile-nickname {
+    font-size: 1.4rem; font-weight: 800; color: var(--text-primary); margin: 0; line-height: 1.2;
+}
+.profile-username {
+    font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 5px;
+}
+.profile-stats-bar {
+    display: flex; gap: 15px; margin-top: 10px; font-weight: 600; color: var(--text-primary); font-size: 0.85rem;
 }
 
 /* 2. Floating Upload Button */
