@@ -30,6 +30,7 @@
     --radius-sm: 8px;
     --radius-md: 16px;
     --radius-lg: 24px;
+    --radius-full: 9999px;
     --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
     --shadow-md: 0 10px 25px -5px rgba(0, 0, 0, 0.6);
     --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
@@ -44,7 +45,7 @@ body {
     min-height: 100vh;
     line-height: 1.6;
     overflow-x: hidden;
-    -webkit-tap-highlight-color: transparent; /* Removes blue flash on mobile tap */
+    -webkit-tap-highlight-color: transparent; 
 }
 
 ::-webkit-scrollbar { width: 6px; }
@@ -84,9 +85,10 @@ a { text-decoration: none; color: inherit; }
 .nav-icon { font-size: 1.6rem; color: var(--text-secondary); transition: var(--transition-fast); }
 .nav-icon.active { color: var(--accent-primary); transform: scale(1.1); font-weight: bold; }
 
+/* The Floating Plus Button in Nav */
 .nav-plus-btn {
     background: linear-gradient(135deg, var(--accent-hover), var(--accent-primary));
-    color: #000 !important; /* High contrast black icon */
+    color: #000 !important; 
     width: 45px; height: 45px;
     border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
@@ -107,8 +109,9 @@ a { text-decoration: none; color: inherit; }
 .profile-cover-container {
     position: relative; width: 100%; height: 120px;
     background: var(--border-color); margin-bottom: 45px;
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
 }
-.profile-cover-img { width: 100%; height: 100%; object-fit: cover; opacity: 0.8; }
+.profile-cover-img { width: 100%; height: 100%; object-fit: cover; opacity: 0.8; border-radius: var(--radius-md) var(--radius-md) 0 0; }
 .profile-dp-wrapper {
     position: absolute; bottom: -40px; left: 20px;
     width: 85px; height: 85px; border-radius: 50%;
@@ -124,14 +127,12 @@ a { text-decoration: none; color: inherit; }
 /* ==========================================
    EXPLORE GRID & FEED TWEAKS
    ========================================== */
-.explore-grid-container {
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; 
-}
+.explore-grid-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; }
 .explore-grid-item { aspect-ratio: 1 / 1; overflow: hidden; background: var(--border-color); cursor: pointer; }
 .explore-grid-item img, .explore-grid-item video { width: 100%; height: 100%; object-fit: cover; transition: 0.3s; }
 .explore-grid-item:hover img { transform: scale(1.05); }
 
-/* Transparent subtle action buttons */
+/* Transparent subtle action buttons for Feed */
 .compact-action-btn { 
     font-size: 13px !important; padding: 6px 12px !important; border-radius: var(--radius-sm); 
     background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); 
@@ -146,10 +147,9 @@ a { text-decoration: none; color: inherit; }
    ========================================== */
 .container { width: 100%; max-width: 1200px; margin: 0 auto; padding: 15px 5%; }
 
-/* Buttons & Inputs */
 .btn { 
     background: linear-gradient(135deg, var(--accent-hover), var(--accent-primary)); 
-    color: #000; /* High contrast text on neon blue */
+    color: #000; 
     border: none; padding: 10px 20px; font-weight: 800; 
     border-radius: var(--radius-sm); cursor: pointer; 
     box-shadow: 0 4px 10px rgba(0, 242, 254, 0.2);
