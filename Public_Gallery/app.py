@@ -64,7 +64,6 @@ def security_firewall_and_session_check():
     ip = request.remote_addr or "127.0.0.1"
     now = time.time()
     
-    # 1. Anti-DDoS
     request_tracker[ip] = [t for t in request_tracker[ip] if now - t < 60]
     if len(request_tracker[ip]) > 200:
         BANNED_IPS.add(ip)
@@ -75,7 +74,6 @@ def security_firewall_and_session_check():
     if request.endpoint in ['index', 'login', 'verify_otp', 'logout', 'static', 'api_search_suggest', 'privacy_policy', 'terms', 'about', 'dynamic_manifest'] or (request.path and request.path.startswith('/static/')):
         return
 
-    # 2. Strict CSRF Verification
     if request.method in ["POST", "PUT", "DELETE"]:
         token = request.form.get("csrf_token") or request.headers.get("X-CSRF-Token")
         session_token = session.get("csrf_token")
@@ -85,7 +83,6 @@ def security_firewall_and_session_check():
                 flash("Security Firewall Blocked Your Request: Invalid Validation Token.", "error")
                 return redirect(request.referrer or url_for('feed'))
 
-    # 3. GUILLOTINE ENGINE: SESSION TERMINATION
     if "username" in session:
         conn = get_db_connection()
         c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
@@ -109,7 +106,6 @@ def security_firewall_and_session_check():
             flash("Your account has been suspended by the Admin.", "error")
             return redirect(url_for('login'))
             
-    # 💥 Increased Bot Engine Trigger Probability to 40% for faster uploads! 💥
     if random.random() < 0.05: cleanup_database()
     if random.random() < 0.40: run_bot_engine() 
 
@@ -302,16 +298,19 @@ def run_bot_engine():
     conn = get_db_connection()
     c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     try:
-        bot_names = ["Aria_Cyber", "Neo_Vibes", "Luna_Arts", "Zenith_Pro", "Kai_X", "Nova_King", "Echo_World", "Sage_Pixel", "Atlas_Lens", "Orion_Sky", "Lyra_Mood"]
+        bot_names = ["Aria_Cyber", "Neo_Vibes", "Luna_Arts", "Zenith_Pro", "Kai_X", "Nova_King", "Echo_World", "Sage_Pixel", "Atlas_Lens", "Orion_Sky", "Lyra_Mood", "Rohan_Tech", "Kabir_Vibes", "Priya_Art"]
+        
         bot_chats = [
-            "Hey everyone! Kya haal hain? 👋", 
-            "Koi active hai kya abhi? 🤔 Let's chat!", 
-            "This app is lit! 🔥 Ekdum mast vibes.", 
-            "Good morning guys! Have a great day ahead ☀️", 
-            "Hello world! Just joined this awesome gallery. Naya hu yahan.", 
-            "Someone upload aesthetic pics yaar! Need some inspiration 😎", 
-            "Bro the speed of this app is crazy fast 🚀", 
-            "Mausam bohot badiya hai aaj, perfect day to chill! 🌧️"
+            "Bhai yeh app sach me lit hai 🔥",
+            "Koi online hai? Let's vibe ✨",
+            "Just uploaded a new pic, check it out guys!",
+            "Admin ne kya mast features banaye hain 👏",
+            "Need some coins yaar, tip kardo koi 😂🪙",
+            "Exploring the AI studio... crazy results!",
+            "Mausam kaisa hai tum logo ki taraf? 🌧️",
+            "Anyone into cyberpunk aesthetics here? 🏙️",
+            "Can't stop scrolling this feed ngl 🚀",
+            "Hello everyone! Naya hu yahan, support kardo 🙌"
         ]
         
         c.execute("SELECT COUNT(id) as count FROM users WHERE role = 'bot'")
@@ -320,7 +319,7 @@ def run_bot_engine():
         if bot_count < 50:
             name = f"{random.choice(bot_names)}_{random.randint(100, 9999)}"
             code = ''.join(secrets.choice("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ") for _ in range(10))
-            c.execute("INSERT INTO users (username, password, user_code, role, is_verified, bio, wallet_balance) VALUES (%s, %s, %s, 'bot', TRUE, 'Digital Creator exploring the matrix ✨', 5000)", (name, "botpass123", code))
+            c.execute("INSERT INTO users (username, password, user_code, role, is_verified, bio, wallet_balance) VALUES (%s, %s, %s, 'bot', TRUE, 'Creating vibes inside the matrix ✨', 5000)", (name, "botpass123", code))
             conn.commit()
             bot_username = name
         else:
@@ -329,38 +328,48 @@ def run_bot_engine():
             
         action = random.randint(1, 100)
         
-        # 💥 INCREASED UPLOAD CHANCE TO 50% 💥
+        # 50% chance to create a new post to keep feed ALIVE
         if action <= 50: 
             cat = random.choice(["Photo", "Photo", "Photo", "Shayari"])
             if cat == "Photo":
                 high_end_prompts = [
-                    "Cyberpunk neon city in rain, 8k resolution, cinematic lighting, photorealistic",
-                    "Hyper-realistic portrait of a futuristic warrior, Unreal Engine 5, highly detailed",
-                    "Minimalist aesthetic vaporwave sunset, retro 80s, vibrant colors",
-                    "Ethereal fantasy landscape with glowing mushrooms and a starry night sky, digital art",
-                    "A sleek futuristic sports car on a neon-lit bridge, 4k, octane render",
-                    "Beautiful Indian aesthetic street photography at night with neon lights"
+                    "A hyper-realistic cinematic portrait of a cyberpunk hacker in neon lights, 8k resolution, highly detailed, Unreal Engine 5 render",
+                    "Breathtaking beautiful fantasy landscape with floating islands and glowing waterfalls, ethereal lighting, concept art",
+                    "A sleek futuristic sports car driving through a neon-lit Tokyo street at night, rain reflections, ray tracing, 4k",
+                    "Minimalist vaporwave aesthetic room with neon pink and blue lights, retro 80s arcade machine, 3d render",
+                    "Close up photography of a mystical glowing crystal in a dark forest, magical atmosphere, macro lens",
+                    "Anime style beautiful scenery of a quiet train station at sunset with pastel clouds, Makoto Shinkai style",
+                    "Dark moody aesthetic photo of a cup of coffee on a wooden table with rain on the window, cinematic color grading"
                 ]
                 
-                # 💥 FIXED AI URL WITH RANDOM SEED FOR UNIQUE IMAGES 💥
+                # 50-50 split between AI art and Aesthetic real photos
                 if random.random() > 0.5:
                     prompt = random.choice(high_end_prompts)
                     encoded_prompt = urllib.parse.quote(prompt)
-                    seed_val = random.randint(1, 999999)
+                    seed_val = random.randint(1, 999999) # FIX: Prevents caching!
                     img_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?nologo=true&seed={seed_val}&width=800&height=1000"
-                    caption = f"Just generated this! Kaisa laga? ✨ #AIArt #Aesthetics #{bot_username}"
+                    
+                    caption = random.choice([
+                        f"Just generated this masterpiece! Kaisa laga? ✨ #AIArt #Aesthetics",
+                        f"AI Studio is blowing my mind 🤯 What do you think? #Generated #{bot_username}",
+                        f"Speechless... AI art is the future 🔥 #DigitalArt"
+                    ])
                 else:
-                    seed_val = random.randint(1, 999999)
+                    seed_val = random.randint(1, 999999) # FIX: Prevents caching!
                     img_url = f"https://picsum.photos/seed/{seed_val}/800/1000"
                     caption = random.choice([
-                        "Nature's beauty 🌲 #nature #peace #sukoon", 
-                        "Vibes ✨ #chill #mood #aesthetic", 
+                        "Nature ki vibe hi alag hai 🌲 #peace #sukoon", 
+                        "Current mood ✨ #chill #aesthetic", 
                         "Aaj ka din was super productive! 😎 #grind", 
-                        "Random click, kaisa laga? 📸 #photography #india"
+                        "Captured this moment. 📸 Kaisi hai pic? #photography #india"
                     ])
             else:
                 img_url = "SHAYARI_TEXT"
-                caption = "Words hit deeper when you're silent... 💔 #sad #shayari #quotes #deep"
+                caption = random.choice([
+                    "Words hit deeper when you're silent... 💔 #sad #shayari #deep",
+                    "Zindagi ek safar hai suhana... ✨ #quotes #life",
+                    "Akele chalne ka apna hi maza hai 🚶‍♂️ #motivation #hindi"
+                ])
             
             c.execute("INSERT INTO media (filename, title, category, uploaded_by, approved, visibility, views, tips_received) VALUES (%s, %s, %s, %s, 1, 'public', %s, %s)",
                       (img_url, caption, cat, bot_username, random.randint(5, 50), 0))
@@ -892,7 +901,7 @@ def report_asset(media_id):
     finally: conn.close()
 
 # =========================================================
-# CORE ROUTES (FEED & LEADERBOARD)
+# CORE ROUTES (VIEWS)
 # =========================================================
 @app.route("/feed")
 def feed():
@@ -910,7 +919,6 @@ def api_feed_data():
     c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     block_filter = "m.uploaded_by NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) AND m.uploaded_by NOT IN (SELECT blocker FROM blocks WHERE blocked = %s)"
     
-    # 💥 FIX: Changed feed algorithm to show chronological (newest first) so bot posts aren't hidden! 💥
     ai_order_logic = "m.is_pinned DESC, m.id DESC"
     
     if tab == "global":
@@ -1279,7 +1287,7 @@ def api_global_chat_history():
     if "username" not in session: return jsonify([])
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute(f"SELECT gc.id, gc.sender, gc.message, TO_CHAR(gc.created_at, 'HH12:MI AM') as time, u.role, u.is_verified FROM global_chat gc JOIN users u ON gc.sender = u.username WHERE gc.sender NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) ORDER BY gc.created_at ASC", (session["username"],))
+    c.execute(f"SELECT gc.id, gc.sender, gc.message, TO_CHAR(gc.created_at, 'HH12:MI AM') as time, u.role, u.is_verified FROM global_chat gc JOIN u ON gc.sender = u.username WHERE gc.sender NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) ORDER BY gc.created_at ASC", (session["username"],))
     history = c.fetchall()
     conn.close()
     formatted = [{"id": r['id'], "sender": r['sender'], "message": r['message'], "time": r['time'], "role": r['role'], "is_verified": r['is_verified']} for r in history]
@@ -1328,10 +1336,11 @@ def ai_studio():
     if request.method == "POST":
         prompt = request.form.get("prompt", "").strip()
         if not prompt: return redirect(url_for("ai_studio"))
-        wants_image = any(word in prompt.lower() for word in ["create", "generate", "draw", "make an image", "paint"])
+        wants_image = any(word in prompt.lower() for word in ["create", "generate", "draw", "make an image", "paint", "banao"])
         if wants_image:
             encoded_prompt = urllib.parse.quote(prompt)
-            image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?nologo=true"
+            seed_val = random.randint(1, 999999) # 💥 Prevents caching here too! 💥
+            image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?nologo=true&seed={seed_val}&width=800&height=1000"
             try:
                 r = requests.get(image_url, timeout=15)
                 secure_url = cloudinary.uploader.upload(r.content, resource_type="image")["secure_url"] if r.status_code == 200 else image_url
