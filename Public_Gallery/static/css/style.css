@@ -84,6 +84,41 @@ body {
     display: flex; gap: 15px; margin-top: 10px; font-weight: 600; color: var(--text-primary); font-size: 0.85rem;
 }
 
+/* 💥 MOBILE BOTTOM NAVIGATION 💥 */
+.mobile-bottom-nav {
+    display: none;
+    position: fixed;
+    bottom: 0; left: 0; width: 100%;
+    background: var(--surface-glass);
+    backdrop-filter: blur(15px);
+    border-top: 1px solid var(--accent-light);
+    z-index: 1000;
+    padding: 10px 20px;
+    padding-bottom: env(safe-area-inset-bottom, 10px); /* For iPhones */
+}
+
+.nav-icons-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.nav-icon {
+    font-size: 1.5rem;
+    color: var(--text-primary);
+    text-decoration: none;
+    transition: var(--transition-fast);
+}
+
+.nav-icon.active { color: var(--accent-primary); font-weight: bold; }
+
+@media (max-width: 768px) {
+    .glass-header .nav-links { display: none; } /* Hide top links on mobile */
+    .mobile-bottom-nav { display: block; }
+    /* Floating upload button needs to move up slightly to not overlap bottom nav */
+    .floating-upload-btn { bottom: 80px; display: none; } /* Hide floating + if using bottom nav + */
+}
+
 /* 2. Floating Upload Button */
 .floating-upload-btn {
     position: fixed;
