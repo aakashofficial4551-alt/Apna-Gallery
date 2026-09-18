@@ -1,166 +1,88 @@
 /* =========================================================
-   PHANTX - PREMIUM DEEP OBSIDIAN (DARK MODE)
+   PHANTX - ELITE PITCH BLACK & CYAN PREMIUM UI
    ========================================================= */
 :root {
-    /* Deep Space Black & Navy Backgrounds */
-    --bg-base: #0B0F19;
-    --bg-gradient: linear-gradient(135deg, #0B0F19 0%, #111A2F 100%);
+    --bg-base: #050505; /* True Black for OLED screens */
+    --bg-gradient: linear-gradient(135deg, #000000 0%, #0d1117 100%);
+    --surface: #111418;
+    --surface-glass: rgba(17, 20, 24, 0.85);
     
-    /* Cards & Glassmorphism Surfaces */
-    --surface: #1A2235;
-    --surface-glass: rgba(26, 34, 53, 0.85);
-    
-    /* High Contrast Text */
     --text-primary: #F8FAFC; 
     --text-secondary: #94A3B8;
-    --text-tertiary: #64748B;
     
-    /* Cyber Neon Accents */
-    --accent-primary: #00F2FE; 
-    --accent-hover: #4FACFE;
-    --accent-light: rgba(0, 242, 254, 0.15);
+    --accent-primary: #00E5FF; /* Premium Neon Cyan */
+    --accent-hover: #00B8D4;
+    --accent-gold: #FFD700; /* For Premium Feel */
     
-    /* Borders & Alerts */
-    --border-color: #2A3441;
-    --danger: #F43F5E;
-    --success: #10B981;
-    --warning: #F59E0B;
+    --border-color: #22272e;
+    --danger: #FF3366;
     
-    /* Radii & Shadows */
-    --radius-sm: 8px;
     --radius-md: 16px;
     --radius-lg: 24px;
-    --radius-full: 9999px;
-    --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
-    --shadow-md: 0 10px 25px -5px rgba(0, 0, 0, 0.6);
-    --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-fast: 0.15s ease-in-out;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-    font-family: 'Montserrat', -apple-system, sans-serif;
-    background: var(--bg-gradient);
+    font-family: 'Montserrat', sans-serif;
+    background: var(--bg-base);
     color: var(--text-primary);
     min-height: 100vh;
-    line-height: 1.6;
-    overflow-x: hidden;
-    -webkit-tap-highlight-color: transparent; 
+    padding-bottom: 85px; /* CRITICAL FIX: Pushes content above bottom nav */
+    -webkit-tap-highlight-color: transparent;
 }
 
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-thumb { background: var(--accent-primary); border-radius: 10px; }
-a { text-decoration: none; color: inherit; }
+/* 💥 SEARCH BAR FIX (Brings it to front) 💥 */
+.search-container { position: relative; z-index: 100; margin-bottom: 20px; }
+.search-input { 
+    width: 100%; padding: 15px; border-radius: 30px; 
+    background: var(--surface); border: 1px solid var(--border-color); 
+    color: white; font-size: 1rem; z-index: 100; position: relative;
+}
+.search-input:focus { border-color: var(--accent-primary); outline: none; }
 
-/* ==========================================
-   DESKTOP NAVBAR
-   ========================================== */
+/* 💥 CHAT BOX OVERLAP FIX 💥 */
+.chat-input-area {
+    position: fixed; bottom: 70px; left: 0; width: 100%;
+    background: var(--bg-base); padding: 10px; z-index: 999;
+    border-top: 1px solid var(--border-color);
+}
+.chat-message-container { padding-bottom: 140px; } /* Chat dikhne ke liye space */
+
+/* DESKTOP & MOBILE HEADER */
 .glass-header {
     position: sticky; top: 0; z-index: 1000;
-    background: var(--surface-glass);
-    backdrop-filter: blur(12px);
-    border-bottom: 1px solid var(--border-color);
-    padding: 12px 5%;
-    display: flex; justify-content: space-between; align-items: center;
+    background: var(--surface-glass); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border-color); padding: 12px 5%;
 }
-.nav-links { display: flex; gap: 15px; align-items: center; }
-.nav-link { font-weight: 700; color: var(--text-secondary); transition: var(--transition-fast); }
-.nav-link:hover { color: var(--accent-primary); }
 
-/* ==========================================
-   💥 MOBILE BOTTOM NAVIGATION 💥
-   ========================================== */
+/* 💥 BOTTOM NAVIGATION 💥 */
 .mobile-bottom-nav {
-    display: none;
-    position: fixed;
-    bottom: 0; left: 0; width: 100%;
-    background: var(--surface-glass);
-    backdrop-filter: blur(15px);
-    border-top: 1px solid var(--border-color);
-    z-index: 9999;
-    padding: 10px 20px;
-    padding-bottom: env(safe-area-inset-bottom, 10px);
+    display: none; position: fixed; bottom: 0; left: 0; width: 100%;
+    background: var(--surface-glass); backdrop-filter: blur(15px);
+    border-top: 1px solid var(--border-color); z-index: 9999;
+    padding: 10px 20px; padding-bottom: env(safe-area-inset-bottom, 10px);
 }
 .nav-icons-container { display: flex; justify-content: space-between; align-items: center; }
 .nav-icon { font-size: 1.6rem; color: var(--text-secondary); transition: var(--transition-fast); }
 .nav-icon.active { color: var(--accent-primary); transform: scale(1.1); font-weight: bold; }
 
-/* The Floating Plus Button in Nav */
 .nav-plus-btn {
-    background: linear-gradient(135deg, var(--accent-hover), var(--accent-primary));
-    color: #000 !important; 
-    width: 45px; height: 45px;
-    border-radius: 50%;
+    background: var(--accent-primary); color: #000 !important; 
+    width: 45px; height: 45px; border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 4px 15px rgba(0, 242, 254, 0.4);
-    transform: translateY(-10px);
-    font-weight: 900;
+    box-shadow: 0 4px 15px rgba(0, 229, 255, 0.4);
+    transform: translateY(-10px); font-weight: 900;
 }
 
 @media (max-width: 768px) {
     .glass-header .nav-links { display: none; }
     .mobile-bottom-nav { display: block; }
-    body { padding-bottom: 70px; }
 }
 
-/* ==========================================
-   ULTRA-COMPACT DUAL DP PROFILE
-   ========================================== */
-.profile-cover-container {
-    position: relative; width: 100%; height: 120px;
-    background: var(--border-color); margin-bottom: 45px;
-    border-radius: var(--radius-md) var(--radius-md) 0 0;
-}
-.profile-cover-img { width: 100%; height: 100%; object-fit: cover; opacity: 0.8; border-radius: var(--radius-md) var(--radius-md) 0 0; }
-.profile-dp-wrapper {
-    position: absolute; bottom: -40px; left: 20px;
-    width: 85px; height: 85px; border-radius: 50%;
-    border: 4px solid var(--bg-base); background: var(--surface);
-    overflow: hidden; box-shadow: var(--shadow-md); z-index: 10;
-}
-.profile-dp-img { width: 100%; height: 100%; object-fit: cover; }
-.profile-info-compact { padding: 0 20px; }
-.profile-nickname { font-size: 1.4rem; font-weight: 800; color: var(--text-primary); margin: 0; line-height: 1.2; }
-.profile-username { font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 5px; }
-.profile-stats-bar { display: flex; gap: 15px; margin-top: 10px; font-weight: 600; color: var(--text-primary); font-size: 0.85rem; }
-
-/* ==========================================
-   EXPLORE GRID & FEED TWEAKS
-   ========================================== */
+/* EXPLORE GRID & UI */
 .explore-grid-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; }
 .explore-grid-item { aspect-ratio: 1 / 1; overflow: hidden; background: var(--border-color); cursor: pointer; }
-.explore-grid-item img, .explore-grid-item video { width: 100%; height: 100%; object-fit: cover; transition: 0.3s; }
-.explore-grid-item:hover img { transform: scale(1.05); }
-
-/* Transparent subtle action buttons for Feed */
-.compact-action-btn { 
-    font-size: 13px !important; padding: 6px 12px !important; border-radius: var(--radius-sm); 
-    background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); 
-    cursor: pointer; color: var(--text-primary); 
-    transition: var(--transition-fast);
-}
-.compact-action-btn:hover { background: var(--border-color); }
-.post-header-avatar { width: 38px !important; height: 38px !important; }
-
-/* ==========================================
-   BASIC UTILITY & FORMS
-   ========================================== */
-.container { width: 100%; max-width: 1200px; margin: 0 auto; padding: 15px 5%; }
-
-.btn { 
-    background: linear-gradient(135deg, var(--accent-hover), var(--accent-primary)); 
-    color: #000; 
-    border: none; padding: 10px 20px; font-weight: 800; 
-    border-radius: var(--radius-sm); cursor: pointer; 
-    box-shadow: 0 4px 10px rgba(0, 242, 254, 0.2);
-}
-.form-input { 
-    width: 100%; padding: 12px; 
-    background: var(--bg-base); 
-    border: 1px solid var(--border-color); 
-    border-radius: var(--radius-md); 
-    color: var(--text-primary); 
-    outline: none; 
-    transition: var(--transition-fast);
-}
-.form-input:focus { border-color: var(--accent-primary); box-shadow: 0 0 0 2px rgba(0, 242, 254, 0.2); }
+.explore-grid-item img, .explore-grid-item video { width: 100%; height: 100%; object-fit: cover; }
+.btn { background: var(--accent-primary); color: #000; border: none; padding: 12px 20px; font-weight: 800; border-radius: 30px; cursor: pointer; }
