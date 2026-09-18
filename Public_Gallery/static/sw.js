@@ -5,18 +5,13 @@ const STATIC_ASSETS = [
     '/manifest.json'
 ];
 
-// Install Event - Caches critical files
 self.addEventListener('install', (event) => {
     event.waitUntil(
-        caches.open(CACHE_NAME).then((cache) => {
-            console.log('Caching offline assets');
-            return cache.addAll(STATIC_ASSETS);
-        })
+        caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
     );
     self.skipWaiting();
 });
 
-// Activate Event - Clears old caches
 self.addEventListener('activate', (event) => {
     event.waitUntil(
         caches.keys().then((cacheNames) => {
@@ -28,7 +23,6 @@ self.addEventListener('activate', (event) => {
     self.clients.claim();
 });
 
-// Fetch Event - Network first, fallback to cache
 self.addEventListener('fetch', (event) => {
     if (event.request.method !== 'GET') return;
     event.respondWith(
