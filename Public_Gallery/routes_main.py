@@ -364,24 +364,34 @@ def init_main_routes(app):
         conn.close()
         return render_template("reels.html", videos=videos)
 
+    # 💥 AUTO-PILOT AI BOTS (Background Trigger) 💥
+    @app.before_request
+    def wake_up_bots():
+        # Har request par 5% chance hai ki ek bot active hokar upload karega
+        if request.endpoint not in ['static', 'sw', 'manifest'] and random.random() < 0.05:
+            try:
+                # Triggering bot logic silently
+                from core_utils import execute_bot_routine
+                execute_bot_routine()
+            except:
+                pass
+
     @app.route("/explore")
     def explore():
         if "username" not in session: return redirect(url_for("login"))
         conn = get_db_connection()
         c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        
+        # Spotlight user
         c.execute("SELECT username, profile_pic, bio, is_verified FROM users WHERE role = 'user' AND is_verified = TRUE AND username NOT LIKE 'Guest-%%' ORDER BY wallet_balance DESC LIMIT 1")
         spotlight = c.fetchone()
-        c.execute("SELECT m.id, m.filename, m.title, m.category, m.likes, m.views, m.uploaded_by FROM media m WHERE m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' AND m.uploaded_by NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) ORDER BY RANDOM() LIMIT 40", (session["username"],))
+        
+        # 💥 FIXED: Post ID linked properly for anchor scrolling
+        c.execute("SELECT m.id, m.filename, m.title, m.category, m.likes, m.views, m.uploaded_by FROM media m WHERE m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' AND m.uploaded_by NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) ORDER BY RANDOM() LIMIT 42", (session["username"],))
         explore_posts = [dict(row) for row in c.fetchall()]
-        c.execute("SELECT title FROM media WHERE approved = 1 AND visibility = 'public'")
-        all_titles = c.fetchall()
-        tag_counts = defaultdict(int)
-        for row in all_titles:
-            if row['title']:
-                for t in re.findall(r'#(\w+)', row['title']): tag_counts[t.lower()] += 1
-        trending_tags = [tag for tag, count in sorted(tag_counts.items(), key=lambda x: x[1], reverse=True)[:6]]
+        
         conn.close()
-        return render_template("explore.html", posts=explore_posts, trending_tags=trending_tags, spotlight=spotlight)
+        return render_template("explore.html", posts=explore_posts, spotlight=spotlight)
 
     @app.route("/gallery/<category>", methods=["GET", "POST"])
     def gallery(category):
