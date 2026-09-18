@@ -5,32 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>{% block title %}PHANTX{% endblock %}</title>
     
-    <!-- PWA Manifest -->
+    <!-- PWA Manifest & App Info -->
     <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="#0f172a">
+    <meta name="theme-color" content="#050505">
     
-    <!-- 💥 NAYA CSS PATH (Sahi folder ke sath) 💥 -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=2.1">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=3.0">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800;900&display=swap" rel="stylesheet">
-    
-    <style>
-        /* Mobile vs Desktop Display Logic */
-        .mobile-top-icons { display: none; }
-        @media (max-width: 768px) {
-            .nav-links { display: none !important; }
-            .mobile-top-icons { display: flex !important; }
-            .glass-header { padding: 12px 15px; } /* Thoda compact mobile padding */
-        }
-    </style>
 </head>
 <body>
 
     <!-- FLASH MESSAGES -->
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
-        <div style="position: fixed; top: 10px; right: 10px; z-index: 10000; width: 90%; max-width: 350px;">
+        <div style="position: fixed; top: 10px; right: 10px; z-index: 100000; width: 90%; max-width: 350px;">
           {% for category, message in messages %}
-            <div style="background: {% if category == 'error' %}#F43F5E{% else %}#00F2FE{% endif %}; color: {% if category == 'error' %}white{% else %}black{% endif %}; padding: 15px; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); font-weight: 800; animation: fadeUp 0.3s ease-out;">
+            <div style="background: {% if category == 'error' %}var(--danger){% else %}var(--accent-primary){% endif %}; color: {% if category == 'error' %}white{% else %}black{% endif %}; padding: 15px; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); font-weight: 800;">
               {{ message }}
             </div>
           {% endfor %}
@@ -38,7 +27,7 @@
       {% endif %}
     {% endwith %}
 
-    <!-- TOP HEADER -->
+    <!-- DESKTOP HEADER & MOBILE TOP ICONS -->
     {% if not hide_navbar %}
     <header class="glass-header">
         <div style="display: flex; align-items: center; gap: 15px;">
@@ -46,72 +35,84 @@
         </div>
         
         {% if session.get('username') %}
-        
-        <!-- 💥 DESKTOP NAVIGATION (Sabkuch yahan hai) 💥 -->
+        <!-- Desktop Nav -->
         <nav class="nav-links">
             <a href="{{ url_for('dashboard') }}" class="nav-link">Dashboard</a>
             <a href="{{ url_for('feed') }}" class="nav-link">Feed</a>
             <a href="{{ url_for('explore') }}" class="nav-link">Explore</a>
-            <a href="{{ url_for('global_chat') }}" class="nav-link">🌍 Global Chat</a>
+            <a href="{{ url_for('reels') }}" class="nav-link">Reels</a>
+            <a href="{{ url_for('global_chat') }}" class="nav-link">🌍 Global</a>
             <a href="#" onclick="openUploadModal()" class="nav-link btn" style="color: black;">+ Upload</a>
-            <a href="{{ url_for('inbox') }}" class="nav-link">💬 Inbox 
-                {% if unread_messages > 0 %}<span style="background:var(--danger); color:white; border-radius:50%; padding:2px 6px; font-size:10px;">{{ unread_messages }}</span>{% endif %}
-            </a>
-            <a href="{{ url_for('notifications') }}" class="nav-link">🔔
-                {% if unread_notifications > 0 %}<span style="background:var(--danger); color:white; border-radius:50%; padding:2px 6px; font-size:10px;">{{ unread_notifications }}</span>{% endif %}
-            </a>
+            <a href="{{ url_for('inbox') }}" class="nav-link">💬 Inbox</a>
+            <a href="{{ url_for('notifications') }}" class="nav-link">🔔</a>
             <a href="{{ url_for('profile') }}" class="nav-link">
                 <img src="{{ get_avatar(my_profile_pic, session.username) }}" style="width:32px; height:32px; border-radius:50%; vertical-align:middle; border:2px solid var(--accent-primary);">
             </a>
         </nav>
 
-        <!-- 💥 MOBILE TOP ICONS (Chats & Notifs Upar) 💥 -->
+        <!-- Mobile Top Nav (Chats & Notifs) -->
         <div class="mobile-top-icons" style="align-items: center; gap: 18px;">
-            <a href="{{ url_for('global_chat') }}" style="font-size: 1.4rem; text-decoration: none;">🌍</a>
-            <a href="{{ url_for('inbox') }}" style="font-size: 1.4rem; position: relative; text-decoration: none;">
-                💬{% if unread_messages > 0 %}<span style="position:absolute; top:-5px; right:-10px; background:var(--danger); color:white; border-radius:50%; padding:2px 5px; font-size:10px; font-weight:bold;">{{ unread_messages }}</span>{% endif %}
-            </a>
-            <a href="{{ url_for('notifications') }}" style="font-size: 1.4rem; position: relative; text-decoration: none;">
-                🔔{% if unread_notifications > 0 %}<span style="position:absolute; top:-5px; right:-10px; background:var(--danger); color:white; border-radius:50%; padding:2px 5px; font-size:10px; font-weight:bold;">{{ unread_notifications }}</span>{% endif %}
-            </a>
+            <a href="{{ url_for('global_chat') }}" style="font-size: 1.4rem;">🌍</a>
+            <a href="{{ url_for('inbox') }}" style="font-size: 1.4rem; position: relative;">💬</a>
+            <a href="{{ url_for('notifications') }}" style="font-size: 1.4rem; position: relative;">🔔</a>
         </div>
-        
         {% endif %}
     </header>
     {% endif %}
 
-    <!-- MAIN CONTENT -->
     <main>
         {% block content %}{% endblock %}
     </main>
 
-    <!-- 💥 UPDATED BOTTOM NAVIGATION (REELS ADDED) 💥 -->
+    <!-- MOBILE BOTTOM NAV -->
     {% if session.get('username') and not hide_navbar %}
     <nav class="mobile-bottom-nav">
         <div class="nav-icons-container">
             <a href="{{ url_for('feed') }}" class="nav-icon {% if request.endpoint == 'feed' %}active{% endif %}">🏠</a>
             <a href="{{ url_for('explore') }}" class="nav-icon {% if request.endpoint == 'explore' %}active{% endif %}">🔍</a>
-            <!-- Naya Reels Button -->
             <a href="{{ url_for('reels') }}" class="nav-icon {% if request.endpoint == 'reels' %}active{% endif %}">🎞️</a>
-            
             <a href="#" onclick="openUploadModal()" class="nav-icon nav-plus-btn">➕</a>
-            
             <a href="{{ url_for('profile') }}" class="nav-icon {% if request.endpoint == 'profile' %}active{% endif %}">👤</a>
         </div>
     </nav>
     {% endif %}
 
-    <!-- 💥 SWIPE & PERMISSIONS ENGINE 💥 -->
+    <!-- UPLOAD MODAL -->
+    <div id="uploadModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 100000; justify-content: center; align-items: center; backdrop-filter: blur(8px);">
+        <div style="background: var(--surface); padding: 30px; border-radius: var(--radius-lg); width: 90%; max-width: 400px; position: relative; border: 1px solid var(--border-color);">
+            <span onclick="document.getElementById('uploadModal').style.display='none'" style="position: absolute; top: 15px; right: 20px; font-size: 1.8rem; cursor: pointer; color: var(--text-secondary);">&times;</span>
+            <h3 style="color: var(--text-primary); margin-bottom: 20px; font-weight: 800;">Upload to Vault</h3>
+            <form method="POST" action="/upload_asset" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="file" name="media" accept="image/*,video/*,audio/*" required class="form-input" style="margin-bottom: 15px;">
+                <input type="text" name="title" placeholder="Caption (#tags @mentions)" required class="form-input" style="margin-bottom: 15px;">
+                <select name="category" class="form-input" style="margin-bottom: 15px;">
+                    <option value="Photo">Photo / Art</option>
+                    <option value="Video">Short Video (Reel)</option>
+                </select>
+                <select name="visibility" class="form-input" style="margin-bottom: 20px;">
+                    <option value="public">🌍 Public (Global Feed)</option>
+                    <option value="followers">👥 Followers Only</option>
+                </select>
+                <button type="submit" class="btn" style="width: 100%;">Upload Asset</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- SWIPE GESTURES, PWA & PERMISSIONS -->
     <script>
-        // Camera & Mic Permissions Request on Load
+        function openUploadModal() { document.getElementById('uploadModal').style.display = 'flex'; }
+
+        // Ask for Media Permissions smoothly
         window.addEventListener('load', async () => {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-                // Instantly stop the stream after permission is granted to save battery
-                stream.getTracks().forEach(track => track.stop());
-                console.log("Media Permissions Granted.");
-            } catch (err) {
-                console.log("Permissions Denied.");
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                    stream.getTracks().forEach(track => track.stop()); // Stop immediately
+                } catch (err) { console.log("Permissions Denied"); }
+            }
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/sw.js');
             }
         });
 
@@ -121,105 +122,14 @@
         document.addEventListener('touchstart', e => { touchstartX = e.changedTouches[0].screenX; });
         document.addEventListener('touchend', e => {
             touchendX = e.changedTouches[0].screenX;
-            let swipeDistance = touchendX - touchstartX;
-            if (swipeDistance < -100 && window.location.pathname === '/feed') window.location.href = '/explore';
-            if (swipeDistance > 100 && window.location.pathname === '/explore') window.location.href = '/feed';
-        });
-    </script>
-
-    <!-- UPLOAD MODAL (Global) -->
-    <div id="uploadModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 10000; justify-content: center; align-items: center; backdrop-filter: blur(8px);">
-        <div style="background: var(--surface); padding: 30px; border-radius: var(--radius-lg); width: 90%; max-width: 400px; position: relative; border: 1px solid var(--border-color);">
-            <span onclick="document.getElementById('uploadModal').style.display='none'" style="position: absolute; top: 15px; right: 20px; font-size: 1.8rem; cursor: pointer; color: var(--text-secondary);">&times;</span>
-            <h3 style="color: var(--text-primary); margin-bottom: 20px; font-weight: 800;">Upload to Vault</h3>
-            
-            <form method="POST" action="/upload_asset" enctype="multipart/form-data">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                
-                <input type="file" name="media" accept="image/*,video/*" required class="form-input" style="margin-bottom: 15px;">
-                <input type="text" name="title" placeholder="Caption (use #tags or @mentions)" required class="form-input" style="margin-bottom: 15px;">
-                
-                <select name="category" class="form-input" style="margin-bottom: 15px;">
-                    <option value="Photo">Photo / Art</option>
-                    <option value="Video">Short Video (Reel)</option>
-                </select>
-                
-                <select name="visibility" class="form-input" style="margin-bottom: 20px;">
-                    <option value="public">🌍 Public (Global Feed)</option>
-                    <option value="followers">👥 Followers Only</option>
-                </select>
-
-                <button type="submit" class="btn" style="width: 100%;">Upload Asset</button>
-            </form>
-        </div>
-    </div>
-
-    <!-- SCRIPT FOR MODAL -->
-    <script>
-        function openUploadModal() {
-            document.getElementById('uploadModal').style.display = 'flex';
-        }
-    </script>
-<!-- 💥 PWA REGISTRATION SCRIPT 💥 -->
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js')
-                    .then(reg => console.log('✅ Service Worker Active! Native App Ready.'))
-                    .catch(err => console.error('Service Worker Error:', err));
-            });
-        }
-    </script>
-    <!-- 💥 SWIPE GESTURES & PERMISSIONS ENGINE 💥 -->
-    <script>
-        // 1. App Permissions Request (Camera, Mic)
-        window.addEventListener('load', async () => {
-            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-                try {
-                    // Requests permission quietly in background on first load
-                    await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-                    console.log("Media Permissions Granted.");
-                } catch (err) {
-                    console.log("Media Permissions Denied or Ignored.");
-                }
-            }
-        });
-
-        // 2. Swipe Left/Right to change tabs
-        let touchstartX = 0;
-        let touchendX = 0;
-        
-        function handleSwipe() {
-            const swipeDistance = touchendX - touchstartX;
-            if (swipeDistance < -100) {
-                // Swiped Left -> Go to Explore
+            let diff = touchendX - touchstartX;
+            if (diff < -100) {
                 if(window.location.pathname === '/feed') window.location.href = '/explore';
+                else if(window.location.pathname === '/explore') window.location.href = '/reels';
             }
-            if (swipeDistance > 100) {
-                // Swiped Right -> Go to Feed
-                if(window.location.pathname === '/explore') window.location.href = '/feed';
-            }
-        }
-
-        document.addEventListener('touchstart', e => {
-            touchstartX = e.changedTouches[0].screenX;
-        });
-
-        document.addEventListener('touchend', e => {
-            touchendX = e.changedTouches[0].screenX;
-            handleSwipe();
-        });
-
-        // 3. Smooth scroll for Explore to Feed linking
-        document.addEventListener("DOMContentLoaded", function() {
-            if(window.location.hash) {
-                setTimeout(() => {
-                    let target = document.querySelector(window.location.hash);
-                    if(target) {
-                        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                        target.style.border = "2px solid #00E5FF"; // Highlight post
-                    }
-                }, 500);
+            if (diff > 100) {
+                if(window.location.pathname === '/reels') window.location.href = '/explore';
+                else if(window.location.pathname === '/explore') window.location.href = '/feed';
             }
         });
     </script>
