@@ -143,5 +143,58 @@
             });
         }
     </script>
+    <!-- 💥 SWIPE GESTURES & PERMISSIONS ENGINE 💥 -->
+    <script>
+        // 1. App Permissions Request (Camera, Mic)
+        window.addEventListener('load', async () => {
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                try {
+                    // Requests permission quietly in background on first load
+                    await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                    console.log("Media Permissions Granted.");
+                } catch (err) {
+                    console.log("Media Permissions Denied or Ignored.");
+                }
+            }
+        });
+
+        // 2. Swipe Left/Right to change tabs
+        let touchstartX = 0;
+        let touchendX = 0;
+        
+        function handleSwipe() {
+            const swipeDistance = touchendX - touchstartX;
+            if (swipeDistance < -100) {
+                // Swiped Left -> Go to Explore
+                if(window.location.pathname === '/feed') window.location.href = '/explore';
+            }
+            if (swipeDistance > 100) {
+                // Swiped Right -> Go to Feed
+                if(window.location.pathname === '/explore') window.location.href = '/feed';
+            }
+        }
+
+        document.addEventListener('touchstart', e => {
+            touchstartX = e.changedTouches[0].screenX;
+        });
+
+        document.addEventListener('touchend', e => {
+            touchendX = e.changedTouches[0].screenX;
+            handleSwipe();
+        });
+
+        // 3. Smooth scroll for Explore to Feed linking
+        document.addEventListener("DOMContentLoaded", function() {
+            if(window.location.hash) {
+                setTimeout(() => {
+                    let target = document.querySelector(window.location.hash);
+                    if(target) {
+                        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        target.style.border = "2px solid #00E5FF"; // Highlight post
+                    }
+                }, 500);
+            }
+        });
+    </script>
 </body>
 </html>
