@@ -4,13 +4,12 @@
 {% block content %}
 <div class="container" style="max-width: 800px; padding: 0;">
     
-    <!-- 💥 DUAL DP FACEBOOK STYLE 💥 -->
+    <!-- DUAL DP FACEBOOK STYLE -->
     <div class="profile-cover-container">
         {% if user.cover_pic %}
             <img src="{{ user.cover_pic }}" class="profile-cover-img">
         {% else %}
-            <!-- Default gradient if no cover is uploaded -->
-            <div style="width: 100%; height: 100%; background: linear-gradient(135deg, var(--accent-primary), var(--text-primary)); border-radius: var(--radius-lg);"></div>
+            <div style="width: 100%; height: 100%; background: linear-gradient(135deg, var(--accent-primary), var(--text-primary)); border-radius: var(--radius-md) var(--radius-md) 0 0;"></div>
         {% endif %}
         
         <div class="profile-dp-wrapper">
@@ -18,20 +17,27 @@
         </div>
     </div>
 
-    <!-- COMPACT INFO -->
-    <div class="profile-info-compact">
-        <h1 class="profile-nickname">
-            {{ user.nickname or user.username }} 
-            {% if user.is_verified %}<span style="color:var(--accent-primary); font-size:1rem;">✅</span>{% endif %}
-        </h1>
-        <p class="profile-username">@{{ user.username }} • {{ user.country or "Earth" }}</p>
-        <p style="color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 0;">{{ user.bio or "No bio yet." }}</p>
-        
-        <div class="profile-stats-bar">
-            <span><b>{{ followers_count }}</b> Followers</span>
-            <span><b>{{ following_count }}</b> Following</span>
-            <span><b>{{ my_wallet }}</b> 🪙</span>
+    <!-- COMPACT INFO & SETTINGS BUTTON -->
+    <div class="profile-info-compact" style="display: flex; justify-content: space-between; align-items: flex-start;">
+        <div>
+            <h1 class="profile-nickname">
+                {{ user.nickname or user.username }} 
+                {% if user.is_verified %}<span style="color:var(--accent-primary); font-size:1rem;">✅</span>{% endif %}
+            </h1>
+            <p class="profile-username">@{{ user.username }} • {{ user.country or "Earth" }}</p>
+            <p style="color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 0;">{{ user.bio or "No bio yet." }}</p>
+            
+            <div class="profile-stats-bar">
+                <span><b>{{ followers_count }}</b> Followers</span>
+                <span><b>{{ following_count }}</b> Following</span>
+                <span><b>{{ my_wallet }}</b> 🪙</span>
+            </div>
         </div>
+        
+        <!-- ⚙️ SETTINGS BUTTON -->
+        <button onclick="document.getElementById('settingsModal').style.display='flex'" style="background: transparent; border: none; font-size: 1.8rem; cursor: pointer; color: var(--text-secondary); transition: 0.2s;" onmouseover="this.style.color='var(--text-primary)'" onmouseout="this.style.color='var(--text-secondary)'">
+            ⚙️
+        </button>
     </div>
 
     <hr style="border: 0; border-top: 2px solid var(--accent-light); margin: 25px 0;">
@@ -41,11 +47,57 @@
     <!-- GALLERY GRID -->
     <div class="explore-grid-container">
         {% for post in my_uploads %}
-            <!-- Redirects to feed anchor -->
             <a href="/feed#post-{{ post.id }}" class="explore-grid-item">
-                <img src="{{ post.filename }}">
+                {% if post.category == 'Video' %}
+                    <video src="{{ post.filename }}" style="width: 100%; height: 100%; object-fit: cover;"></video>
+                {% else %}
+                    <img src="{{ post.filename }}" loading="lazy">
+                {% endif %}
             </a>
         {% endfor %}
+    </div>
+</div>
+
+<!-- 💥 SETTINGS MODAL (Play Store Required) 💥 -->
+<div id="settingsModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 10000; justify-content: center; align-items: center; backdrop-filter: blur(8px);">
+    <div style="background: var(--surface); padding: 30px; border-radius: var(--radius-lg); width: 90%; max-width: 400px; position: relative; border: 1px solid var(--border-color);">
+        <span onclick="document.getElementById('settingsModal').style.display='none'" style="position: absolute; top: 15px; right: 20px; font-size: 1.8rem; cursor: pointer; color: var(--text-secondary);">&times;</span>
+        
+        <h3 style="color: var(--text-primary); margin-bottom: 20px; font-weight: 800;">Settings</h3>
+        
+        <!-- Update Profile Details -->
+        <form method="POST" action="/profile" enctype="multipart/form-data" style="margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 20px;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="action" value="update_profile">
+            
+            <label style="color: var(--text-secondary); font-size: 0.8rem;">Display Name</label>
+            <input type="text" name="nickname" value="{{ user.nickname or user.username }}" class="form-input" style="margin-bottom: 10px;">
+            
+            <label style="color: var(--text-secondary); font-size: 0.8rem;">Bio</label>
+            <input type="text" name="bio" value="{{ user.bio or '' }}" placeholder="Write something about yourself..." class="form-input" style="margin-bottom: 10px;">
+            
+            <label style="color: var(--text-secondary); font-size: 0.8rem;">Country</label>
+            <input type="text" name="country" value="{{ user.country or '' }}" placeholder="Your Country" class="form-input" style="margin-bottom: 15px;">
+            
+            <label style="color: var(--text-secondary); font-size: 0.8rem;">Profile Picture</label>
+            <input type="file" name="profile_pic" accept="image/*" class="form-input" style="margin-bottom: 10px; padding: 8px;">
+            
+            <label style="color: var(--text-secondary); font-size: 0.8rem;">Cover Photo</label>
+            <input type="file" name="cover_pic" accept="image/*" class="form-input" style="margin-bottom: 15px; padding: 8px;">
+
+            <button type="submit" class="btn" style="width: 100%; background: var(--bg-base); color: var(--text-primary); border: 1px solid var(--border-color);">Save Profile</button>
+        </form>
+
+        <!-- Play Store Mandatory Data Controls -->
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+            <a href="/logout" class="btn" style="text-align: center; background: var(--border-color); color: var(--text-primary);">Log Out</a>
+            
+            <form method="POST" action="/settings" onsubmit="return confirm('Are you sure you want to permanently delete your account and all your data? This action cannot be undone.');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="action" value="delete_account">
+                <button type="submit" class="btn" style="width: 100%; background: rgba(244, 63, 94, 0.1); color: var(--danger); border: 1px solid var(--danger);">Delete Account</button>
+            </form>
+        </div>
     </div>
 </div>
 {% endblock %}
