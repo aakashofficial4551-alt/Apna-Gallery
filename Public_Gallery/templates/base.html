@@ -85,20 +85,47 @@
         {% block content %}{% endblock %}
     </main>
 
-    <!-- 💥 MOBILE BOTTOM NAVIGATION (Feed, Explore, Dash, Profile) 💥 -->
+    <!-- 💥 UPDATED BOTTOM NAVIGATION (REELS ADDED) 💥 -->
     {% if session.get('username') and not hide_navbar %}
     <nav class="mobile-bottom-nav">
         <div class="nav-icons-container">
             <a href="{{ url_for('feed') }}" class="nav-icon {% if request.endpoint == 'feed' %}active{% endif %}">🏠</a>
             <a href="{{ url_for('explore') }}" class="nav-icon {% if request.endpoint == 'explore' %}active{% endif %}">🔍</a>
+            <!-- Naya Reels Button -->
+            <a href="{{ url_for('reels') }}" class="nav-icon {% if request.endpoint == 'reels' %}active{% endif %}">🎞️</a>
             
             <a href="#" onclick="openUploadModal()" class="nav-icon nav-plus-btn">➕</a>
             
-            <a href="{{ url_for('dashboard') }}" class="nav-icon {% if request.endpoint == 'dashboard' %}active{% endif %}">📊</a>
             <a href="{{ url_for('profile') }}" class="nav-icon {% if request.endpoint == 'profile' %}active{% endif %}">👤</a>
         </div>
     </nav>
     {% endif %}
+
+    <!-- 💥 SWIPE & PERMISSIONS ENGINE 💥 -->
+    <script>
+        // Camera & Mic Permissions Request on Load
+        window.addEventListener('load', async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                // Instantly stop the stream after permission is granted to save battery
+                stream.getTracks().forEach(track => track.stop());
+                console.log("Media Permissions Granted.");
+            } catch (err) {
+                console.log("Permissions Denied.");
+            }
+        });
+
+        // Swipe Left/Right Logic
+        let touchstartX = 0;
+        let touchendX = 0;
+        document.addEventListener('touchstart', e => { touchstartX = e.changedTouches[0].screenX; });
+        document.addEventListener('touchend', e => {
+            touchendX = e.changedTouches[0].screenX;
+            let swipeDistance = touchendX - touchstartX;
+            if (swipeDistance < -100 && window.location.pathname === '/feed') window.location.href = '/explore';
+            if (swipeDistance > 100 && window.location.pathname === '/explore') window.location.href = '/feed';
+        });
+    </script>
 
     <!-- UPLOAD MODAL (Global) -->
     <div id="uploadModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 10000; justify-content: center; align-items: center; backdrop-filter: blur(8px);">
