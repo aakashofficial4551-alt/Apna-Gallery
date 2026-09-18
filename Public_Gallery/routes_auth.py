@@ -3,13 +3,78 @@ import random
 from uuid import uuid4
 import datetime
 import secrets
+import smtplib
+from email.mime.text import MIMEText
 import psycopg2.extras
 from flask import request, render_template, redirect, url_for, flash, session, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 from database import get_db_connection
 from core_utils import get_ist_time
 
+# 💥 GMAIL OTP MAILER SCRIPT 💥
+def send_otp_email(receiver_email, otp):
+    # DHYAAN DO: Apna asli Gmail ID aur App Password yahan dalna
+    sender_email = "your-email@gmail.com"
+    password = "your-app-password-here" 
+    
+    msg = MIMEText(f"Welcome to PHANTX. Your Login OTP is: {otp}\n\nPlease do not share this code with anyone. It expires in 10 minutes.")
+    msg['Subject'] = 'PHANTX Security OTP'
+    msg['From'] = sender_email
+    msg['To'] = receiver_email
+    
+    try:
+        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
+        server.login(sender_email, password)
+        server.sendmail(sender_email, receiver_email, msg.as_string())
+        server.quit()
+        return True
+    except Exception as e:
+        print("Mail Sending Failed:", e)
+        return False
+
 def init_auth_routes(app):
+
+    @app.route("/upgrade_guest", methods=["POST"])
+    def upgrade_guest():
+        if "username" not in session or not session["username"].startswith("Guest-"):
+            return redirect(url_for("profile"))
+            
+        new_email = request.form.get("email").strip()
+        new_username = request.form.get("new_username").strip()
+        password = request.form.get("password", "")
+        
+        if not new_username.isalnum() or len(new_username) < 3:
+            flash("Username must be at least 3 alphanumeric characters.", "error")
+            return redirect(url_for("profile"))
+            
+        conn = get_db_connection()
+        c = conn.cursor()
+        try:
+            # 1. Update Username in Users table
+            c.execute("UPDATE users SET username = %s, email = %s, password = %s WHERE username = %s", (new_username, new_email, generate_password_hash(password), session["username"]))
+            # 2. Transfer all records to new username
+            tables_to_update = [
+                ("media", "uploaded_by"), ("comments", "username"), ("likes", "username"),
+                ("followers", "follower"), ("followers", "following"), ("messages", "sender"),
+                ("messages", "receiver"), ("bookmarks", "username"), ("global_chat", "sender"),
+                ("reports", "reported_by"), ("comment_likes", "username"), ("blocks", "blocker"),
+                ("blocks", "blocked"), ("notifications", "username"), ("stories", "username")
+            ]
+            for table, col in tables_to_update:
+                c.execute(f"UPDATE {table} SET {col} = %s WHERE {col} = %s", (new_username, session["username"]))
+            
+            conn.commit()
+            session["username"] = new_username
+            session["is_registered"] = True
+            flash("Account Upgraded Permanently! 🚀 Welcome to the Elite club.", "success")
+        except Exception as e:
+            conn.rollback()
+            flash("Username or Email is already taken by someone else.", "error")
+        finally:
+            conn.close()
+            
+        return redirect(url_for("profile"))
+
     @app.route("/login", methods=["GET", "POST"])
     def login():
         if session.get("username"): return redirect(url_for("feed"))
@@ -99,30 +164,6 @@ def init_auth_routes(app):
             new_pass = request.form.get("new_password")
             c.execute("UPDATE users SET password = %s WHERE username = %s", (generate_password_hash(new_pass), session["username"]))
             flash("Password Changed Successfully!", "success")
-            
-        elif action == "upgrade_guest":
-            new_username = html.escape(request.form.get("new_username", "").strip())
-            email = html.escape(request.form.get("email", "").strip())
-            password = request.form.get("password", "")
-            old_username = session["username"]
-            c.execute("SELECT id FROM users WHERE username = %s OR email = %s", (new_username, email))
-            if c.fetchone():
-                flash("Username or Email already exists!", "error")
-            else:
-                try:
-                    c.execute("UPDATE users SET username = %s, email = %s, password = %s WHERE username = %s", (new_username, email, generate_password_hash(password), old_username))
-                    tables_to_update = [
-                        ("media", "uploaded_by"), ("comments", "username"), ("likes", "username"),
-                        ("followers", "follower"), ("followers", "following"), ("messages", "sender"),
-                        ("messages", "receiver"), ("bookmarks", "username"), ("global_chat", "sender"),
-                        ("reports", "reported_by"), ("comment_likes", "username"), ("blocks", "blocker"),
-                        ("blocks", "blocked"), ("notifications", "username"), ("stories", "username")
-                    ]
-                    for table, col in tables_to_update:
-                        c.execute(f"UPDATE {table} SET {col} = %s WHERE {col} = %s", (new_username, old_username))
-                    session.update({"username": new_username, "is_registered": True})
-                    flash("Account Upgraded Permanently! 🎉", "success")
-                except Exception: flash("Error upgrading account.", "error")
 
         elif action == "unblock_user":
             target = request.form.get("blocked_username")
