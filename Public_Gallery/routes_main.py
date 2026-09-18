@@ -11,11 +11,18 @@ from core_utils import get_ist_time, save_uploaded_file, hijack_bot_post, curren
 import os
 
 def init_main_routes(app):
-    # 💥 THE PWA SERVICE WORKER ROUTE 💥
+    # 💥 STRICT PWA ROUTES FOR PWABUILDER 💥
     @app.route('/sw.js')
     def sw():
         response = make_response(send_from_directory('static', 'sw.js'))
         response.headers['Content-Type'] = 'application/javascript'
+        response.headers['Service-Worker-Allowed'] = '/'
+        return response
+
+    @app.route('/manifest.json')
+    def manifest():
+        response = make_response(send_from_directory('static', 'manifest.json'))
+        response.headers['Content-Type'] = 'application/manifest+json'
         return response
 
     @app.route("/")
@@ -30,34 +37,6 @@ def init_main_routes(app):
     @app.route("/privacy")
     def privacy_policy(): return render_template("privacy.html", hide_navbar=True)
 
-    @app.route("/manifest.json")
-    def dynamic_manifest():
-        return jsonify({
-            "name": "PHANTX - The Creator Vault",
-            "short_name": "PHANTX",
-            "description": "Premium stealth ecosystem for creators to share photos, reels, and ideas globally.",
-            "start_url": "/",
-            "display": "standalone",
-            "orientation": "portrait-primary",
-            "background_color": "#0B0F19",
-            "theme_color": "#00F2FE",
-            "icons": [
-                {
-                    "src": "/static/icon-192.png",
-                    "sizes": "192x192",
-                    "type": "image/png",
-                    "purpose": "any maskable"
-                },
-                {
-                    "src": "/static/icon-512.png",
-                    "sizes": "512x512",
-                    "type": "image/png",
-                    "purpose": "any maskable"
-                }
-            ],
-            "categories": ["social", "photography", "entertainment"]
-        })
-        
     @app.route("/upload_asset", methods=["POST"])
     def upload_asset():
         if "username" not in session: return redirect(url_for("login"))
@@ -463,12 +442,15 @@ def init_main_routes(app):
         c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
         if request.method == "POST":
             action = request.form.get("action")
-            if action == "avatar" and "profile_pic" in request.files:
-                url = save_uploaded_file(request.files["profile_pic"], "Photo")
-                if url: c.execute("UPDATE users SET profile_pic = %s WHERE username = %s", (url, session["username"]))
-            elif action == "cover" and "cover_pic" in request.files:
-                url = save_uploaded_file(request.files["cover_pic"], "Photo")
-                if url: c.execute("UPDATE users SET cover_pic = %s WHERE username = %s", (url, session["username"]))
+            if action == "update_profile":
+                nickname = html.escape(request.form.get("nickname", session["username"]))
+                bio = html.escape(request.form.get("bio", ""))
+                country = html.escape(request.form.get("country", ""))
+                if request.files.get("cover_pic"): c.execute("UPDATE users SET cover_pic = %s WHERE username = %s", (save_uploaded_file(request.files["cover_pic"], "Photo"), session["username"]))
+                if request.files.get("profile_pic"): c.execute("UPDATE users SET profile_pic = %s WHERE username = %s", (save_uploaded_file(request.files["profile_pic"], "Photo"), session["username"]))
+                c.execute("UPDATE users SET nickname = %s, bio = %s, country = %s WHERE username = %s", (nickname, bio, country, session["username"]))
+                conn.commit()
+                flash("Profile Updated!", "success")
             elif action == "story" and "story_media" in request.files:
                 url = save_uploaded_file(request.files["story_media"], "Photo")
                 if url: c.execute("INSERT INTO stories (username, filename) VALUES (%s, %s)", (session["username"], url))
