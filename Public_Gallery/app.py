@@ -55,7 +55,7 @@ def security_firewall_and_session_check():
     if ip in BANNED_IPS: return "Your IP has been permanently blocked for malicious activity. (Error 429)", 429
     request_tracker[ip].append(now)
 
-    if request.endpoint in ['index', 'login', 'request_otp', 'verify_otp', 'logout', 'static', 'api_search_suggest', 'privacy_policy', 'terms', 'about', 'dynamic_manifest'] or (request.path and request.path.startswith('/static/')):
+    if request.endpoint in ['index', 'login', 'request_otp', 'verify_otp', 'logout', 'static', 'api_search_suggest', 'privacy_policy', 'terms', 'about', 'manifest', 'sw'] or (request.path and request.path.startswith('/static/')):
         return
 
     if request.method in ["POST", "PUT", "DELETE"]:
