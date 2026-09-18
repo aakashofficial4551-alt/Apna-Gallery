@@ -2,6 +2,7 @@ import html
 import urllib.parse
 import re
 import random
+import threading
 from collections import defaultdict
 import requests
 import psycopg2.extras
@@ -10,8 +11,24 @@ from database import get_db_connection
 from core_utils import get_ist_time, save_uploaded_file, hijack_bot_post, current_user_is_admin, sync_admin_session, ZERO_TOLERANCE_WORDS
 import os
 
+# 💥 BACKGROUND AI BOT ENGINE (App fast chalegi, bot peeche kaam karenge) 💥
+def trigger_bots_in_background():
+    try:
+        from core_utils import execute_bot_routine
+        thread = threading.Thread(target=execute_bot_routine)
+        thread.start()
+    except Exception as e:
+        print("Bot Engine Error:", e)
+
 def init_main_routes(app):
-    # 💥 STRICT PWA ROUTES FOR PWABUILDER 💥
+
+    # Har baar jab koi app chalayega, bots background me check karenge ki post karna hai ya nahi
+    @app.before_request
+    def auto_bots():
+        if request.endpoint not in ['static', 'sw', 'manifest'] and random.random() < 0.10:
+            trigger_bots_in_background()
+
+    # --- PWA ROUTES ---
     @app.route('/sw.js')
     def sw():
         response = make_response(send_from_directory('static', 'sw.js'))
@@ -25,6 +42,7 @@ def init_main_routes(app):
         response.headers['Content-Type'] = 'application/manifest+json'
         return response
 
+    # --- PAGES ---
     @app.route("/")
     def index(): return render_template("index.html")
 
@@ -37,6 +55,7 @@ def init_main_routes(app):
     @app.route("/privacy")
     def privacy_policy(): return render_template("privacy.html", hide_navbar=True)
 
+    # 💥 UPLOAD ROUTE WITH NUDE/NSFW SCANNER 💥
     @app.route("/upload_asset", methods=["POST"])
     def upload_asset():
         if "username" not in session: return redirect(url_for("login"))
@@ -46,6 +65,7 @@ def init_main_routes(app):
             visibility = request.form.get("visibility", "public")
             file = request.files.get("media")
             
+            # 1. Zero Tolerance Word Ban Filter
             for word in ZERO_TOLERANCE_WORDS:
                 if word in title.lower() or word in category.lower():
                     conn = get_db_connection()
@@ -56,6 +76,13 @@ def init_main_routes(app):
                     session.clear()
                     flash("Zero Tolerance Policy Violated. Account Permanently Banned.", "error")
                     return redirect(url_for("index"))
+            
+            # 2. AI NSFW / Nude Basic Scanner 
+            if file:
+                nsfw_keywords = ['nude', 'sex', 'porn', 'xxx', 'naked', 'dick', 'pussy', 'boobs', 'ass']
+                if any(word in title.lower() or word in file.filename.lower() for word in nsfw_keywords):
+                    flash("⚠️ ALERT: Inappropriate/NSFW Content Blocked by Security AI.", "error")
+                    return redirect(request.referrer or url_for("dashboard"))
                     
             filename = "SHAYARI_TEXT"
             if category != 'Shayari':
@@ -364,32 +391,15 @@ def init_main_routes(app):
         conn.close()
         return render_template("reels.html", videos=videos)
 
-    # 💥 AUTO-PILOT AI BOTS (Background Trigger) 💥
-    @app.before_request
-    def wake_up_bots():
-        # Har request par 5% chance hai ki ek bot active hokar upload karega
-        if request.endpoint not in ['static', 'sw', 'manifest'] and random.random() < 0.05:
-            try:
-                # Triggering bot logic silently
-                from core_utils import execute_bot_routine
-                execute_bot_routine()
-            except:
-                pass
-
     @app.route("/explore")
     def explore():
         if "username" not in session: return redirect(url_for("login"))
         conn = get_db_connection()
         c = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-        
-        # Spotlight user
         c.execute("SELECT username, profile_pic, bio, is_verified FROM users WHERE role = 'user' AND is_verified = TRUE AND username NOT LIKE 'Guest-%%' ORDER BY wallet_balance DESC LIMIT 1")
         spotlight = c.fetchone()
-        
-        # 💥 FIXED: Post ID linked properly for anchor scrolling
         c.execute("SELECT m.id, m.filename, m.title, m.category, m.likes, m.views, m.uploaded_by FROM media m WHERE m.approved = 1 AND m.visibility = 'public' AND m.filename != 'SHAYARI_TEXT' AND m.uploaded_by NOT IN (SELECT blocked FROM blocks WHERE blocker = %s) ORDER BY RANDOM() LIMIT 42", (session["username"],))
         explore_posts = [dict(row) for row in c.fetchall()]
-        
         conn.close()
         return render_template("explore.html", posts=explore_posts, spotlight=spotlight)
 
