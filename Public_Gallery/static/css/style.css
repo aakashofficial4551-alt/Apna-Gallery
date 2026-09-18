@@ -2,64 +2,76 @@
    PHANTX - ELITE PITCH BLACK & CYAN PREMIUM UI
    ========================================================= */
 :root {
-    --bg-base: #050505; /* True Black for OLED screens */
+    --bg-base: #050505; /* True OLED Black */
     --bg-gradient: linear-gradient(135deg, #000000 0%, #0d1117 100%);
     --surface: #111418;
     --surface-glass: rgba(17, 20, 24, 0.85);
     
     --text-primary: #F8FAFC; 
     --text-secondary: #94A3B8;
+    --text-tertiary: #64748B;
     
     --accent-primary: #00E5FF; /* Premium Neon Cyan */
     --accent-hover: #00B8D4;
-    --accent-gold: #FFD700; /* For Premium Feel */
+    --accent-gold: #FFD700; 
     
     --border-color: #22272e;
     --danger: #FF3366;
+    --success: #00E676;
     
+    --radius-sm: 8px;
     --radius-md: 16px;
     --radius-lg: 24px;
+    --radius-full: 9999px;
     --transition-fast: 0.15s ease-in-out;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-    font-family: 'Montserrat', sans-serif;
+    font-family: 'Montserrat', -apple-system, sans-serif;
     background: var(--bg-base);
     color: var(--text-primary);
     min-height: 100vh;
-    padding-bottom: 85px; /* CRITICAL FIX: Pushes content above bottom nav */
+    line-height: 1.6;
+    overflow-x: hidden;
+    padding-bottom: 85px; /* Pushes content above bottom nav */
     -webkit-tap-highlight-color: transparent;
 }
 
-/* 💥 SEARCH BAR FIX (Brings it to front) 💥 */
-.search-container { position: relative; z-index: 100; margin-bottom: 20px; }
-.search-input { 
-    width: 100%; padding: 15px; border-radius: 30px; 
-    background: var(--surface); border: 1px solid var(--border-color); 
-    color: white; font-size: 1rem; z-index: 100; position: relative;
-}
-.search-input:focus { border-color: var(--accent-primary); outline: none; }
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-thumb { background: var(--accent-primary); border-radius: 10px; }
+a { text-decoration: none; color: inherit; }
 
-/* 💥 CHAT BOX OVERLAP FIX 💥 */
-.chat-input-area {
-    position: fixed; bottom: 70px; left: 0; width: 100%;
-    background: var(--bg-base); padding: 10px; z-index: 999;
-    border-top: 1px solid var(--border-color);
+/* 💥 HIDE FREE APP BUILDER WATERMARKS 💥 */
+a[href*="webintoapp"], div[style*="z-index: 9999999"], div[style*="z-index:9999999"] {
+    display: none !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
 }
-.chat-message-container { padding-bottom: 140px; } /* Chat dikhne ke liye space */
 
-/* DESKTOP & MOBILE HEADER */
+/* ==========================================
+   DESKTOP NAVBAR
+   ========================================== */
 .glass-header {
     position: sticky; top: 0; z-index: 1000;
-    background: var(--surface-glass); backdrop-filter: blur(12px);
-    border-bottom: 1px solid var(--border-color); padding: 12px 5%;
+    background: var(--surface-glass);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border-color);
+    padding: 12px 5%;
+    display: flex; justify-content: space-between; align-items: center;
 }
+.nav-links { display: flex; gap: 15px; align-items: center; }
+.nav-link { font-weight: 700; color: var(--text-secondary); transition: var(--transition-fast); }
+.nav-link:hover { color: var(--accent-primary); }
 
-/* 💥 BOTTOM NAVIGATION 💥 */
+/* ==========================================
+   💥 MOBILE BOTTOM NAVIGATION & TOP ICONS 💥
+   ========================================== */
+.mobile-top-icons { display: none; }
 .mobile-bottom-nav {
-    display: none; position: fixed; bottom: 0; left: 0; width: 100%;
+    display: none;
+    position: fixed; bottom: 0; left: 0; width: 100%;
     background: var(--surface-glass); backdrop-filter: blur(15px);
     border-top: 1px solid var(--border-color); z-index: 9999;
     padding: 10px 20px; padding-bottom: env(safe-area-inset-bottom, 10px);
@@ -77,12 +89,53 @@ body {
 }
 
 @media (max-width: 768px) {
-    .glass-header .nav-links { display: none; }
+    .glass-header .nav-links { display: none !important; }
+    .mobile-top-icons { display: flex !important; }
     .mobile-bottom-nav { display: block; }
 }
 
-/* EXPLORE GRID & UI */
+/* ==========================================
+   SEARCH BAR & CHAT FIXES
+   ========================================== */
+.search-container { position: relative; z-index: 10000; margin-bottom: 20px; pointer-events: auto; }
+.search-input { 
+    width: 100%; padding: 15px; border-radius: 30px; 
+    background: var(--surface); border: 1px solid var(--border-color); 
+    color: white; font-size: 1rem; outline: none;
+}
+.search-input:focus { border-color: var(--accent-primary); box-shadow: 0 0 10px rgba(0,229,255,0.2); }
+
+.chat-input-area {
+    position: fixed; bottom: 70px; left: 0; width: 100%;
+    background: var(--bg-base); padding: 15px; z-index: 9999;
+    border-top: 1px solid var(--border-color);
+}
+
+/* ==========================================
+   PROFILE & EXPLORE GRID
+   ========================================== */
+.profile-cover-container {
+    position: relative; width: 100%; height: 120px;
+    background: var(--border-color); margin-bottom: 45px;
+}
+.profile-cover-img { width: 100%; height: 100%; object-fit: cover; opacity: 0.8; }
+.profile-dp-wrapper {
+    position: absolute; bottom: -40px; left: 20px;
+    width: 85px; height: 85px; border-radius: 50%;
+    border: 4px solid var(--bg-base); background: var(--surface);
+    overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.5); z-index: 10;
+}
+.profile-dp-img { width: 100%; height: 100%; object-fit: cover; }
+.profile-info-compact { padding: 0 20px; }
+.profile-nickname { font-size: 1.4rem; font-weight: 800; color: var(--text-primary); margin: 0; line-height: 1.2; }
+.profile-username { font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 5px; }
+
 .explore-grid-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; }
 .explore-grid-item { aspect-ratio: 1 / 1; overflow: hidden; background: var(--border-color); cursor: pointer; }
 .explore-grid-item img, .explore-grid-item video { width: 100%; height: 100%; object-fit: cover; }
-.btn { background: var(--accent-primary); color: #000; border: none; padding: 12px 20px; font-weight: 800; border-radius: 30px; cursor: pointer; }
+
+/* UTILITY */
+.container { width: 100%; max-width: 1200px; margin: 0 auto; padding: 15px 5%; }
+.btn { background: var(--accent-primary); color: #000; border: none; padding: 10px 20px; font-weight: 800; border-radius: 30px; cursor: pointer; transition: 0.2s; }
+.btn:hover { transform: scale(1.05); }
+.form-input { width: 100%; padding: 12px; background: var(--surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); color: white; }
